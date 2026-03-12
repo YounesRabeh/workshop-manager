@@ -22,6 +22,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'go-to-mods'): void
   (e: 'pick-content-folder'): void
+  (e: 'pick-workspace-root'): void
+  (e: 'clear-workspace'): void
   (e: 'pick-preview-file'): void
   (e: 'change-tag-input', value: string): void
   (e: 'add-tag'): void
@@ -31,7 +33,6 @@ const emit = defineEmits<{
   (e: 'change-visibility-selection', value: 0 | 1 | 2 | 3): void
   (e: 'update-visibility-only'): void
   (e: 'pick-upload-files'): void
-  (e: 'use-staged-folder-as-content'): void
   (e: 'clear-upload-files'): void
   (e: 'upload-drag-over', event: DragEvent): void
   (e: 'upload-drag-leave', event: DragEvent): void
@@ -134,9 +135,39 @@ const sectionDescription = computed(() =>
     ? 'Review and publish changes to this item.'
     : 'Create a new Workshop item. A Published File ID will be assigned by Steam after upload.'
 )
+const workspaceRootValue = computed(() => props.draft.contentFolder.trim())
+const hasWorkspaceRoot = computed(() => workspaceRootValue.value.length > 0)
 const primaryActionLabel = computed(() => (isUpdateMode.value ? 'Update Existing Item' : 'Create New Item'))
 const primaryActionDisabled = computed(() => (isUpdateMode.value ? !props.canUpdate : !props.canUpload))
 const publishedFileIdValue = computed(() => props.selectedWorkshopItem?.publishedFileId || props.draft.publishedFileId || 'Not selected')
+const appIdValue = computed(() => props.selectedWorkshopItem?.appId || props.draft.appId || 'Not selected')
+
+function readinessItemClass(item: PublishChecklistItem): string {
+  if (item.ok) {
+    return 'border-emerald-400/45 bg-emerald-500/18'
+  }
+  if (item.optional) {
+    return 'border-slate-600/70 bg-slate-900/35'
+  }
+  return 'border-slate-600/80 bg-slate-900/45'
+}
+
+function readinessStatusClass(item: PublishChecklistItem): string {
+  if (item.ok) {
+    return 'text-emerald-200'
+  }
+  if (item.optional) {
+    return 'text-slate-300'
+  }
+  return 'text-slate-400'
+}
+
+function readinessStatusLabel(item: PublishChecklistItem): string {
+  if (item.ok) {
+    return 'Ready'
+  }
+  return item.optional ? 'Optional' : 'Missing'
+}
 
 function submitPrimaryAction(): void {
   if (isUpdateMode.value) {
@@ -149,19 +180,19 @@ function submitPrimaryAction(): void {
 
 <template>
   <section class="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
-    <article class="fade-in app-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-md">
+    <article class="fade-in app-panel rounded-2xl border border-[#305070] bg-[#1b2838] p-5 shadow-[0_16px_40px_rgba(4,10,20,0.45)]">
       <div class="flex items-center justify-between gap-2">
-        <h2 class="text-lg font-semibold text-slate-800">{{ sectionTitle }}</h2>
+        <h2 class="text-lg font-semibold text-slate-100">{{ sectionTitle }}</h2>
         <button
           v-if="isUpdateMode"
-          class="rounded bg-sky-700 px-3 py-1 text-xs font-semibold text-white"
+          class="rounded border border-[#78c2f7] bg-[#59b9f8] px-3 py-1 text-xs font-semibold text-[#05253a]"
           @click="emit('go-to-mods')"
         >
           Choose Another Mod
         </button>
       </div>
 
-      <p class="mt-2 text-sm text-slate-600">{{ sectionDescription }}</p>
+      <p class="mt-2 text-sm text-slate-300">{{ sectionDescription }}</p>
 
       <div
         v-if="isUpdateMode"
@@ -190,7 +221,8 @@ function submitPrimaryAction(): void {
                 Currently editing
               </p>
               <p class="text-2xl font-bold leading-tight text-slate-100">{{ selectedItemDisplay }}</p>
-              <p class="mt-0.5 text-xs text-slate-300">ID: {{ publishedFileIdValue }}</p>
+              <p class="mt-0.5 text-xs text-slate-300">Item ID: {{ publishedFileIdValue }}</p>
+              <p class="text-xs text-slate-300">App ID: {{ appIdValue }}</p>
             </div>
           </div>
 
@@ -234,62 +266,52 @@ function submitPrimaryAction(): void {
         </div>
       </div>
 
-      <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-        <p class="text-sm font-semibold text-slate-800">Publish Readiness</p>
-        <ul class="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-          <li v-for="item in publishChecklist" :key="item.label" class="flex items-center justify-between rounded-lg border px-3 py-2" :class="item.ok ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'">
+      <div class="mt-4 rounded-xl border border-[#2f4f69] bg-[#1a2b3e] p-4">
+        <p class="text-sm font-semibold text-slate-100">Publish Readiness</p>
+        <ul class="mt-3 grid gap-2 text-sm text-slate-200 sm:grid-cols-2">
+          <li
+            v-for="item in publishChecklist"
+            :key="item.label"
+            class="flex items-center justify-between rounded-lg border px-3 py-2"
+            :class="readinessItemClass(item)"
+          >
             <span>{{ item.label }}</span>
-            <span class="text-xs font-semibold" :class="item.ok ? 'text-emerald-700' : 'text-slate-500'">{{ item.ok ? 'Ready' : 'Missing' }}</span>
+            <span class="text-xs font-semibold" :class="readinessStatusClass(item)">{{ readinessStatusLabel(item) }}</span>
           </li>
         </ul>
       </div>
 
-      <div class="mt-4 grid gap-3 md:grid-cols-2">
-        <label class="text-sm text-slate-700">
+      <div v-if="!isUpdateMode" class="mt-4">
+        <label class="text-sm text-slate-300">
           App ID
-          <input v-model="draft.appId" class="mt-1 w-full rounded border border-slate-300 px-2 py-1" />
-        </label>
-        <label v-if="isUpdateMode" class="text-sm text-slate-700">
-          Published File ID
           <input
-            :value="publishedFileIdValue"
-            class="mt-1 w-full rounded border border-slate-300 px-2 py-1 opacity-80"
-            readonly
+            v-model="draft.appId"
+            class="mt-1 w-full rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100"
           />
         </label>
       </div>
 
-      <label class="mt-3 block text-sm text-slate-700">Title</label>
-      <input v-model="draft.title" class="mt-1 w-full rounded border border-slate-300 px-2 py-1" />
-
-      <label class="mt-3 block text-sm text-slate-700">Description</label>
-      <textarea v-model="draft.description" rows="4" class="mt-1 w-full rounded border border-slate-300 px-2 py-1" />
+      <label class="mt-3 block text-sm text-slate-300">Title</label>
+      <input v-model="draft.title" class="mt-1 w-full rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100" />
 
       <div class="mt-3 grid gap-3 md:grid-cols-2">
-        <div>
-          <label class="text-sm text-slate-700">Content Folder (mod root directory)</label>
+        <div class="md:col-span-2">
+          <label class="text-sm text-slate-300">Preview File (optional)</label>
           <div class="mt-1 flex gap-2">
-            <input v-model="draft.contentFolder" class="w-full rounded border border-slate-300 px-2 py-1" />
-            <button class="rounded bg-slate-700 px-3 py-1 text-sm font-semibold text-white" @click="emit('pick-content-folder')">Pick</button>
-          </div>
-        </div>
-        <div>
-          <label class="text-sm text-slate-700">Preview File</label>
-          <div class="mt-1 flex gap-2">
-            <input v-model="draft.previewFile" class="w-full rounded border border-slate-300 px-2 py-1" />
-            <button class="rounded bg-slate-700 px-3 py-1 text-sm font-semibold text-white" @click="emit('pick-preview-file')">Pick</button>
+            <input v-model="draft.previewFile" class="w-full rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100" />
+            <button class="rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 py-1 text-sm font-semibold text-slate-100" @click="emit('pick-preview-file')">Pick</button>
           </div>
         </div>
       </div>
 
       <div class="mt-3">
-        <label class="text-sm text-slate-700">Tags</label>
+        <label class="text-sm text-slate-300">Tags</label>
         <div class="mt-1 flex gap-2">
-          <input :value="tagInput" class="w-full rounded border border-slate-300 px-2 py-1" @input="onTagInput" @keyup.enter="emit('add-tag')" />
-          <button class="rounded bg-cyan-600 px-3 py-1 text-sm font-semibold text-white" @click="emit('add-tag')">Add</button>
+          <input :value="tagInput" class="w-full rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100" @input="onTagInput" @keyup.enter="emit('add-tag')" />
+          <button class="rounded border border-[#6ecbff] bg-[#59b9f8] px-3 py-1 text-sm font-semibold text-[#05253a]" @click="emit('add-tag')">Add</button>
         </div>
         <div class="mt-2 flex flex-wrap gap-2">
-          <button v-for="tag in draft.tags" :key="tag" class="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-800" @click="emit('remove-tag', tag)">
+          <button v-for="tag in draft.tags" :key="tag" class="rounded-full border border-[#386487] bg-[#122638] px-3 py-1 text-xs font-semibold text-sky-200" @click="emit('remove-tag', tag)">
             {{ tag }} x
           </button>
         </div>
@@ -297,8 +319,8 @@ function submitPrimaryAction(): void {
 
       <div class="mt-4">
         <button
-          class="w-full rounded px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
-          :class="isUpdateMode ? 'bg-sky-700' : 'bg-orange-600'"
+          class="w-full rounded border px-3 py-2 text-sm font-semibold text-slate-100 disabled:opacity-40"
+          :class="isUpdateMode ? 'border-[#78c2f7] bg-[#2c7fb2]' : 'border-[#d18642] bg-[#9b5b22]'"
           :disabled="primaryActionDisabled"
           @click="submitPrimaryAction"
         >
@@ -307,35 +329,43 @@ function submitPrimaryAction(): void {
       </div>
     </article>
 
-    <article class="fade-in app-panel h-fit rounded-2xl border border-orange-200 bg-orange-50/70 p-5 shadow-md 2xl:sticky 2xl:top-4">
+    <article class="fade-in app-panel h-fit rounded-2xl border border-[#ad6f2f] bg-[linear-gradient(135deg,rgba(93,56,21,0.7),rgba(40,32,24,0.82))] p-5 shadow-md 2xl:sticky 2xl:top-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-lg font-semibold text-orange-900">Upload Workspace</h2>
+        <h2 class="text-lg font-semibold text-orange-200">Upload Workspace</h2>
         <div class="flex gap-2">
-          <button class="rounded bg-slate-900 px-3 py-2 text-xs font-semibold text-white" @click="emit('pick-upload-files')">Select Multiple Files</button>
-          <button class="rounded bg-orange-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" :disabled="uploadFiles.length === 0" @click="emit('use-staged-folder-as-content')">Use Folder as Content Root</button>
+          <button class="rounded border border-[#6ecbff] bg-[#59b9f8] px-3 py-2 text-xs font-semibold text-[#05253a]" @click="emit('pick-workspace-root')">Select Workspace Root</button>
+          <button class="rounded border border-[#6ecbff] bg-[#59b9f8] px-3 py-2 text-xs font-semibold text-[#05253a] disabled:opacity-40" :disabled="!hasWorkspaceRoot" @click="emit('pick-upload-files')">Add Files</button>
+          <button class="rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 py-2 text-xs font-semibold text-slate-100 disabled:opacity-40" :disabled="!hasWorkspaceRoot && uploadFiles.length === 0" @click="emit('clear-workspace')">Clear Workspace</button>
           <button class="steam-btn-muted rounded px-3 py-2 text-xs font-semibold disabled:opacity-40" :disabled="uploadFiles.length === 0" @click="emit('clear-upload-files')">Clear</button>
         </div>
       </div>
 
-      <div class="mt-3 cursor-pointer rounded-xl border-2 border-dashed p-4 transition" :class="isUploadDropActive ? 'border-orange-500 bg-orange-100' : 'border-orange-300 bg-white/70'" @dragover="emit('upload-drag-over', $event)" @dragleave="emit('upload-drag-leave', $event)" @drop="emit('upload-drop', $event)" @click="emit('pick-upload-files')">
-        <p class="text-sm font-semibold text-orange-900">Drag and drop files to stage upload content</p>
-        <p class="mt-1 text-xs text-orange-700">Click to open native multi-file picker.</p>
+      <div class="mt-3 rounded-lg border border-[#ad6f2f] bg-[#1f3248] px-3 py-2">
+        <p class="text-xs text-orange-100/80">Workspace root:</p>
+        <p class="mt-1 select-text break-all text-sm font-semibold text-orange-100">
+          {{ hasWorkspaceRoot ? workspaceRootValue : 'Not selected' }}
+        </p>
       </div>
 
-      <div class="mt-3 rounded-lg border border-orange-200 bg-white">
-        <div class="flex items-center justify-between border-b border-orange-100 px-3 py-2">
-          <p class="text-sm font-semibold text-slate-800">Staged Files</p>
-          <p class="text-xs text-slate-500">{{ uploadFiles.length }} item(s)</p>
+      <div class="mt-3 cursor-pointer rounded-xl border-2 border-dashed p-4 transition" :class="isUploadDropActive ? 'border-[#ffb86b] bg-[#2c3f56]' : 'border-[#d0883f] bg-[#1f3248]'" @dragover="emit('upload-drag-over', $event)" @dragleave="emit('upload-drag-leave', $event)" @drop="emit('upload-drop', $event)" @click="emit('pick-upload-files')">
+        <p class="text-sm font-semibold text-orange-200">Drag and drop files to add workspace content</p>
+        <p class="mt-1 text-xs text-orange-100/85">Click to open native multi-file picker.</p>
+      </div>
+
+      <div class="mt-3 rounded-lg border border-[#ad6f2f] bg-[#1f3248]">
+        <div class="flex items-center justify-between border-b border-[#ad6f2f] px-3 py-2">
+          <p class="text-sm font-semibold text-slate-100">Workspace Content</p>
+          <p class="text-xs text-slate-300">{{ uploadFiles.length }} item(s)</p>
         </div>
         <div class="max-h-56 overflow-auto px-3 py-2">
-          <p v-if="uploadFiles.length === 0" class="text-xs text-slate-500">No files staged yet.</p>
-          <ul v-else class="space-y-1 text-xs text-slate-700">
-            <li v-for="path in uploadFiles" :key="path" class="flex items-center justify-between gap-2 rounded bg-slate-50 px-2 py-1">
+          <p v-if="uploadFiles.length === 0" class="text-xs text-slate-300">No files staged yet.</p>
+          <ul v-else class="space-y-1 text-xs text-slate-200">
+            <li v-for="path in uploadFiles" :key="path" class="flex items-center justify-between gap-2 rounded border border-[#355874] bg-[#122638] px-2 py-1">
               <div class="min-w-0">
                 <p class="truncate font-semibold">{{ fileNameFromPath(path) }}</p>
-                <p class="truncate text-slate-500">{{ path }}</p>
+                <p class="truncate text-slate-400">{{ path }}</p>
               </div>
-              <button class="h-6 w-6 shrink-0 rounded-full bg-rose-100 text-xs font-bold text-rose-700" title="Remove file" @click.stop="emit('remove-staged-file', path)">x</button>
+              <button class="h-6 w-6 shrink-0 rounded-full border border-rose-300/40 bg-rose-900/40 text-xs font-bold text-rose-200" title="Remove file" @click.stop="emit('remove-staged-file', path)">x</button>
             </li>
           </ul>
         </div>

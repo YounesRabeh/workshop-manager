@@ -4,9 +4,7 @@ import { AppError } from './errors'
 const REQUIRED_FIELDS: Array<keyof UploadDraft> = [
   'appId',
   'contentFolder',
-  'previewFile',
-  'title',
-  'description'
+  'title'
 ]
 
 export function validateDraft(draft: UploadDraft, mode: 'upload' | 'update' | 'visibility'): void {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import type { RunEvent, WorkshopItemSummary } from '@shared/contracts'
+import type { RunEvent, UploadDraft, WorkshopItemSummary } from '@shared/contracts'
 import AppTopBar from './components/AppTopBar.vue'
 import LoginSection from './components/LoginSection.vue'
 import PublishSection from './components/PublishSection.vue'
@@ -69,7 +69,6 @@ function createEmptyDraft(): UploadDraftState {
     contentFolder: '',
     previewFile: '',
     title: '',
-    description: '',
     tags: []
   }
 }
@@ -81,7 +80,6 @@ function cloneDraft(source: UploadDraftState): UploadDraftState {
     contentFolder: source.contentFolder,
     previewFile: source.previewFile,
     title: source.title,
-    description: source.description,
     tags: [...source.tags]
   }
 }
@@ -92,7 +90,6 @@ function applyDraft(target: UploadDraftState, source: UploadDraftState): void {
   target.contentFolder = source.contentFolder
   target.previewFile = source.previewFile
   target.title = source.title
-  target.description = source.description
   target.tags = [...source.tags]
 }
 
@@ -166,25 +163,18 @@ const loginHeaderStatusMessage = computed(() => (isSteamCmdDetected.value ? 'Ste
 
 const updateChecklist = computed<PublishChecklistItem[]>(() => {
   return [
-    { label: 'Steam login', ok: loginState.value === 'signed_in' },
     { label: 'Workshop item selected', ok: selectedWorkshopItemId.value.trim().length > 0 },
-    { label: 'App ID', ok: updateDraft.appId.trim().length > 0 },
-    { label: 'Content folder', ok: updateDraft.contentFolder.trim().length > 0 },
-    { label: 'Preview image', ok: updateDraft.previewFile.trim().length > 0 },
-    { label: 'Title', ok: updateDraft.title.trim().length > 0 },
-    { label: 'Description', ok: updateDraft.description.trim().length > 0 },
-    { label: 'Published File ID', ok: updateDraft.publishedFileId.trim().length > 0 }
+    { label: 'Workspace root', ok: updateDraft.contentFolder.trim().length > 0 },
+    { label: 'Preview image', ok: updateDraft.previewFile.trim().length > 0, optional: true },
+    { label: 'Title', ok: updateDraft.title.trim().length > 0 }
   ]
 })
 
 const createChecklist = computed<PublishChecklistItem[]>(() => {
   return [
-    { label: 'Steam login', ok: loginState.value === 'signed_in' },
-    { label: 'App ID', ok: createDraft.appId.trim().length > 0 },
-    { label: 'Content folder', ok: createDraft.contentFolder.trim().length > 0 },
-    { label: 'Preview image', ok: createDraft.previewFile.trim().length > 0 },
-    { label: 'Title', ok: createDraft.title.trim().length > 0 },
-    { label: 'Description', ok: createDraft.description.trim().length > 0 }
+    { label: 'Workspace root', ok: createDraft.contentFolder.trim().length > 0 },
+    { label: 'Preview image', ok: createDraft.previewFile.trim().length > 0, optional: true },
+    { label: 'Title', ok: createDraft.title.trim().length > 0 }
   ]
 })
 
@@ -348,11 +338,56 @@ function dedupePaths(paths: string[]): string[] {
   return [...new Set(paths.filter((path) => path.trim().length > 0))]
 }
 
-function stageUploadFiles(paths: string[]): void {
-  uploadFiles.value = dedupePaths(paths)
-  if (uploadFiles.value.length > 0) {
-    statusMessage.value = `Staged ${uploadFiles.value.length} file(s) for upload verification.`
+function normalizeFsPath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+}
+
+function isPathInWorkspace(filePath: string, workspaceRoot: string): boolean {
+  const normalizedFile = normalizeFsPath(filePath)
+  const normalizedRoot = normalizeFsPath(workspaceRoot)
+  if (!normalizedRoot) {
+    return false
   }
+  return normalizedFile === normalizedRoot || normalizedFile.startsWith(`${normalizedRoot}/`)
+}
+
+function filterPathsByWorkspace(paths: string[], workspaceRoot: string): { inside: string[]; outside: string[] } {
+  const inside: string[] = []
+  const outside: string[] = []
+
+  for (const path of paths) {
+    if (isPathInWorkspace(path, workspaceRoot)) {
+      inside.push(path)
+    } else {
+      outside.push(path)
+    }
+  }
+
+  return { inside, outside }
+}
+
+function stageUploadFiles(paths: string[]): void {
+  const workspaceRoot = activeDraft.value.contentFolder.trim()
+  if (workspaceRoot.length === 0) {
+    statusMessage.value = 'Select workspace root first.'
+    return
+  }
+
+  const dedupedPaths = dedupePaths(paths)
+  const { inside, outside } = filterPathsByWorkspace(dedupedPaths, workspaceRoot)
+
+  uploadFiles.value = inside
+  if (inside.length === 0) {
+    statusMessage.value = 'No files were added. Pick files inside the selected workspace root.'
+    return
+  }
+
+  if (outside.length > 0) {
+    statusMessage.value = `Added ${inside.length} file(s) from workspace. Skipped ${outside.length} outside workspace root.`
+    return
+  }
+
+  statusMessage.value = `Added ${inside.length} workspace file(s).`
 }
 
 function removeStagedFile(path: string): void {
@@ -361,6 +396,11 @@ function removeStagedFile(path: string): void {
 }
 
 async function pickUploadFiles(): Promise<void> {
+  if (activeDraft.value.contentFolder.trim().length === 0) {
+    statusMessage.value = 'Select workspace root first.'
+    return
+  }
+
   const paths = await window.workshop.pickFiles()
   if (!paths || paths.length === 0) {
     return
@@ -372,28 +412,17 @@ function clearUploadFiles(): void {
   uploadFiles.value = []
 }
 
-function getParentFolder(path: string): string {
-  return path.replace(/[\\/][^\\/]+$/, '')
-}
-
-function useStagedFolderAsContent(): void {
-  if (uploadFiles.value.length === 0) {
-    statusMessage.value = 'Stage at least one file first.'
-    return
-  }
-
-  const folders = dedupePaths(uploadFiles.value.map(getParentFolder).filter((folder) => folder.trim().length > 0))
-  if (folders.length !== 1) {
-    statusMessage.value = 'Staged files must come from one folder to auto-fill content folder.'
-    return
-  }
-
-  activeDraft.value.contentFolder = folders[0]
-  statusMessage.value = `Content folder set from staged files: ${folders[0]}`
+function clearWorkspace(): void {
+  activeDraft.value.contentFolder = ''
+  uploadFiles.value = []
+  statusMessage.value = 'Workspace cleared.'
 }
 
 function onUploadDragOver(event: DragEvent): void {
   event.preventDefault()
+  if (activeDraft.value.contentFolder.trim().length === 0) {
+    return
+  }
   isUploadDropActive.value = true
 }
 
@@ -405,6 +434,11 @@ function onUploadDragLeave(event: DragEvent): void {
 function onUploadDrop(event: DragEvent): void {
   event.preventDefault()
   isUploadDropActive.value = false
+
+  if (activeDraft.value.contentFolder.trim().length === 0) {
+    statusMessage.value = 'Select workspace root first.'
+    return
+  }
 
   const files = event.dataTransfer?.files
   if (!files || files.length === 0) {
@@ -420,8 +454,7 @@ function onUploadDrop(event: DragEvent): void {
     return
   }
 
-  uploadFiles.value = dedupePaths(Array.from(files).map((file) => file.name))
-  statusMessage.value = `Staged ${uploadFiles.value.length} dropped file name(s).`
+  statusMessage.value = 'Dropped files did not include local paths. Use Add Files instead.'
 }
 
 function addTag(): void {
@@ -604,23 +637,13 @@ function buildUploadDraft(
   source: UploadDraftState,
   mode: 'update' | 'create',
   visibility?: 0 | 1 | 2 | 3
-): {
-  appId: string
-  publishedFileId?: string
-  contentFolder: string
-  previewFile: string
-  title: string
-  description: string
-  tags: string[]
-  visibility?: 0 | 1 | 2 | 3
-} {
+): UploadDraft {
   return {
     appId: source.appId,
     publishedFileId: mode === 'update' ? source.publishedFileId || undefined : undefined,
     contentFolder: source.contentFolder,
     previewFile: source.previewFile,
     title: source.title,
-    description: source.description,
     tags: [...source.tags],
     visibility
   }
@@ -913,6 +936,8 @@ async function pickContentFolder(): Promise<void> {
   const path = await window.workshop.pickFolder()
   if (path) {
     activeDraft.value.contentFolder = path
+    uploadFiles.value = uploadFiles.value.filter((filePath) => isPathInWorkspace(filePath, path))
+    statusMessage.value = `Workspace root selected: ${path}`
   }
 }
 
@@ -928,9 +953,7 @@ function canCreate(): boolean {
     loginState.value === 'signed_in' &&
     createDraft.appId.trim().length > 0 &&
     createDraft.contentFolder.trim().length > 0 &&
-    createDraft.previewFile.trim().length > 0 &&
-    createDraft.title.trim().length > 0 &&
-    createDraft.description.trim().length > 0
+    createDraft.title.trim().length > 0
   )
 }
 
@@ -940,9 +963,7 @@ function canUpdate(): boolean {
     selectedWorkshopItemId.value.trim().length > 0 &&
     updateDraft.appId.trim().length > 0 &&
     updateDraft.contentFolder.trim().length > 0 &&
-    updateDraft.previewFile.trim().length > 0 &&
     updateDraft.title.trim().length > 0 &&
-    updateDraft.description.trim().length > 0 &&
     updateDraft.publishedFileId.trim().length > 0
   )
 }
@@ -1226,6 +1247,8 @@ onUnmounted(() => {
           :can-update="canUpdate()"
           @go-to-mods="goToStep('mods')"
           @pick-content-folder="pickContentFolder"
+          @pick-workspace-root="pickContentFolder"
+          @clear-workspace="clearWorkspace"
           @pick-preview-file="pickPreviewFile"
           @change-tag-input="onChangeTagInput"
           @add-tag="addTag"
@@ -1235,7 +1258,6 @@ onUnmounted(() => {
           @upload="upload"
           @update-item="updateItem"
           @pick-upload-files="pickUploadFiles"
-          @use-staged-folder-as-content="useStagedFolderAsContent"
           @clear-upload-files="clearUploadFiles"
           @upload-drag-over="onUploadDragOver"
           @upload-drag-leave="onUploadDragLeave"

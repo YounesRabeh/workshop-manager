@@ -37,4 +37,22 @@ describe('generateWorkshopVdf', () => {
       )
     ).toThrowError(/publishedfileid/i)
   })
+
+  it('omits optional preview and description fields when empty', () => {
+    const output = generateWorkshopVdf(
+      {
+        appId: '480',
+        contentFolder: '/mods/base',
+        previewFile: '',
+        title: 'No Optional Fields',
+        description: '',
+        tags: []
+      },
+      'upload'
+    )
+
+    expect(output).toContain('"title"\t"No Optional Fields"')
+    expect(output).not.toContain('"previewfile"')
+    expect(output).not.toContain('"description"')
+  })
 })

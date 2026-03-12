@@ -48,13 +48,13 @@ export interface UploadDraftState {
   contentFolder: string
   previewFile: string
   title: string
-  description: string
   tags: string[]
 }
 
 export interface PublishChecklistItem {
   label: string
   ok: boolean
+  optional?: boolean
 }
 
 export type WorkshopVisibilityFilter = 'all' | 'public' | 'friends' | 'hidden' | 'unlisted' | 'unknown'

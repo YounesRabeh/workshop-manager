@@ -11,9 +11,9 @@ export interface ModProfile {
   appId: string
   publishedFileId?: string
   contentFolder: string
-  previewFile: string
+  previewFile?: string
   title: string
-  description: string
+  description?: string
   tags: string[]
 }
 
@@ -21,9 +21,9 @@ export interface UploadDraft {
   appId: string
   publishedFileId?: string
   contentFolder: string
-  previewFile: string
+  previewFile?: string
   title: string
-  description: string
+  description?: string
   tags: string[]
   visibility?: 0 | 1 | 2 | 3
   validationErrors?: string[]

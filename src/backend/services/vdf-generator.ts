@@ -37,9 +37,9 @@ export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update
   }
 
   const contentFolder = assertString('contentfolder', draft.contentFolder)
-  const previewFile = assertString('previewfile', draft.previewFile)
+  const previewFile = draft.previewFile?.trim()
   const title = assertString('title', draft.title)
-  const description = assertString('description', draft.description)
+  const description = draft.description?.trim()
 
   const tagsBlock = draft.tags
     .map((tag) => tag.trim())
@@ -67,9 +67,9 @@ export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update
   const lines = [
     ...headerLines,
     `\t\"contentfolder\"\t\"${escapeVdf(contentFolder)}\"`,
-    `\t\"previewfile\"\t\"${escapeVdf(previewFile)}\"`,
+    ...(previewFile ? [`\t\"previewfile\"\t\"${escapeVdf(previewFile)}\"`] : []),
     `\t\"title\"\t\"${escapeVdf(title)}\"`,
-    `\t\"description\"\t\"${escapeVdf(description)}\"`,
+    ...(description ? [`\t\"description\"\t\"${escapeVdf(description)}\"`] : []),
     '\t"tags"',
     '\t{',
     tagsBlock,
