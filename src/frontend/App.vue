@@ -5,6 +5,7 @@ import AppTopBar from './components/AppTopBar.vue'
 import LoginSection from './components/LoginSection.vue'
 import PublishSection from './components/PublishSection.vue'
 import WorkshopItemsSection from './components/WorkshopItemsSection.vue'
+import { createAppGlobalKeyDownHandler, createAppGlobalMouseDownHandler } from './events/keyboard-events'
 import './styles/themes/app.theme.css'
 import type {
   AdvancedSettingsState,
@@ -517,6 +518,33 @@ function closeAboutModal(): void {
   isAboutOpen.value = false
 }
 
+function canGoBackFlow(): boolean {
+  return isAuthenticated.value && flowStep.value !== 'mods'
+}
+
+function goBackFlow(): void {
+  if (canGoBackFlow()) {
+    goToStep('mods')
+  }
+}
+
+const onGlobalKeyDown = createAppGlobalKeyDownHandler({
+  isAboutOpen: () => isAboutOpen.value,
+  toggleFullscreen: () => {
+    void toggleFullscreen()
+  },
+  closeAbout: closeAboutModal,
+  goToStep,
+  canGoBack: canGoBackFlow,
+  goBack: goBackFlow,
+  isAuthenticated: () => isAuthenticated.value
+})
+
+const onGlobalMouseDown = createAppGlobalMouseDownHandler({
+  canGoBack: canGoBackFlow,
+  goBack: goBackFlow
+})
+
 function toastToneClass(tone: UiToast['tone']): string {
   if (tone === 'success') {
     return 'border-emerald-400/60 bg-emerald-900/85 text-emerald-100'
@@ -1012,6 +1040,9 @@ watch(
 onMounted(async () => {
   syncFullscreenState()
   document.addEventListener('fullscreenchange', syncFullscreenState)
+  document.addEventListener('keydown', onGlobalKeyDown)
+  document.addEventListener('mousedown', onGlobalMouseDown)
+  document.addEventListener('auxclick', onGlobalMouseDown)
 
   if (!(window as Window & { workshop?: unknown }).workshop) {
     statusMessage.value = 'Bridge error (bridge_unavailable): preload API not found. Restart the app/dev server.'
@@ -1105,6 +1136,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState)
+  document.removeEventListener('keydown', onGlobalKeyDown)
+  document.removeEventListener('mousedown', onGlobalMouseDown)
+  document.removeEventListener('auxclick', onGlobalMouseDown)
   if (toastTimer) {
     clearTimeout(toastTimer)
     toastTimer = null

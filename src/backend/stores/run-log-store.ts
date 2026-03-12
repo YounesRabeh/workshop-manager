@@ -1,4 +1,4 @@
-import { appendFile, mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { RunResult } from '@shared/contracts'
 
@@ -54,21 +54,18 @@ export class RunLogStore {
   }
 
   async appendLine(runId: string, line: string): Promise<void> {
-    await this.withWriteLock(async () => {
-      const current = this.runs.get(runId) ?? {
-        runId,
-        success: false,
-        steamOutputSummary: '',
-        logPath: this.getSessionLogPath(),
-        lines: [],
-        status: 'running' as const
-      }
+    const current = this.runs.get(runId) ?? {
+      runId,
+      success: false,
+      steamOutputSummary: '',
+      logPath: this.getSessionLogPath(),
+      lines: [],
+      status: 'running' as const
+    }
 
-      current.lines.push(line)
-      current.steamOutputSummary = current.lines.slice(-25).join('\n')
-      this.runs.set(runId, cloneLog(current))
-      await appendFile(this.getSessionLogPath(), `${line}\n`, 'utf8')
-    })
+    current.lines.push(line)
+    current.steamOutputSummary = current.lines.slice(-25).join('\n')
+    this.runs.set(runId, cloneLog(current))
   }
 
   async finalize(runId: string, update: Partial<PersistedRunLog>): Promise<PersistedRunLog> {
@@ -90,6 +87,8 @@ export class RunLogStore {
         logPath: this.getSessionLogPath()
       }
       this.runs.set(runId, cloneLog(merged))
+      const output = merged.lines.length > 0 ? `${merged.lines.join('\n')}\n` : ''
+      await writeFile(this.getSessionLogPath(), output, 'utf8')
     })
     return cloneLog(merged)
   }
