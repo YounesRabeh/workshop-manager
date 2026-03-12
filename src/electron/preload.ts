@@ -1,0 +1,67 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import type {
+  AdvancedSettings,
+  LoginInput,
+  ModProfile,
+  RunEvent,
+  SaveAdvancedSettingsInput,
+  SteamProfileSummary,
+  UploadDraft,
+  VisibilityUpdateInput,
+  WorkshopItemSummary
+} from '@shared/contracts'
+import { IPC_CHANNELS } from '@shared/ipc'
+
+export interface WorkshopApi {
+  ensureSteamCmdInstalled: () => Promise<unknown>
+  login: (input: LoginInput) => Promise<{ sessionId: string; rememberedUsername?: string }>
+  logout: () => Promise<{ ok: true }>
+  submitSteamGuardCode: (payload: { sessionId: string; code: string }) => Promise<{ ok: true }>
+  uploadMod: (payload: { profileId: string; draft: UploadDraft }) => Promise<unknown>
+  updateMod: (payload: { profileId: string; draft: UploadDraft }) => Promise<unknown>
+  updateVisibility: (payload: VisibilityUpdateInput) => Promise<unknown>
+  getProfiles: () => Promise<{ profiles: ModProfile[]; rememberedUsername?: string; rememberAuth?: boolean }>
+  getAdvancedSettings: () => Promise<AdvancedSettings>
+  saveAdvancedSettings: (payload: SaveAdvancedSettingsInput) => Promise<AdvancedSettings>
+  saveProfile: (payload: { profile: ModProfile }) => Promise<ModProfile>
+  deleteProfile: (payload: { profileId: string }) => Promise<{ ok: true }>
+  getRunLogs: () => Promise<unknown>
+  getRunLog: (runId: string) => Promise<unknown>
+  getCurrentProfile: () => Promise<SteamProfileSummary>
+  getMyWorkshopItems: (payload: { appId?: string }) => Promise<WorkshopItemSummary[]>
+  pickFolder: () => Promise<string | undefined>
+  pickFile: () => Promise<string | undefined>
+  pickFiles: () => Promise<string[]>
+  onRunEvent: (callback: (event: RunEvent) => void) => () => void
+}
+
+const api: WorkshopApi = {
+  ensureSteamCmdInstalled: () => ipcRenderer.invoke(IPC_CHANNELS.ensureSteamCmdInstalled),
+  login: (input) => ipcRenderer.invoke(IPC_CHANNELS.login, input),
+  logout: () => ipcRenderer.invoke(IPC_CHANNELS.logout),
+  submitSteamGuardCode: (payload) => ipcRenderer.invoke(IPC_CHANNELS.submitSteamGuardCode, payload),
+  uploadMod: (payload) => ipcRenderer.invoke(IPC_CHANNELS.uploadMod, payload),
+  updateMod: (payload) => ipcRenderer.invoke(IPC_CHANNELS.updateMod, payload),
+  updateVisibility: (payload) => ipcRenderer.invoke(IPC_CHANNELS.updateVisibility, payload),
+  getProfiles: () => ipcRenderer.invoke(IPC_CHANNELS.getProfiles),
+  getAdvancedSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getAdvancedSettings),
+  saveAdvancedSettings: (payload) => ipcRenderer.invoke(IPC_CHANNELS.saveAdvancedSettings, payload),
+  saveProfile: (payload) => ipcRenderer.invoke(IPC_CHANNELS.saveProfile, payload),
+  deleteProfile: (payload) => ipcRenderer.invoke(IPC_CHANNELS.deleteProfile, payload),
+  getRunLogs: () => ipcRenderer.invoke(IPC_CHANNELS.getRunLogs),
+  getRunLog: (runId) => ipcRenderer.invoke(IPC_CHANNELS.getRunLog, { runId }),
+  getCurrentProfile: () => ipcRenderer.invoke(IPC_CHANNELS.getCurrentProfile),
+  getMyWorkshopItems: (payload) => ipcRenderer.invoke(IPC_CHANNELS.getMyWorkshopItems, payload),
+  pickFolder: () => ipcRenderer.invoke(IPC_CHANNELS.pickFolder),
+  pickFile: () => ipcRenderer.invoke(IPC_CHANNELS.pickFile),
+  pickFiles: () => ipcRenderer.invoke(IPC_CHANNELS.pickFiles),
+  onRunEvent: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: RunEvent) => {
+      callback(payload)
+    }
+    ipcRenderer.on(IPC_CHANNELS.runEvent, listener)
+    return () => ipcRenderer.off(IPC_CHANNELS.runEvent, listener)
+  }
+}
+
+contextBridge.exposeInMainWorld('workshop', api)

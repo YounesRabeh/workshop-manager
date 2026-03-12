@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": [
+    "electron.vite.config.ts",
+    "src/electron/**/*.ts",
+    "src/backend/**/*.ts",
+    "src/frontend/**/*.d.ts",
+    "src/shared/**/*.ts",
+    "test/**/*.ts"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "types": ["node", "vitest"]
+  }
+}
