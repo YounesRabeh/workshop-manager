@@ -55,4 +55,21 @@ describe('generateWorkshopVdf', () => {
     expect(output).not.toContain('"previewfile"')
     expect(output).not.toContain('"description"')
   })
+
+  it('includes changenote for update mode when provided', () => {
+    const output = generateWorkshopVdf(
+      {
+        appId: '480',
+        publishedFileId: '12345',
+        contentFolder: '/mods/base',
+        title: 'Update Target',
+        changenote: 'Balance tweaks and crash fixes',
+        tags: []
+      },
+      'update'
+    )
+
+    expect(output).toContain('"publishedfileid"\t"12345"')
+    expect(output).toContain('"changenote"\t"Balance tweaks and crash fixes"')
+  })
 })

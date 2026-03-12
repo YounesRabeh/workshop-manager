@@ -69,6 +69,7 @@ function createEmptyDraft(): UploadDraftState {
     contentFolder: '',
     previewFile: '',
     title: '',
+    releaseNotes: '',
     tags: []
   }
 }
@@ -80,6 +81,7 @@ function cloneDraft(source: UploadDraftState): UploadDraftState {
     contentFolder: source.contentFolder,
     previewFile: source.previewFile,
     title: source.title,
+    releaseNotes: source.releaseNotes,
     tags: [...source.tags]
   }
 }
@@ -90,6 +92,7 @@ function applyDraft(target: UploadDraftState, source: UploadDraftState): void {
   target.contentFolder = source.contentFolder
   target.previewFile = source.previewFile
   target.title = source.title
+  target.releaseNotes = source.releaseNotes
   target.tags = [...source.tags]
 }
 
@@ -163,18 +166,19 @@ const loginHeaderStatusMessage = computed(() => (isSteamCmdDetected.value ? 'Ste
 
 const updateChecklist = computed<PublishChecklistItem[]>(() => {
   return [
-    { label: 'Workshop item selected', ok: selectedWorkshopItemId.value.trim().length > 0 },
+    { label: 'Title', ok: updateDraft.title.trim().length > 0 },
     { label: 'Workspace root', ok: updateDraft.contentFolder.trim().length > 0 },
     { label: 'Preview image', ok: updateDraft.previewFile.trim().length > 0, optional: true },
-    { label: 'Title', ok: updateDraft.title.trim().length > 0 }
+    { label: 'Release notes', ok: updateDraft.releaseNotes.trim().length > 0, optional: true }
   ]
 })
 
 const createChecklist = computed<PublishChecklistItem[]>(() => {
   return [
+    { label: 'Title', ok: createDraft.title.trim().length > 0 },
     { label: 'Workspace root', ok: createDraft.contentFolder.trim().length > 0 },
     { label: 'Preview image', ok: createDraft.previewFile.trim().length > 0, optional: true },
-    { label: 'Title', ok: createDraft.title.trim().length > 0 }
+    { label: 'Release notes', ok: createDraft.releaseNotes.trim().length > 0, optional: true }
   ]
 })
 
@@ -644,6 +648,7 @@ function buildUploadDraft(
     contentFolder: source.contentFolder,
     previewFile: source.previewFile,
     title: source.title,
+    changenote: source.releaseNotes.trim().length > 0 ? source.releaseNotes.trim() : undefined,
     tags: [...source.tags],
     visibility
   }

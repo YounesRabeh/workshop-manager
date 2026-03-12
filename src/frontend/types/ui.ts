@@ -48,6 +48,7 @@ export interface UploadDraftState {
   contentFolder: string
   previewFile: string
   title: string
+  releaseNotes: string
   tags: string[]
 }
 

@@ -228,10 +228,6 @@ watch(
         <p class="mt-1 text-[11px] text-slate-500">
           Uses SteamCMD cached login session. Password is never stored by this app.
         </p>
-        <p v-if="loginForm.rememberAuth && loginForm.password.trim().length === 0" class="mt-1 text-[11px] text-slate-500">
-          Password is empty. You can sign in with saved session, or type password for full login.
-        </p>
-
         <button
           type="button"
           class="login-peek mt-3 w-full rounded border border-slate-300 px-3 py-2 text-xs font-semibold"

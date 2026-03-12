@@ -149,7 +149,7 @@ function readinessItemClass(item: PublishChecklistItem): string {
   if (item.optional) {
     return 'border-slate-600/70 bg-slate-900/35'
   }
-  return 'border-slate-600/80 bg-slate-900/45'
+  return 'border-rose-400/45 bg-rose-500/18'
 }
 
 function readinessStatusClass(item: PublishChecklistItem): string {
@@ -159,7 +159,7 @@ function readinessStatusClass(item: PublishChecklistItem): string {
   if (item.optional) {
     return 'text-slate-300'
   }
-  return 'text-slate-400'
+  return 'text-rose-200'
 }
 
 function readinessStatusLabel(item: PublishChecklistItem): string {
@@ -179,7 +179,7 @@ function submitPrimaryAction(): void {
 </script>
 
 <template>
-  <section class="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
+  <section class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(430px,36vw)] 2xl:grid-cols-[minmax(0,1fr)_minmax(520px,34vw)]">
     <article class="fade-in app-panel rounded-2xl border border-[#305070] bg-[#1b2838] p-5 shadow-[0_16px_40px_rgba(4,10,20,0.45)]">
       <div class="flex items-center justify-between gap-2">
         <h2 class="text-lg font-semibold text-slate-100">{{ sectionTitle }}</h2>
@@ -294,6 +294,13 @@ function submitPrimaryAction(): void {
       <label class="mt-3 block text-sm text-slate-300">Title</label>
       <input v-model="draft.title" class="mt-1 w-full rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100" />
 
+      <label class="mt-3 block text-sm text-slate-300">Release Notes (optional)</label>
+      <textarea
+        v-model="draft.releaseNotes"
+        rows="2"
+        class="mt-1 min-h-[3.5rem] w-full resize-y rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100"
+      />
+
       <div class="mt-3 grid gap-3 md:grid-cols-2">
         <div class="md:col-span-2">
           <label class="text-sm text-slate-300">Preview File (optional)</label>
@@ -329,37 +336,58 @@ function submitPrimaryAction(): void {
       </div>
     </article>
 
-    <article class="fade-in app-panel h-fit rounded-2xl border border-[#ad6f2f] bg-[linear-gradient(135deg,rgba(93,56,21,0.7),rgba(40,32,24,0.82))] p-5 shadow-md 2xl:sticky 2xl:top-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-lg font-semibold text-orange-200">Upload Workspace</h2>
-        <div class="flex gap-2">
-          <button class="rounded border border-[#6ecbff] bg-[#59b9f8] px-3 py-2 text-xs font-semibold text-[#05253a]" @click="emit('pick-workspace-root')">Select Workspace Root</button>
-          <button class="rounded border border-[#6ecbff] bg-[#59b9f8] px-3 py-2 text-xs font-semibold text-[#05253a] disabled:opacity-40" :disabled="!hasWorkspaceRoot" @click="emit('pick-upload-files')">Add Files</button>
-          <button class="rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 py-2 text-xs font-semibold text-slate-100 disabled:opacity-40" :disabled="!hasWorkspaceRoot && uploadFiles.length === 0" @click="emit('clear-workspace')">Clear Workspace</button>
-          <button class="steam-btn-muted rounded px-3 py-2 text-xs font-semibold disabled:opacity-40" :disabled="uploadFiles.length === 0" @click="emit('clear-upload-files')">Clear</button>
-        </div>
+    <article class="fade-in app-panel h-fit rounded-2xl border border-[#ad6f2f] bg-[linear-gradient(135deg,rgba(93,56,21,0.7),rgba(40,32,24,0.82))] p-5 shadow-md xl:p-6 2xl:sticky 2xl:top-4">
+      <h2 class="text-xl font-semibold text-orange-200">Upload Workspace</h2>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button
+          class="flex min-h-[3.25rem] items-center justify-center rounded border border-[#6ecbff] bg-[#59b9f8] px-3 text-center text-sm font-semibold leading-tight text-[#05253a]"
+          @click="emit('pick-workspace-root')"
+        >
+          Select Workspace Root
+        </button>
+        <button
+          class="flex min-h-[3.25rem] items-center justify-center rounded border border-[#6ecbff] bg-[#59b9f8] px-3 text-center text-sm font-semibold leading-tight text-[#05253a] disabled:opacity-40"
+          :disabled="!hasWorkspaceRoot"
+          @click="emit('pick-upload-files')"
+        >
+          Add Files
+        </button>
+        <button
+          class="flex min-h-[3.25rem] items-center justify-center rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 text-center text-sm font-semibold leading-tight text-slate-100 disabled:opacity-40"
+          :disabled="!hasWorkspaceRoot && uploadFiles.length === 0"
+          @click="emit('clear-workspace')"
+        >
+          Clear Workspace
+        </button>
+        <button
+          class="steam-btn-muted flex min-h-[3.25rem] items-center justify-center rounded px-3 text-center text-sm font-semibold leading-tight disabled:opacity-40"
+          :disabled="uploadFiles.length === 0"
+          @click="emit('clear-upload-files')"
+        >
+          Clear
+        </button>
       </div>
 
-      <div class="mt-3 rounded-lg border border-[#ad6f2f] bg-[#1f3248] px-3 py-2">
-        <p class="text-xs text-orange-100/80">Workspace root:</p>
-        <p class="mt-1 select-text break-all text-sm font-semibold text-orange-100">
+      <div class="mt-4 rounded-lg border border-[#ad6f2f] bg-[#1f3248] px-3 py-3">
+        <p class="text-sm text-orange-100/85">Workspace root:</p>
+        <p class="mt-1 select-text break-all text-lg font-semibold text-orange-100">
           {{ hasWorkspaceRoot ? workspaceRootValue : 'Not selected' }}
         </p>
       </div>
 
-      <div class="mt-3 cursor-pointer rounded-xl border-2 border-dashed p-4 transition" :class="isUploadDropActive ? 'border-[#ffb86b] bg-[#2c3f56]' : 'border-[#d0883f] bg-[#1f3248]'" @dragover="emit('upload-drag-over', $event)" @dragleave="emit('upload-drag-leave', $event)" @drop="emit('upload-drop', $event)" @click="emit('pick-upload-files')">
-        <p class="text-sm font-semibold text-orange-200">Drag and drop files to add workspace content</p>
-        <p class="mt-1 text-xs text-orange-100/85">Click to open native multi-file picker.</p>
+      <div class="mt-4 cursor-pointer rounded-xl border-2 border-dashed p-5 transition" :class="isUploadDropActive ? 'border-[#ffb86b] bg-[#2c3f56]' : 'border-[#d0883f] bg-[#1f3248]'" @dragover="emit('upload-drag-over', $event)" @dragleave="emit('upload-drag-leave', $event)" @drop="emit('upload-drop', $event)" @click="emit('pick-upload-files')">
+        <p class="text-2xl font-semibold text-orange-200">Drag and drop files to add workspace content</p>
+        <p class="mt-1 text-sm text-orange-100/85">Click to open native multi-file picker.</p>
       </div>
 
-      <div class="mt-3 rounded-lg border border-[#ad6f2f] bg-[#1f3248]">
+      <div class="mt-4 rounded-lg border border-[#ad6f2f] bg-[#1f3248]">
         <div class="flex items-center justify-between border-b border-[#ad6f2f] px-3 py-2">
-          <p class="text-sm font-semibold text-slate-100">Workspace Content</p>
-          <p class="text-xs text-slate-300">{{ uploadFiles.length }} item(s)</p>
+          <p class="text-base font-semibold text-slate-100">Workspace Content</p>
+          <p class="text-sm text-slate-300">{{ uploadFiles.length }} item(s)</p>
         </div>
-        <div class="max-h-56 overflow-auto px-3 py-2">
-          <p v-if="uploadFiles.length === 0" class="text-xs text-slate-300">No files staged yet.</p>
-          <ul v-else class="space-y-1 text-xs text-slate-200">
+        <div class="max-h-72 overflow-auto px-3 py-2 xl:max-h-[24rem]">
+          <p v-if="uploadFiles.length === 0" class="text-sm text-slate-300">No files staged yet.</p>
+          <ul v-else class="space-y-1.5 text-sm text-slate-200">
             <li v-for="path in uploadFiles" :key="path" class="flex items-center justify-between gap-2 rounded border border-[#355874] bg-[#122638] px-2 py-1">
               <div class="min-w-0">
                 <p class="truncate font-semibold">{{ fileNameFromPath(path) }}</p>

@@ -40,6 +40,7 @@ export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update
   const previewFile = draft.previewFile?.trim()
   const title = assertString('title', draft.title)
   const description = draft.description?.trim()
+  const changeNote = draft.changenote?.trim()
 
   const tagsBlock = draft.tags
     .map((tag) => tag.trim())
@@ -70,6 +71,7 @@ export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update
     ...(previewFile ? [`\t\"previewfile\"\t\"${escapeVdf(previewFile)}\"`] : []),
     `\t\"title\"\t\"${escapeVdf(title)}\"`,
     ...(description ? [`\t\"description\"\t\"${escapeVdf(description)}\"`] : []),
+    ...(mode === 'update' && changeNote ? [`\t\"changenote\"\t\"${escapeVdf(changeNote)}\"`] : []),
     '\t"tags"',
     '\t{',
     tagsBlock,
