@@ -41,6 +41,7 @@ const workshop = {
   listContentFolderFiles: vi.fn(
     async () => [] as Array<{ absolutePath: string; relativePath: string; sizeBytes: number }>
   ),
+  openPath: vi.fn(async () => ({ ok: true })),
   saveProfile: vi.fn(async ({ profile }) => profile),
   deleteProfile: vi.fn(async () => ({ ok: true })),
   getRunLogs: vi.fn(async () => []),
@@ -296,13 +297,13 @@ describe('App UI validation gates', () => {
 
     const pickContentFolderButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Select Content Folder'))
+      .find((button) => button.text().includes('Choose Content Folder'))
     expect(pickContentFolderButton).toBeDefined()
     await pickContentFolderButton?.trigger('click')
     await flushPromises()
 
     expect(workshop.listContentFolderFiles).toHaveBeenCalledWith({ folderPath: '/mods' })
-    expect(wrapper.text()).toContain('Mod Content')
+    expect(wrapper.text()).toContain('Content Hierarchy')
     expect(wrapper.text()).toContain('readme.txt')
     expect(wrapper.text()).toContain('config.json')
     expect(wrapper.text()).toContain('24 B')
@@ -336,14 +337,14 @@ describe('App UI validation gates', () => {
 
     const pickContentFolderButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Select Content Folder'))
+      .find((button) => button.text().includes('Choose Content Folder'))
     expect(pickContentFolderButton).toBeDefined()
     await pickContentFolderButton?.trigger('click')
     await flushPromises()
 
     const clearContentFolderButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Clear Content Folder'))
+      .find((button) => button.text().includes('Reset Folder'))
     expect(clearContentFolderButton).toBeDefined()
     await clearContentFolderButton?.trigger('click')
     await flushPromises()

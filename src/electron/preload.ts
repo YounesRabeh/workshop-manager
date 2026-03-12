@@ -32,6 +32,7 @@ export interface WorkshopApi {
   getCurrentProfile: () => Promise<SteamProfileSummary>
   getMyWorkshopItems: (payload: { appId?: string }) => Promise<WorkshopItemSummary[]>
   listContentFolderFiles: (payload: { folderPath: string }) => Promise<ContentFolderFileEntry[]>
+  openPath: (payload: { path: string }) => Promise<{ ok: true; error?: string }>
   pickFolder: () => Promise<string | undefined>
   pickFile: () => Promise<string | undefined>
   pickFiles: () => Promise<string[]>
@@ -57,6 +58,7 @@ const api: WorkshopApi = {
   getCurrentProfile: () => ipcRenderer.invoke(IPC_CHANNELS.getCurrentProfile),
   getMyWorkshopItems: (payload) => ipcRenderer.invoke(IPC_CHANNELS.getMyWorkshopItems, payload),
   listContentFolderFiles: (payload) => ipcRenderer.invoke(IPC_CHANNELS.listContentFolderFiles, payload),
+  openPath: (payload) => ipcRenderer.invoke(IPC_CHANNELS.openPath, payload),
   pickFolder: () => ipcRenderer.invoke(IPC_CHANNELS.pickFolder),
   pickFile: () => ipcRenderer.invoke(IPC_CHANNELS.pickFile),
   pickFiles: () => ipcRenderer.invoke(IPC_CHANNELS.pickFiles),

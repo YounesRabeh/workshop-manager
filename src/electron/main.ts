@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron'
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -95,8 +95,8 @@ function decryptSecret(value: string): string {
 
 async function createWindow(): Promise<void> {
   mainWindow = new BrowserWindow({
-    width: 980,
-    height: 700,
+    width: 1050,
+    height: 750,
     minWidth: 780,
     minHeight: 560,
     autoHideMenuBar: true,
@@ -335,6 +335,19 @@ app.whenReady().then(async () => {
   ipcMain.handle(IPC_CHANNELS.listContentFolderFiles, async (_event, payload: { folderPath: string }) => {
     try {
       return await listContentFolderFiles(payload.folderPath)
+    } catch (error) {
+      throw toIpcError(error)
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.openPath, async (_event, payload: { path: string }) => {
+    try {
+      const targetPath = payload.path?.trim()
+      if (!targetPath) {
+        throw new AppError('validation', 'Path is required')
+      }
+      const openError = await shell.openPath(targetPath)
+      return openError ? { ok: true, error: openError } : { ok: true }
     } catch (error) {
       throw toIpcError(error)
     }

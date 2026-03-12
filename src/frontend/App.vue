@@ -1114,6 +1114,24 @@ async function pickContentFolder(): Promise<void> {
   }
 }
 
+async function openCurrentContentFolder(): Promise<void> {
+  const folderPath = activeDraft.value.contentFolder.trim()
+  if (!folderPath) {
+    statusMessage.value = 'Select content folder first.'
+    return
+  }
+
+  try {
+    const result = await window.workshop.openPath({ path: folderPath })
+    if (result.error) {
+      statusMessage.value = `Could not open folder: ${result.error}`
+    }
+  } catch (error) {
+    const parsed = normalizeError(error)
+    statusMessage.value = `Open folder failed (${parsed.code}): ${parsed.message}`
+  }
+}
+
 async function pickPreviewFile(): Promise<void> {
   const path = await window.workshop.pickFile()
   if (path) {
@@ -1436,6 +1454,7 @@ onUnmounted(() => {
           @pick-upload-files="pickUploadFiles"
           @clear-upload-files="clearUploadFiles"
           @remove-staged-file="removeStagedFile"
+          @open-content-folder="openCurrentContentFolder"
         />
 
         <div

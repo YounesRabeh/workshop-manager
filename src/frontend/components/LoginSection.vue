@@ -170,7 +170,7 @@ watch(
       <header>
         <p class="login-kicker">STEAM WORKSHOP MANAGER</p>
         <h1 class="text-5xl font-extrabold tracking-tight text-slate-900">Sign in</h1>
-        <p class="mt-2 text-sm text-slate-600">Use your Steam account to unlock mod publishing.</p>
+        <p class="mt-2 text-sm text-slate-600">Use your Steam account to unlock mod management !</p>
         <p v-if="statusMessage" class="login-status">{{ statusMessage }}</p>
       </header>
 

@@ -39,6 +39,10 @@ function createRunId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
 }
 
+function formatRunMeta(message: string): string {
+  return `[RUN_META] ${message}`
+}
+
 export function isSteamGuardPrompt(line: string): boolean {
   return /two-factor|auth(?:entication)?\s*code|guard code|steam guard code/i.test(line)
 }
@@ -100,6 +104,34 @@ export function parseSteamLoginFailure(lines: string[]): LoginFailure | undefine
       code: 'auth',
       message: 'Steam login failed. Check credentials or guard method.'
     }
+  }
+
+  return undefined
+}
+
+export function parseWorkshopRunFailure(
+  lines: string[],
+  mode: 'upload' | 'update' | 'visibility'
+): string | undefined {
+  const joined = lines.join('\n')
+
+  if (/timeout uploading manifest/i.test(joined)) {
+    return 'Steam upload timed out while sending the manifest. Retry in a minute and check network/Steam service status.'
+  }
+
+  if (/failed to update workshop item\s*\(failure\)/i.test(joined)) {
+    if (mode === 'visibility') {
+      return 'Steam failed to change item visibility. Retry shortly.'
+    }
+    return 'Steam failed to update the Workshop item. Retry shortly; if it persists, verify content folder and Steam service status.'
+  }
+
+  if (/not logged on|login failure|please use\s+\+login/i.test(joined)) {
+    return 'Steam session is not valid anymore. Sign in again and retry.'
+  }
+
+  if (/rate limit|too many requests|try again later/i.test(joined)) {
+    return 'Steam rate-limited this request. Wait a bit, then retry.'
   }
 
   return undefined
@@ -323,8 +355,19 @@ export class SteamCmdRuntimeService extends EventEmitter {
       const isLoginPhase = options.phase === 'login'
 
       const timeoutMs = options.timeoutMs ?? 5 * 60_000
+      let finalized = false
+      let timedOut = false
+
+      void this.runLogStore.appendLine(
+        runId,
+        formatRunMeta(
+          `started phase=${options.phase} timeoutMs=${timeoutMs} executable=${executablePath} args=${JSON.stringify(args)}`
+        )
+      )
 
       const timeout = setTimeout(() => {
+        timedOut = true
+        void this.runLogStore.appendLine(runId, formatRunMeta(`timeout reached after ${timeoutMs}ms, sending SIGTERM`))
         child.kill('SIGTERM')
         reject(new AppError('timeout', `SteamCMD run exceeded timeout (${timeoutMs}ms)`))
       }, timeoutMs)
@@ -399,6 +442,10 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
       child.once('error', (error) => {
         clearTimeout(timeout)
+        if (!finalized) {
+          finalized = true
+          void this.runLogStore.appendLine(runId, formatRunMeta(`spawn error: ${error.message}`))
+        }
         reject(new AppError('command_failed', `SteamCMD spawn failed: ${error.message}`))
       })
 
@@ -406,6 +453,14 @@ export class SteamCmdRuntimeService extends EventEmitter {
         void (async () => {
           clearTimeout(timeout)
           this.activeRuns.delete(runId)
+          if (!finalized) {
+            finalized = true
+            const reason = timedOut ? 'timeout' : 'normal'
+            await this.runLogStore.appendLine(
+              runId,
+              formatRunMeta(`process closed exitCode=${exitCode ?? 1} reason=${reason}`)
+            )
+          }
           await logWriteQueue
           resolve({ lines, exitCode: exitCode ?? 1 })
         })()
@@ -757,12 +812,13 @@ export class SteamCmdRuntimeService extends EventEmitter {
     })
 
     if (commandResult.exitCode !== 0) {
+      const parsedFailure = parseWorkshopRunFailure(commandResult.lines, mode)
       this.emitRunEvent({ runId, ts: Date.now(), type: 'run_failed', phase: mode, errorCode: 'command_failed' })
-      const failed = await this.runLogStore.finalize(runId, {
+      await this.runLogStore.finalize(runId, {
         success: false,
         status: 'failed'
       })
-      throw new AppError('command_failed', `Workshop ${mode} failed. See run logs for details.`)
+      throw new AppError('command_failed', parsedFailure ?? `Workshop ${mode} failed. See run logs for details.`)
     }
 
     const publishedFileId = parsePublishedFileId(commandResult.lines) ?? draft.publishedFileId
