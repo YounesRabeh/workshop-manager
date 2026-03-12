@@ -175,12 +175,10 @@ const updateRequirements = computed(() => evaluateUpdateRequirements(updateDraft
 
 const updateChecklist = computed<PublishChecklistItem[]>(() => {
   return [
-    { label: 'Workshop item selected', ok: selectedWorkshopItemId.value.trim().length > 0 },
     { label: 'App ID', ok: updateRequirements.value.appId },
     { label: 'Published File ID', ok: updateRequirements.value.publishedFileId },
-    { label: 'Content folder or preview image', ok: updateRequirements.value.contentOrPreview },
-    { label: 'Title', ok: updateDraft.title.trim().length > 0, optional: true },
-    { label: 'Preview image', ok: updateDraft.previewFile.trim().length > 0, optional: true },
+    { label: 'Title', ok: updateDraft.title.trim().length > 0 },
+    { label: 'Content folder or Thumbnail', ok: updateRequirements.value.contentOrPreview },
     { label: 'Release notes', ok: updateDraft.releaseNotes.trim().length > 0, optional: true }
   ]
 })
