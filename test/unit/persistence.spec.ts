@@ -53,6 +53,7 @@ describe('profile and run-log persistence', () => {
 
     await store.create('run-2')
     await store.appendLine('run-2', 'line-c')
+    await store.finalize('run-2', { success: true, status: 'success' })
     const second = await store.get('run-2')
     const secondSessionOutput = await readFile(second!.logPath, 'utf8')
     expect(secondSessionOutput).toContain('line-c')

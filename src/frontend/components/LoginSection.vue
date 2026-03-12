@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type {
   AdvancedSettingsState,
   AuthIssue,
@@ -7,6 +7,7 @@ import type {
   LoginFormState,
   SteamGuardPromptType
 } from '../types/ui'
+import { moveFocusWithVerticalArrows } from '../events/keyboard-events'
 
 const props = defineProps<{
   statusMessage: string
@@ -74,6 +75,91 @@ const submitLabel = computed(() => {
 const canSaveAdvancedSettings = computed(() => {
   return !props.advancedSettings.isSaving
 })
+
+const usernameInputRef = ref<HTMLInputElement | null>(null)
+const passwordInputRef = ref<HTMLInputElement | null>(null)
+const rememberUsernameRef = ref<HTMLInputElement | null>(null)
+const rememberAuthRef = ref<HTMLInputElement | null>(null)
+const submitButtonRef = ref<HTMLButtonElement | null>(null)
+const hasUserEditedCredentials = ref(false)
+const hasAppliedDefaultFocus = ref(false)
+const lastDefaultFocusTarget = ref<number | null>(null)
+
+function getLoginControl(index: number): HTMLElement | null {
+  const orderedControls: Array<HTMLElement | null> = [
+    usernameInputRef.value,
+    passwordInputRef.value,
+    rememberUsernameRef.value,
+    rememberAuthRef.value,
+    submitButtonRef.value
+  ]
+  return orderedControls[index] ?? null
+}
+
+function focusLoginControl(index: number): void {
+  getLoginControl(index)?.focus()
+}
+
+function onLoginControlArrowKey(event: KeyboardEvent, index: number): void {
+  moveFocusWithVerticalArrows(event, index, getLoginControl, 4)
+}
+
+function resolveDefaultFocusTarget(): number {
+  const hasUsername = props.loginForm.username.trim().length > 0
+  const hasPassword = props.loginForm.password.trim().length > 0
+  const canUseSavedSession = props.loginForm.rememberAuth && !hasPassword
+
+  if (!hasUsername) {
+    return 0
+  }
+
+  if (!(hasPassword || canUseSavedSession)) {
+    return 1
+  }
+
+  return 4
+}
+
+function applyDefaultFocus(): void {
+  if (props.isLoginSubmitting) {
+    return
+  }
+  const target = resolveDefaultFocusTarget()
+  focusLoginControl(target)
+  hasAppliedDefaultFocus.value = true
+  lastDefaultFocusTarget.value = target
+}
+
+function onCredentialInput(): void {
+  hasUserEditedCredentials.value = true
+}
+
+onMounted(() => {
+  void nextTick(() => {
+    applyDefaultFocus()
+  })
+})
+
+watch(
+  () => [props.loginForm.username, props.loginForm.password, props.loginForm.rememberAuth, props.isLoginSubmitting],
+  () => {
+    if (!hasAppliedDefaultFocus.value) {
+      applyDefaultFocus()
+      return
+    }
+
+    // If cached credentials hydrate after mount, move focus from fields to Sign in once.
+    if (
+      !hasUserEditedCredentials.value &&
+      lastDefaultFocusTarget.value !== 4 &&
+      resolveDefaultFocusTarget() === 4 &&
+      !props.isLoginSubmitting
+    ) {
+      applyDefaultFocus()
+    }
+  },
+  { flush: 'post' }
+)
 </script>
 
 <template>
@@ -88,16 +174,25 @@ const canSaveAdvancedSettings = computed(() => {
 
       <form class="mt-5" @submit.prevent="emit('submit-login')">
         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Account name</label>
-        <input v-model="loginForm.username" class="login-input mt-1 w-full rounded border border-slate-300 px-3 py-2" />
+        <input
+          ref="usernameInputRef"
+          v-model="loginForm.username"
+          class="login-input mt-1 w-full rounded border border-slate-300 px-3 py-2"
+          @keydown="onLoginControlArrowKey($event, 0)"
+          @input="onCredentialInput"
+        />
 
         <label class="mt-3 block text-xs font-semibold uppercase tracking-wide text-slate-500">Password</label>
         <div class="mt-1 flex items-center gap-2">
           <input
+            ref="passwordInputRef"
             v-model="loginForm.password"
             :type="isPasswordPeek ? 'text' : 'password'"
             :placeholder="loginForm.rememberAuth && loginForm.password.trim().length === 0 ? '********' : ''"
             autocomplete="current-password"
             class="login-input w-full rounded border border-slate-300 px-3 py-2"
+            @keydown="onLoginControlArrowKey($event, 1)"
+            @input="onCredentialInput"
           />
           <button
             type="button"
@@ -112,12 +207,22 @@ const canSaveAdvancedSettings = computed(() => {
         </div>
 
         <label class="mt-3 flex items-center gap-2 text-sm text-slate-700">
-          <input v-model="loginForm.rememberUsername" type="checkbox" />
+          <input
+            ref="rememberUsernameRef"
+            v-model="loginForm.rememberUsername"
+            type="checkbox"
+            @keydown="onLoginControlArrowKey($event, 2)"
+          />
           Remember account name
         </label>
 
         <label class="mt-2 flex items-center gap-2 text-sm text-slate-700">
-          <input v-model="loginForm.rememberAuth" type="checkbox" />
+          <input
+            ref="rememberAuthRef"
+            v-model="loginForm.rememberAuth"
+            type="checkbox"
+            @keydown="onLoginControlArrowKey($event, 3)"
+          />
           Keep me signed in on this device
         </label>
         <p class="mt-1 text-[11px] text-slate-500">
@@ -195,9 +300,11 @@ const canSaveAdvancedSettings = computed(() => {
         </div>
 
         <button
+          ref="submitButtonRef"
           type="submit"
           class="login-submit mt-5 w-full rounded px-3 py-2 text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="!canSubmitLogin"
+          @keydown="onLoginControlArrowKey($event, 4)"
         >
           {{ submitLabel }}
         </button>

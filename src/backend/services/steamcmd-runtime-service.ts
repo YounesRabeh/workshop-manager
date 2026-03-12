@@ -27,6 +27,7 @@ interface GuardPrompt {
 interface RunOptions {
   timeoutMs?: number
   phase: string
+  emitOutputEvents?: boolean
 }
 
 interface LoginFailure {
@@ -318,6 +319,8 @@ export class SteamCmdRuntimeService extends EventEmitter {
       this.activeRuns.set(runId, child)
       let guardMobilePromptSent = false
       let logWriteQueue: Promise<void> = Promise.resolve()
+      const shouldEmitOutputEvents = options.emitOutputEvents === true
+      const isLoginPhase = options.phase === 'login'
 
       const timeoutMs = options.timeoutMs ?? 5 * 60_000
       const timeout = setTimeout(() => {
@@ -331,7 +334,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
           return
         }
 
-        if (isSteamGuardMobilePrompt(normalizedLine) && guardMobilePromptSent === false) {
+        if (isLoginPhase && isSteamGuardMobilePrompt(normalizedLine) && guardMobilePromptSent === false) {
           guardMobilePromptSent = true
           this.emitRunEvent({
             runId,
@@ -342,7 +345,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
           })
         }
 
-        if (isSteamGuardPrompt(normalizedLine) && this.pendingSteamGuard.has(runId) === false) {
+        if (isLoginPhase && isSteamGuardPrompt(normalizedLine) && this.pendingSteamGuard.has(runId) === false) {
           this.emitRunEvent({
             runId,
             ts: Date.now(),
@@ -373,7 +376,9 @@ export class SteamCmdRuntimeService extends EventEmitter {
         logWriteQueue = logWriteQueue
           .then(() => this.runLogStore.appendLine(runId, normalizedLine))
           .catch(() => undefined)
-        this.emitRunEvent({ runId, ts: Date.now(), type, line: normalizedLine, phase: options.phase })
+        if (shouldEmitOutputEvents) {
+          this.emitRunEvent({ runId, ts: Date.now(), type, line: normalizedLine, phase: options.phase })
+        }
 
       }
 
@@ -412,7 +417,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     const args = buildLoginArgs(username, password, useStoredAuth)
     const timeoutMs = useStoredAuth ? 20_000 : 300_000
 
-    const result = await this.runSteamCmd(runId, args, { phase: 'login', timeoutMs })
+    const result = await this.runSteamCmd(runId, args, { phase: 'login', timeoutMs, emitOutputEvents: true })
     const parsedFailure = parseSteamLoginFailure(result.lines)
 
     if (result.exitCode !== 0 || parsedFailure) {
@@ -746,7 +751,8 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
     const commandResult = await this.runSteamCmd(runId, args, {
       phase: mode,
-      timeoutMs: 10 * 60_000
+      timeoutMs: 10 * 60_000,
+      emitOutputEvents: false
     })
 
     if (commandResult.exitCode !== 0) {
