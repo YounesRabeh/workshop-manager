@@ -323,6 +323,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
       const isLoginPhase = options.phase === 'login'
 
       const timeoutMs = options.timeoutMs ?? 5 * 60_000
+
       const timeout = setTimeout(() => {
         child.kill('SIGTERM')
         reject(new AppError('timeout', `SteamCMD run exceeded timeout (${timeoutMs}ms)`))
@@ -415,7 +416,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
   async login(username: string, password: string, useStoredAuth = false): Promise<{ sessionId: string }> {
     const runId = createRunId()
     const args = buildLoginArgs(username, password, useStoredAuth)
-    const timeoutMs = useStoredAuth ? 20_000 : 300_000
+    const timeoutMs = useStoredAuth ? 20_000 : 30_000
 
     const result = await this.runSteamCmd(runId, args, { phase: 'login', timeoutMs, emitOutputEvents: true })
     const parsedFailure = parseSteamLoginFailure(result.lines)

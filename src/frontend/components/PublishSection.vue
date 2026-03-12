@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { WorkshopItemSummary } from '@shared/contracts'
-import type { PublishChecklistItem, UploadDraftState } from '../types/ui'
+import type { ContentTreeNode, PublishChecklistItem, StagedContentFile, UploadDraftState } from '../types/ui'
+import { formatSizeLabel } from '../utils/size-format'
 import VisibilityIcon from './VisibilityIcon.vue'
 
 const props = defineProps<{
@@ -13,7 +14,9 @@ const props = defineProps<{
   visibilityCommitted: 0 | 1 | 2 | 3
   visibilityPending: 0 | 1 | 2 | 3
   canChangeVisibility: boolean
-  uploadFiles: string[]
+  stagedContentFiles: StagedContentFile[]
+  stagedContentTree: ContentTreeNode[]
+  totalStagedContentSizeBytes: number
   isUploadDropActive: boolean
   canUpload: boolean
   canUpdate: boolean
@@ -40,9 +43,20 @@ const emit = defineEmits<{
   (e: 'remove-staged-file', path: string): void
 }>()
 
-function fileNameFromPath(path: string): string {
-  const segments = path.split(/[/\\]/)
-  return segments[segments.length - 1] || path
+interface FlattenedContentNode {
+  node: ContentTreeNode
+  depth: number
+}
+
+function flattenContentTree(nodes: ContentTreeNode[], depth = 0): FlattenedContentNode[] {
+  const rows: FlattenedContentNode[] = []
+  for (const node of nodes) {
+    rows.push({ node, depth })
+    if (node.type === 'folder' && node.children && node.children.length > 0) {
+      rows.push(...flattenContentTree(node.children, depth + 1))
+    }
+  }
+  return rows
 }
 
 function onTagInput(event: Event): void {
@@ -135,12 +149,14 @@ const sectionDescription = computed(() =>
     ? 'Review and publish changes to this item.'
     : 'Create a new Workshop item. A Published File ID will be assigned by Steam after upload.'
 )
-const workspaceRootValue = computed(() => props.draft.contentFolder.trim())
-const hasWorkspaceRoot = computed(() => workspaceRootValue.value.length > 0)
+const contentFolderValue = computed(() => props.draft.contentFolder.trim())
+const hasContentFolder = computed(() => contentFolderValue.value.length > 0)
 const primaryActionLabel = computed(() => (isUpdateMode.value ? 'Update Existing Item' : 'Create New Item'))
 const primaryActionDisabled = computed(() => (isUpdateMode.value ? !props.canUpdate : !props.canUpload))
 const publishedFileIdValue = computed(() => props.selectedWorkshopItem?.publishedFileId || props.draft.publishedFileId || 'Not selected')
 const appIdValue = computed(() => props.selectedWorkshopItem?.appId || props.draft.appId || 'Not selected')
+const flattenedContentNodes = computed(() => flattenContentTree(props.stagedContentTree))
+const totalContentSizeLabel = computed(() => formatSizeLabel(props.totalStagedContentSizeBytes))
 
 function readinessItemClass(item: PublishChecklistItem): string {
   if (item.ok) {
@@ -179,7 +195,7 @@ function submitPrimaryAction(): void {
 </script>
 
 <template>
-  <section class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(430px,36vw)] 2xl:grid-cols-[minmax(0,1fr)_minmax(520px,34vw)]">
+  <section class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,6fr)_minmax(0,4fr)]">
     <article class="fade-in app-panel rounded-2xl border border-[#305070] bg-[#1b2838] p-5 shadow-[0_16px_40px_rgba(4,10,20,0.45)]">
       <div class="flex items-center justify-between gap-2">
         <h2 class="text-lg font-semibold text-slate-100">{{ sectionTitle }}</h2>
@@ -337,31 +353,31 @@ function submitPrimaryAction(): void {
     </article>
 
     <article class="fade-in app-panel h-fit rounded-2xl border border-[#ad6f2f] bg-[linear-gradient(135deg,rgba(93,56,21,0.7),rgba(40,32,24,0.82))] p-5 shadow-md xl:p-6 2xl:sticky 2xl:top-4">
-      <h2 class="text-xl font-semibold text-orange-200">Upload Workspace</h2>
+      <h2 class="text-xl font-semibold text-orange-200">Mod Content</h2>
       <div class="mt-3 grid grid-cols-2 gap-2">
         <button
           class="flex min-h-[3.25rem] items-center justify-center rounded border border-[#6ecbff] bg-[#59b9f8] px-3 text-center text-sm font-semibold leading-tight text-[#05253a]"
           @click="emit('pick-workspace-root')"
         >
-          Select Workspace Root
+          Select Content Folder
         </button>
         <button
           class="flex min-h-[3.25rem] items-center justify-center rounded border border-[#6ecbff] bg-[#59b9f8] px-3 text-center text-sm font-semibold leading-tight text-[#05253a] disabled:opacity-40"
-          :disabled="!hasWorkspaceRoot"
+          :disabled="!hasContentFolder"
           @click="emit('pick-upload-files')"
         >
           Add Files
         </button>
         <button
           class="flex min-h-[3.25rem] items-center justify-center rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 text-center text-sm font-semibold leading-tight text-slate-100 disabled:opacity-40"
-          :disabled="!hasWorkspaceRoot && uploadFiles.length === 0"
+          :disabled="!hasContentFolder && stagedContentFiles.length === 0"
           @click="emit('clear-workspace')"
         >
-          Clear Workspace
+          Clear Content Folder
         </button>
         <button
           class="steam-btn-muted flex min-h-[3.25rem] items-center justify-center rounded px-3 text-center text-sm font-semibold leading-tight disabled:opacity-40"
-          :disabled="uploadFiles.length === 0"
+          :disabled="stagedContentFiles.length === 0"
           @click="emit('clear-upload-files')"
         >
           Clear
@@ -369,31 +385,54 @@ function submitPrimaryAction(): void {
       </div>
 
       <div class="mt-4 rounded-lg border border-[#ad6f2f] bg-[#1f3248] px-3 py-3">
-        <p class="text-sm text-orange-100/85">Workspace root:</p>
+        <p class="text-sm text-orange-100/85">Content Folder:</p>
         <p class="mt-1 select-text break-all text-lg font-semibold text-orange-100">
-          {{ hasWorkspaceRoot ? workspaceRootValue : 'Not selected' }}
+          {{ hasContentFolder ? contentFolderValue : 'Not selected' }}
         </p>
       </div>
 
       <div class="mt-4 cursor-pointer rounded-xl border-2 border-dashed p-5 transition" :class="isUploadDropActive ? 'border-[#ffb86b] bg-[#2c3f56]' : 'border-[#d0883f] bg-[#1f3248]'" @dragover="emit('upload-drag-over', $event)" @dragleave="emit('upload-drag-leave', $event)" @drop="emit('upload-drop', $event)" @click="emit('pick-upload-files')">
-        <p class="text-2xl font-semibold text-orange-200">Drag and drop files to add workspace content</p>
+        <p class="text-2xl font-semibold text-orange-200">Drag and drop files to add mod content</p>
         <p class="mt-1 text-sm text-orange-100/85">Click to open native multi-file picker.</p>
       </div>
 
       <div class="mt-4 rounded-lg border border-[#ad6f2f] bg-[#1f3248]">
         <div class="flex items-center justify-between border-b border-[#ad6f2f] px-3 py-2">
-          <p class="text-base font-semibold text-slate-100">Workspace Content</p>
-          <p class="text-sm text-slate-300">{{ uploadFiles.length }} item(s)</p>
+          <p class="text-base font-semibold text-slate-100">Mod Content</p>
+          <p class="text-sm text-slate-300">{{ stagedContentFiles.length }} item(s) • {{ totalContentSizeLabel }}</p>
         </div>
         <div class="max-h-72 overflow-auto px-3 py-2 xl:max-h-[24rem]">
-          <p v-if="uploadFiles.length === 0" class="text-sm text-slate-300">No files staged yet.</p>
+          <p v-if="stagedContentFiles.length === 0" class="text-sm text-slate-300">No files staged yet.</p>
           <ul v-else class="space-y-1.5 text-sm text-slate-200">
-            <li v-for="path in uploadFiles" :key="path" class="flex items-center justify-between gap-2 rounded border border-[#355874] bg-[#122638] px-2 py-1">
+            <li
+              v-for="{ node, depth } in flattenedContentNodes"
+              :key="node.id"
+              class="flex items-center justify-between gap-2 rounded border border-[#355874] bg-[#122638] px-2 py-1"
+              :style="{ paddingLeft: `${0.5 + depth * 0.75}rem` }"
+            >
               <div class="min-w-0">
-                <p class="truncate font-semibold">{{ fileNameFromPath(path) }}</p>
-                <p class="truncate text-slate-400">{{ path }}</p>
+                <p class="truncate font-semibold">
+                  <span class="mr-1 opacity-70">{{ node.type === 'folder' ? '[DIR]' : '[FILE]' }}</span>
+                  {{ node.name }}
+                </p>
+                <p v-if="node.type === 'folder'" class="truncate text-slate-400">
+                  {{ node.fileCount }} file(s) • {{ formatSizeLabel(node.sizeBytes) }}
+                </p>
+                <p v-else class="truncate text-slate-400">{{ node.relativePath }}</p>
               </div>
-              <button class="h-6 w-6 shrink-0 rounded-full border border-rose-300/40 bg-rose-900/40 text-xs font-bold text-rose-200" title="Remove file" @click.stop="emit('remove-staged-file', path)">x</button>
+              <div class="flex items-center gap-2">
+                <span class="shrink-0 rounded border border-[#42617a] bg-[#0f1f2e] px-2 py-0.5 text-xs text-slate-200">
+                  {{ formatSizeLabel(node.sizeBytes) }}
+                </span>
+                <button
+                  v-if="node.type === 'file' && node.absolutePath"
+                  class="h-6 w-6 shrink-0 rounded-full border border-rose-300/40 bg-rose-900/40 text-xs font-bold text-rose-200"
+                  title="Remove file"
+                  @click.stop="emit('remove-staged-file', node.absolutePath)"
+                >
+                  x
+                </button>
+              </div>
             </li>
           </ul>
         </div>

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AdvancedSettings,
+  ContentFolderFileEntry,
   LoginInput,
   ModProfile,
   RunEvent,
@@ -16,6 +17,7 @@ export interface WorkshopApi {
   ensureSteamCmdInstalled: () => Promise<unknown>
   login: (input: LoginInput) => Promise<{ sessionId: string; rememberedUsername?: string }>
   logout: () => Promise<{ ok: true }>
+  clearStoredSession: () => Promise<{ ok: true }>
   submitSteamGuardCode: (payload: { sessionId: string; code: string }) => Promise<{ ok: true }>
   uploadMod: (payload: { profileId: string; draft: UploadDraft }) => Promise<unknown>
   updateMod: (payload: { profileId: string; draft: UploadDraft }) => Promise<unknown>
@@ -29,6 +31,7 @@ export interface WorkshopApi {
   getRunLog: (runId: string) => Promise<unknown>
   getCurrentProfile: () => Promise<SteamProfileSummary>
   getMyWorkshopItems: (payload: { appId?: string }) => Promise<WorkshopItemSummary[]>
+  listContentFolderFiles: (payload: { folderPath: string }) => Promise<ContentFolderFileEntry[]>
   pickFolder: () => Promise<string | undefined>
   pickFile: () => Promise<string | undefined>
   pickFiles: () => Promise<string[]>
@@ -39,6 +42,7 @@ const api: WorkshopApi = {
   ensureSteamCmdInstalled: () => ipcRenderer.invoke(IPC_CHANNELS.ensureSteamCmdInstalled),
   login: (input) => ipcRenderer.invoke(IPC_CHANNELS.login, input),
   logout: () => ipcRenderer.invoke(IPC_CHANNELS.logout),
+  clearStoredSession: () => ipcRenderer.invoke(IPC_CHANNELS.clearStoredSession),
   submitSteamGuardCode: (payload) => ipcRenderer.invoke(IPC_CHANNELS.submitSteamGuardCode, payload),
   uploadMod: (payload) => ipcRenderer.invoke(IPC_CHANNELS.uploadMod, payload),
   updateMod: (payload) => ipcRenderer.invoke(IPC_CHANNELS.updateMod, payload),
@@ -52,6 +56,7 @@ const api: WorkshopApi = {
   getRunLog: (runId) => ipcRenderer.invoke(IPC_CHANNELS.getRunLog, { runId }),
   getCurrentProfile: () => ipcRenderer.invoke(IPC_CHANNELS.getCurrentProfile),
   getMyWorkshopItems: (payload) => ipcRenderer.invoke(IPC_CHANNELS.getMyWorkshopItems, payload),
+  listContentFolderFiles: (payload) => ipcRenderer.invoke(IPC_CHANNELS.listContentFolderFiles, payload),
   pickFolder: () => ipcRenderer.invoke(IPC_CHANNELS.pickFolder),
   pickFile: () => ipcRenderer.invoke(IPC_CHANNELS.pickFile),
   pickFiles: () => ipcRenderer.invoke(IPC_CHANNELS.pickFiles),

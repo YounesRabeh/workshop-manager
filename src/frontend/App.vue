@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import type { RunEvent, UploadDraft, WorkshopItemSummary } from '@shared/contracts'
+import type { ContentFolderFileEntry, RunEvent, UploadDraft, WorkshopItemSummary } from '@shared/contracts'
 import AppTopBar from './components/AppTopBar.vue'
 import LoginSection from './components/LoginSection.vue'
 import PublishSection from './components/PublishSection.vue'
 import WorkshopItemsSection from './components/WorkshopItemsSection.vue'
 import { createAppGlobalKeyDownHandler, createAppGlobalMouseDownHandler } from './events/keyboard-events'
 import './styles/themes/app.theme.css'
+import { formatSizeLabel } from './utils/size-format'
 import type {
   AdvancedSettingsState,
   AuthIssue,
+  ContentTreeNode,
   FlowStep,
   LoginFormState,
   PublishChecklistItem,
+  StagedContentFile,
   SteamGuardPromptType,
   UploadDraftState,
   WorkshopVisibilityFilter
@@ -39,6 +42,7 @@ const isPasswordPeek = ref(false)
 const isWebApiKeyPeek = ref(false)
 const steamGuardPromptType = ref<SteamGuardPromptType>('none')
 const isStoredSessionLoginAttempt = ref(false)
+const hasPersistedStoredSession = ref(false)
 const isLoginSubmitting = ref(false)
 const statusMessage = ref<string>('')
 const authIssue = ref<AuthIssue | null>(null)
@@ -109,7 +113,7 @@ const selectedWorkshopItemId = ref<string>('')
 const committedVisibility = ref<0 | 1 | 2 | 3>(0)
 const pendingVisibility = ref<0 | 1 | 2 | 3>(0)
 
-const uploadFiles = ref<string[]>([])
+const stagedContentFiles = ref<StagedContentFile[]>([])
 const isUploadDropActive = ref(false)
 const isFullscreen = ref(false)
 const isAboutOpen = ref(false)
@@ -117,6 +121,9 @@ const activeToast = ref<UiToast | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 const selectedWorkshopItem = computed(() => workshopItems.value.find((item) => item.publishedFileId === selectedWorkshopItemId.value))
+const totalStagedContentSizeBytes = computed(() =>
+  stagedContentFiles.value.reduce((sum, file) => sum + file.sizeBytes, 0)
+)
 const filteredWorkshopItems = computed(() => {
   if (workshopVisibilityFilter.value === 'all') {
     return workshopItems.value
@@ -167,7 +174,7 @@ const loginHeaderStatusMessage = computed(() => (isSteamCmdDetected.value ? 'Ste
 const updateChecklist = computed<PublishChecklistItem[]>(() => {
   return [
     { label: 'Title', ok: updateDraft.title.trim().length > 0 },
-    { label: 'Workspace root', ok: updateDraft.contentFolder.trim().length > 0 },
+    { label: 'Content folder', ok: updateDraft.contentFolder.trim().length > 0 },
     { label: 'Preview image', ok: updateDraft.previewFile.trim().length > 0, optional: true },
     { label: 'Release notes', ok: updateDraft.releaseNotes.trim().length > 0, optional: true }
   ]
@@ -176,7 +183,7 @@ const updateChecklist = computed<PublishChecklistItem[]>(() => {
 const createChecklist = computed<PublishChecklistItem[]>(() => {
   return [
     { label: 'Title', ok: createDraft.title.trim().length > 0 },
-    { label: 'Workspace root', ok: createDraft.contentFolder.trim().length > 0 },
+    { label: 'Content folder', ok: createDraft.contentFolder.trim().length > 0 },
     { label: 'Preview image', ok: createDraft.previewFile.trim().length > 0, optional: true },
     { label: 'Release notes', ok: createDraft.releaseNotes.trim().length > 0, optional: true }
   ]
@@ -185,6 +192,8 @@ const createChecklist = computed<PublishChecklistItem[]>(() => {
 const activePublishChecklist = computed<PublishChecklistItem[]>(() =>
   activePublishMode.value === 'create' ? createChecklist.value : updateChecklist.value
 )
+
+const stagedContentTree = computed<ContentTreeNode[]>(() => buildContentTree(stagedContentFiles.value))
 
 function normalizeError(error: unknown): ApiFailure {
   const fallback: ApiFailure = {
@@ -338,70 +347,209 @@ function fileNameFromPath(path: string): string {
   return segments[segments.length - 1] || path
 }
 
-function dedupePaths(paths: string[]): string[] {
-  return [...new Set(paths.filter((path) => path.trim().length > 0))]
-}
-
 function normalizeFsPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
 }
 
-function isPathInWorkspace(filePath: string, workspaceRoot: string): boolean {
-  const normalizedFile = normalizeFsPath(filePath)
-  const normalizedRoot = normalizeFsPath(workspaceRoot)
-  if (!normalizedRoot) {
-    return false
-  }
-  return normalizedFile === normalizedRoot || normalizedFile.startsWith(`${normalizedRoot}/`)
+function normalizeRelativePath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/^\/+/, '')
 }
 
-function filterPathsByWorkspace(paths: string[], workspaceRoot: string): { inside: string[]; outside: string[] } {
-  const inside: string[] = []
-  const outside: string[] = []
+function dedupeContentFiles(files: StagedContentFile[]): StagedContentFile[] {
+  const byPath = new Map<string, StagedContentFile>()
+  for (const file of files) {
+    byPath.set(normalizeFsPath(file.absolutePath), file)
+  }
+  return [...byPath.values()].sort((a, b) => a.relativePath.localeCompare(b.relativePath, undefined, { sensitivity: 'base' }))
+}
 
-  for (const path of paths) {
-    if (isPathInWorkspace(path, workspaceRoot)) {
-      inside.push(path)
-    } else {
-      outside.push(path)
+function mergeContentFiles(existing: StagedContentFile[], incoming: StagedContentFile[]): StagedContentFile[] {
+  return dedupeContentFiles([...existing, ...incoming])
+}
+
+function isPathInContentFolder(filePath: string, contentFolder: string): boolean {
+  const normalizedFile = normalizeFsPath(filePath)
+  const normalizedFolder = normalizeFsPath(contentFolder)
+  if (!normalizedFolder) {
+    return false
+  }
+  return normalizedFile === normalizedFolder || normalizedFile.startsWith(`${normalizedFolder}/`)
+}
+
+function toStagedContentFile(entry: ContentFolderFileEntry): StagedContentFile {
+  return {
+    absolutePath: entry.absolutePath,
+    relativePath: normalizeRelativePath(entry.relativePath),
+    sizeBytes: entry.sizeBytes
+  }
+}
+
+async function loadContentFolderFiles(contentFolder: string): Promise<StagedContentFile[]> {
+  const payload = await window.workshop.listContentFolderFiles({ folderPath: contentFolder })
+  return dedupeContentFiles(payload.map(toStagedContentFile))
+}
+
+function buildContentTree(files: StagedContentFile[]): ContentTreeNode[] {
+  interface MutableFileNode {
+    id: string
+    name: string
+    type: 'file'
+    relativePath: string
+    absolutePath: string
+    sizeBytes: number
+    fileCount: number
+  }
+
+  interface MutableFolderNode {
+    id: string
+    name: string
+    type: 'folder'
+    relativePath: string
+    children: Map<string, MutableNode>
+  }
+
+  type MutableNode = MutableFolderNode | MutableFileNode
+
+  const root: MutableFolderNode = {
+    id: '__root__',
+    name: '',
+    type: 'folder',
+    relativePath: '',
+    children: new Map()
+  }
+
+  for (const file of files) {
+    const parts = file.relativePath.split('/').filter((part) => part.length > 0)
+    if (parts.length === 0) {
+      continue
+    }
+
+    let currentFolder = root
+    let currentRelativePath = ''
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index]
+      const isLeafFile = index === parts.length - 1
+      currentRelativePath = currentRelativePath ? `${currentRelativePath}/${part}` : part
+
+      if (isLeafFile) {
+        currentFolder.children.set(part, {
+          id: `file:${currentRelativePath}`,
+          name: part,
+          type: 'file',
+          relativePath: currentRelativePath,
+          absolutePath: file.absolutePath,
+          sizeBytes: file.sizeBytes,
+          fileCount: 1
+        })
+        continue
+      }
+
+      const existing = currentFolder.children.get(part)
+      if (existing?.type === 'folder') {
+        currentFolder = existing
+        continue
+      }
+
+      const folder: MutableFolderNode = {
+        id: `folder:${currentRelativePath}`,
+        name: part,
+        type: 'folder',
+        relativePath: currentRelativePath,
+        children: new Map()
+      }
+      currentFolder.children.set(part, folder)
+      currentFolder = folder
     }
   }
 
-  return { inside, outside }
+  const finalizeNode = (node: MutableNode): ContentTreeNode => {
+    if (node.type === 'file') {
+      return node
+    }
+
+    const children = [...node.children.values()]
+      .map(finalizeNode)
+      .sort((left, right) => {
+        if (left.type !== right.type) {
+          return left.type === 'folder' ? -1 : 1
+        }
+        return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
+      })
+
+    return {
+      id: node.id,
+      name: node.name,
+      type: 'folder',
+      relativePath: node.relativePath,
+      sizeBytes: children.reduce((sum, child) => sum + child.sizeBytes, 0),
+      fileCount: children.reduce((sum, child) => sum + child.fileCount, 0),
+      children
+    }
+  }
+
+  const tree = finalizeNode(root)
+  return tree.children ?? []
 }
 
-function stageUploadFiles(paths: string[]): void {
-  const workspaceRoot = activeDraft.value.contentFolder.trim()
-  if (workspaceRoot.length === 0) {
-    statusMessage.value = 'Select workspace root first.'
+async function stageSelectedContentFiles(paths: string[]): Promise<void> {
+  const contentFolder = activeDraft.value.contentFolder.trim()
+  if (contentFolder.length === 0) {
+    statusMessage.value = 'Select content folder first.'
     return
   }
 
-  const dedupedPaths = dedupePaths(paths)
-  const { inside, outside } = filterPathsByWorkspace(dedupedPaths, workspaceRoot)
-
-  uploadFiles.value = inside
-  if (inside.length === 0) {
-    statusMessage.value = 'No files were added. Pick files inside the selected workspace root.'
+  const normalizedSelected = [...new Set(paths.filter((path) => path.trim().length > 0))]
+  if (normalizedSelected.length === 0) {
     return
   }
 
-  if (outside.length > 0) {
-    statusMessage.value = `Added ${inside.length} file(s) from workspace. Skipped ${outside.length} outside workspace root.`
+  const filesInFolder = await loadContentFolderFiles(contentFolder)
+  const fileByAbsolutePath = new Map(filesInFolder.map((file) => [normalizeFsPath(file.absolutePath), file]))
+  const selectedMatches: StagedContentFile[] = []
+  let outsideCount = 0
+
+  for (const path of normalizedSelected) {
+    if (!isPathInContentFolder(path, contentFolder)) {
+      outsideCount += 1
+      continue
+    }
+
+    const match = fileByAbsolutePath.get(normalizeFsPath(path))
+    if (!match) {
+      outsideCount += 1
+      continue
+    }
+    selectedMatches.push(match)
+  }
+
+  if (selectedMatches.length === 0) {
+    statusMessage.value = 'No files were added. Pick files inside the selected content folder.'
     return
   }
 
-  statusMessage.value = `Added ${inside.length} workspace file(s).`
+  const beforeCount = stagedContentFiles.value.length
+  stagedContentFiles.value = mergeContentFiles(stagedContentFiles.value, selectedMatches)
+  const addedCount = stagedContentFiles.value.length - beforeCount
+  const addedSize = selectedMatches.reduce((sum, file) => sum + file.sizeBytes, 0)
+
+  if (outsideCount > 0) {
+    statusMessage.value = `Added ${addedCount} file(s) (${formatSizeLabel(addedSize)}). Skipped ${outsideCount} path(s) outside content folder.`
+    return
+  }
+
+  statusMessage.value = `Added ${addedCount} file(s) (${formatSizeLabel(addedSize)}).`
 }
 
-function removeStagedFile(path: string): void {
-  uploadFiles.value = uploadFiles.value.filter((item) => item !== path)
-  statusMessage.value = `Removed staged file: ${fileNameFromPath(path)}`
+function removeStagedFile(absolutePath: string): void {
+  const pathKey = normalizeFsPath(absolutePath)
+  stagedContentFiles.value = stagedContentFiles.value.filter((item) => normalizeFsPath(item.absolutePath) !== pathKey)
+  const removedName = fileNameFromPath(absolutePath)
+  statusMessage.value = `Removed staged file: ${removedName}`
 }
 
 async function pickUploadFiles(): Promise<void> {
   if (activeDraft.value.contentFolder.trim().length === 0) {
-    statusMessage.value = 'Select workspace root first.'
+    statusMessage.value = 'Select content folder first.'
     return
   }
 
@@ -409,17 +557,27 @@ async function pickUploadFiles(): Promise<void> {
   if (!paths || paths.length === 0) {
     return
   }
-  stageUploadFiles(paths)
+  try {
+    await stageSelectedContentFiles(paths)
+  } catch (error) {
+    const parsed = normalizeError(error)
+    statusMessage.value = `Failed to add files (${parsed.code}): ${parsed.message}`
+    showToast({
+      tone: 'error',
+      title: 'Add Files Failed',
+      detail: parsed.message
+    })
+  }
 }
 
 function clearUploadFiles(): void {
-  uploadFiles.value = []
+  stagedContentFiles.value = []
 }
 
 function clearWorkspace(): void {
   activeDraft.value.contentFolder = ''
-  uploadFiles.value = []
-  statusMessage.value = 'Workspace cleared.'
+  stagedContentFiles.value = []
+  statusMessage.value = 'Mod content cleared.'
 }
 
 function onUploadDragOver(event: DragEvent): void {
@@ -435,12 +593,12 @@ function onUploadDragLeave(event: DragEvent): void {
   isUploadDropActive.value = false
 }
 
-function onUploadDrop(event: DragEvent): void {
+async function onUploadDrop(event: DragEvent): Promise<void> {
   event.preventDefault()
   isUploadDropActive.value = false
 
   if (activeDraft.value.contentFolder.trim().length === 0) {
-    statusMessage.value = 'Select workspace root first.'
+    statusMessage.value = 'Select content folder first.'
     return
   }
 
@@ -454,11 +612,41 @@ function onUploadDrop(event: DragEvent): void {
     .filter((path): path is string => typeof path === 'string' && path.trim().length > 0)
 
   if (paths.length > 0) {
-    stageUploadFiles(paths)
+    try {
+      await stageSelectedContentFiles(paths)
+    } catch (error) {
+      const parsed = normalizeError(error)
+      statusMessage.value = `Failed to add dropped files (${parsed.code}): ${parsed.message}`
+      showToast({
+        tone: 'error',
+        title: 'Drop Failed',
+        detail: parsed.message
+      })
+    }
     return
   }
 
   statusMessage.value = 'Dropped files did not include local paths. Use Add Files instead.'
+}
+
+function setStagedContentFilesFromFolder(contentFolder: string, files: StagedContentFile[]): void {
+  stagedContentFiles.value = files
+  if (files.length === 0) {
+    statusMessage.value = `Content folder selected: ${contentFolder}. No files found.`
+    return
+  }
+  const totalSize = files.reduce((sum, file) => sum + file.sizeBytes, 0)
+  statusMessage.value = `Loaded ${files.length} content file(s), ${formatSizeLabel(totalSize)} total.`
+}
+
+function setContentFolderSelectionError(contentFolder: string, message: string): void {
+  stagedContentFiles.value = []
+  statusMessage.value = `Content folder selected: ${contentFolder}. Scan failed: ${message}`
+  showToast({
+    tone: 'error',
+    title: 'Content Scan Failed',
+    detail: message
+  })
 }
 
 function addTag(): void {
@@ -674,6 +862,7 @@ async function refreshRememberedLoginState(): Promise<void> {
     loginForm.username = payload.rememberedUsername
   }
   loginForm.rememberAuth = payload.rememberAuth === true
+  hasPersistedStoredSession.value = payload.rememberAuth === true
   if (payload.rememberAuth === true) {
     loginForm.rememberUsername = true
   }
@@ -743,6 +932,29 @@ async function clearSavedWebApiKey(): Promise<void> {
   }
 }
 
+async function clearStoredSession(): Promise<void> {
+  if (isLoginSubmitting.value) {
+    return
+  }
+
+  try {
+    await window.workshop.clearStoredSession()
+    hasPersistedStoredSession.value = false
+    loginForm.rememberAuth = false
+    loginForm.password = ''
+    isPasswordPeek.value = false
+    isStoredSessionLoginAttempt.value = false
+    steamGuardSessionId.value = null
+    steamGuardCode.value = ''
+    steamGuardPromptType.value = 'none'
+    authIssue.value = null
+    statusMessage.value = 'Saved session cleared. Enter password to sign in.'
+  } catch (error) {
+    const parsed = normalizeError(error)
+    statusMessage.value = `Clear session failed (${parsed.code}): ${parsed.message}`
+  }
+}
+
 async function finalizeSuccessfulLogin(successMessage: string): Promise<void> {
   loginState.value = 'signed_in'
   steamGuardSessionId.value = null
@@ -750,6 +962,7 @@ async function finalizeSuccessfulLogin(successMessage: string): Promise<void> {
   authIssue.value = null
   statusMessage.value = successMessage
   loginForm.password = ''
+  hasPersistedStoredSession.value = loginForm.rememberAuth && loginForm.rememberUsername
   flowStep.value = 'mods'
   await Promise.all([loadWorkshopItems(), refreshCurrentProfile()])
 }
@@ -941,8 +1154,13 @@ async function pickContentFolder(): Promise<void> {
   const path = await window.workshop.pickFolder()
   if (path) {
     activeDraft.value.contentFolder = path
-    uploadFiles.value = uploadFiles.value.filter((filePath) => isPathInWorkspace(filePath, path))
-    statusMessage.value = `Workspace root selected: ${path}`
+    try {
+      const files = await loadContentFolderFiles(path)
+      setStagedContentFilesFromFolder(path, files)
+    } catch (error) {
+      const parsed = normalizeError(error)
+      setContentFolderSelectionError(path, parsed.message)
+    }
   }
 }
 
@@ -1184,6 +1402,7 @@ onUnmounted(() => {
       :steam-guard-prompt-type="steamGuardPromptType"
       :steam-guard-code="steamGuardCode"
       :is-stored-session-login-attempt="isStoredSessionLoginAttempt"
+      :can-clear-stored-session="hasPersistedStoredSession"
       :is-advanced-options-open="isAdvancedOptionsOpen"
       :advanced-settings="advancedSettings"
       :is-web-api-key-peek="isWebApiKeyPeek"
@@ -1196,6 +1415,7 @@ onUnmounted(() => {
       @set-web-api-key-peek="setWebApiKeyPeek"
       @save-advanced-settings="saveAdvancedSettings"
       @clear-web-api-key="clearSavedWebApiKey"
+      @clear-stored-session="clearStoredSession"
     />
 
     <template v-else>
@@ -1246,7 +1466,9 @@ onUnmounted(() => {
           :visibility-committed="committedVisibility"
           :visibility-pending="pendingVisibility"
           :can-change-visibility="canChangeVisibility"
-          :upload-files="uploadFiles"
+          :staged-content-files="stagedContentFiles"
+          :staged-content-tree="stagedContentTree"
+          :total-staged-content-size-bytes="totalStagedContentSizeBytes"
           :is-upload-drop-active="isUploadDropActive"
           :can-upload="canCreate()"
           :can-update="canUpdate()"
