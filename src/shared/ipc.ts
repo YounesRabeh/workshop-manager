@@ -1,0 +1,22 @@
+export const IPC_CHANNELS = {
+  ensureSteamCmdInstalled: 'workshop:ensureSteamCmdInstalled',
+  login: 'workshop:login',
+  logout: 'workshop:logout',
+  submitSteamGuardCode: 'workshop:submitSteamGuardCode',
+  uploadMod: 'workshop:uploadMod',
+  updateMod: 'workshop:updateMod',
+  updateVisibility: 'workshop:updateVisibility',
+  getProfiles: 'workshop:getProfiles',
+  getAdvancedSettings: 'workshop:getAdvancedSettings',
+  saveAdvancedSettings: 'workshop:saveAdvancedSettings',
+  saveProfile: 'workshop:saveProfile',
+  deleteProfile: 'workshop:deleteProfile',
+  getRunLogs: 'workshop:getRunLogs',
+  getRunLog: 'workshop:getRunLog',
+  getCurrentProfile: 'workshop:getCurrentProfile',
+  getMyWorkshopItems: 'workshop:getMyWorkshopItems',
+  pickFolder: 'workshop:pickFolder',
+  pickFile: 'workshop:pickFile',
+  pickFiles: 'workshop:pickFiles',
+  runEvent: 'workshop:runEvent'
+} as const

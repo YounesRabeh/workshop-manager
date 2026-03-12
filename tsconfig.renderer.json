@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": ["src/frontend/**/*.ts", "src/frontend/**/*.vue", "src/shared/**/*.ts"],
+  "compilerOptions": {
+    "jsx": "preserve",
+    "types": ["vite/client", "vitest/globals"]
+  }
+}
