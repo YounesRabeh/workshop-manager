@@ -343,6 +343,19 @@ function goToStep(step: FlowStep): void {
     updateDraft.publishedFileId = selectedWorkshopItemId.value
   }
 
+  if (
+    (step === 'update' || step === 'create') &&
+    (flowStep.value === 'update' || flowStep.value === 'create') &&
+    flowStep.value !== step
+  ) {
+    const fromDraft = flowStep.value === 'create' ? createDraft : updateDraft
+    const toDraft = step === 'create' ? createDraft : updateDraft
+    const fromContentFolder = fromDraft.contentFolder.trim()
+    if (!toDraft.contentFolder.trim() && fromContentFolder.length > 0) {
+      toDraft.contentFolder = fromContentFolder
+    }
+  }
+
   flowStep.value = step
 }
 
