@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { WorkshopItemSummary } from '@shared/contracts'
-import { getUpdateDraftPath } from '@shared/workshop-requirements'
 import type { ContentTreeNode, PublishChecklistItem, StagedContentFile, UploadDraftState } from '../types/ui'
 import { formatSizeLabel } from '../utils/size-format'
 import VisibilityIcon from './VisibilityIcon.vue'
@@ -156,48 +155,20 @@ const sectionDescription = computed(() =>
     ? 'Review and publish changes to this item.'
     : 'Create a new Workshop item. A Published File ID will be assigned by Steam after upload.'
 )
+const readinessTitle = computed(() => (isUpdateMode.value ? 'Update Readiness' : 'Create Readiness'))
 const contentFolderValue = computed(() => props.draft.contentFolder.trim())
 const hasContentFolder = computed(() => contentFolderValue.value.length > 0)
 const primaryActionLabel = computed(() => (isUpdateMode.value ? 'Update Existing Item' : 'Create New Item'))
 const primaryActionDisabled = computed(() => (isUpdateMode.value ? !props.canUpdate : !props.canUpload))
 const publishedFileIdValue = computed(() => props.selectedWorkshopItem?.publishedFileId || props.draft.publishedFileId || 'Not selected')
 const appIdValue = computed(() => props.selectedWorkshopItem?.appId || props.draft.appId || 'Not selected')
-const updateDraftPath = computed(() => getUpdateDraftPath(props.draft))
-const updateModeLabel = computed(() => {
-  if (!isUpdateMode.value) {
-    return ''
-  }
-  if (updateDraftPath.value === 'content_and_preview') {
-    return 'Update mode: Content + Preview'
-  }
-  if (updateDraftPath.value === 'content') {
-    return 'Update mode: Content update'
-  }
-  if (updateDraftPath.value === 'preview') {
-    return 'Update mode: Preview-only update'
-  }
-  return 'Update mode: Not selected'
-})
-const updateModeHint = computed(() => {
-  if (!isUpdateMode.value) {
-    return ''
-  }
-  if (updateDraftPath.value === 'content_and_preview') {
-    return 'Uploads content folder files and updates preview image.'
-  }
-  if (updateDraftPath.value === 'content') {
-    return 'Uploads content folder files and keeps current preview unless replaced.'
-  }
-  if (updateDraftPath.value === 'preview') {
-    return 'Updates only the Workshop preview image.'
-  }
-  return 'Select a content folder for content update or pick a preview file for image-only update.'
-})
 const collapsedFolderIds = ref<Set<string>>(new Set())
 const flattenedContentNodes = computed(() =>
   flattenContentTree(props.stagedContentTree, collapsedFolderIds.value)
 )
 const totalContentSizeLabel = computed(() => formatSizeLabel(props.totalStagedContentSizeBytes))
+const requiredPublishChecklist = computed(() => props.publishChecklist.filter((item) => !item.optional))
+const optionalPublishChecklist = computed(() => props.publishChecklist.filter((item) => item.optional))
 
 const allFolderIds = computed(() => {
   const ids = new Set<string>()
@@ -244,6 +215,9 @@ function toggleFolder(folderId: string): void {
 }
 
 function readinessItemClass(item: PublishChecklistItem): string {
+  if (item.label === 'Release notes' && !hasContentFolder.value) {
+    return 'border-[#2a3542] bg-[#0a111a] opacity-60'
+  }
   if (item.ok) {
     return 'border-emerald-400/45 bg-emerald-500/18'
   }
@@ -254,6 +228,9 @@ function readinessItemClass(item: PublishChecklistItem): string {
 }
 
 function readinessStatusClass(item: PublishChecklistItem): string {
+  if (item.label === 'Release notes' && !hasContentFolder.value) {
+    return 'text-slate-600'
+  }
   if (item.ok) {
     return 'text-emerald-200'
   }
@@ -265,7 +242,7 @@ function readinessStatusClass(item: PublishChecklistItem): string {
 
 function readinessStatusLabel(item: PublishChecklistItem): string {
   if (item.ok) {
-    return 'Ready'
+    return 'OK'
   }
   return item.optional ? 'Optional' : 'Missing'
 }
@@ -294,14 +271,6 @@ function submitPrimaryAction(): void {
       </div>
 
       <p class="mt-2 text-sm text-slate-300">{{ sectionDescription }}</p>
-      <div
-        v-if="isUpdateMode"
-        class="mt-2 rounded-lg border border-[#355874] bg-[#15283b] px-3 py-2"
-      >
-        <p class="text-xs font-semibold uppercase tracking-wide text-slate-200">{{ updateModeLabel }}</p>
-        <p class="mt-1 text-xs text-slate-300">{{ updateModeHint }}</p>
-      </div>
-
       <div
         v-if="isUpdateMode"
         class="mt-3 rounded-xl border p-4 transition-[background,border-color,box-shadow] duration-500 ease-out"
@@ -375,10 +344,24 @@ function submitPrimaryAction(): void {
       </div>
 
       <div class="mt-4 rounded-xl border border-[#2f4f69] bg-[#1a2b3e] p-4">
-        <p class="text-sm font-semibold text-slate-100">Publish Readiness</p>
+        <p class="text-sm font-semibold text-slate-100">{{ readinessTitle }}</p>
         <ul class="mt-3 grid gap-2 text-sm text-slate-200 sm:grid-cols-2">
           <li
-            v-for="item in publishChecklist"
+            v-for="item in requiredPublishChecklist"
+            :key="item.label"
+            class="flex items-center justify-between rounded-lg border px-3 py-2"
+            :class="readinessItemClass(item)"
+          >
+            <span>{{ item.label }}</span>
+            <span class="text-xs font-semibold" :class="readinessStatusClass(item)">{{ readinessStatusLabel(item) }}</span>
+          </li>
+        </ul>
+        <div v-if="optionalPublishChecklist.length > 0" class="mt-3 pb-2">
+          <div class="border-t border-[#365572]/70"></div>
+        </div>
+        <ul v-if="optionalPublishChecklist.length > 0" class="grid gap-2 text-sm text-slate-200 sm:grid-cols-2">
+          <li
+            v-for="item in optionalPublishChecklist"
             :key="item.label"
             class="flex items-center justify-between rounded-lg border px-3 py-2"
             :class="readinessItemClass(item)"
@@ -406,7 +389,9 @@ function submitPrimaryAction(): void {
       <textarea
         v-model="draft.releaseNotes"
         rows="2"
-        class="mt-1 min-h-[3.5rem] w-full resize-y rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100"
+        :disabled="!hasContentFolder"
+        :placeholder="hasContentFolder ? '' : 'Select a content folder to enable release notes.'"
+        class="mt-1 min-h-[3.5rem] w-full resize-y rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100 disabled:cursor-not-allowed disabled:border-[#33465a] disabled:bg-[#0c1623] disabled:text-slate-500"
       />
 
       <div class="mt-3 grid gap-3 md:grid-cols-2">
@@ -445,7 +430,7 @@ function submitPrimaryAction(): void {
     </article>
 
     <article class="fade-in app-panel h-fit rounded-2xl border border-[#ad6f2f] bg-[linear-gradient(135deg,rgba(93,56,21,0.7),rgba(40,32,24,0.82))] p-5 shadow-md xl:p-6 2xl:sticky 2xl:top-4">
-      <h2 class="text-xl font-semibold text-orange-200">Content Hierarchy</h2>
+      <h2 class="text-xl font-semibold text-orange-200">Content Explorer</h2>
       <div class="mt-3 grid grid-cols-2 gap-2">
         <button
           class="flex min-h-[3.25rem] items-center justify-center rounded border border-[#6ecbff] bg-[#59b9f8] px-3 text-center text-sm font-semibold leading-tight text-[#05253a]"
@@ -494,7 +479,7 @@ function submitPrimaryAction(): void {
 
       <div class="mt-4 rounded-lg border border-[#ad6f2f] bg-[#1f3248]">
         <div class="flex w-full items-center justify-between border-b border-[#ad6f2f] px-3 py-2 text-left">
-          <span class="text-base font-semibold text-slate-100">Content Hierarchy</span>
+          <span class="text-base font-semibold text-slate-100">Content Explorer</span>
           <span class="flex items-center gap-2 text-sm text-slate-300">
             {{ stagedContentFiles.length }} item(s) • {{ totalContentSizeLabel }}
           </span>
