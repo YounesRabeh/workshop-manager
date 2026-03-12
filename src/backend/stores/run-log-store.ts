@@ -1,5 +1,5 @@
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { appendFile, mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { RunResult } from '@shared/contracts'
 
 export interface PersistedRunLog extends RunResult {
@@ -7,13 +7,29 @@ export interface PersistedRunLog extends RunResult {
   status: 'running' | 'success' | 'failed' | 'cancelled'
 }
 
+const SESSION_LOG_FILE = 'steamcmd-output.log'
+
+function cloneLog(log: PersistedRunLog): PersistedRunLog {
+  return {
+    ...log,
+    lines: [...log.lines]
+  }
+}
+
 export class RunLogStore {
-  private writeChains = new Map<string, Promise<void>>()
+  private writeChain: Promise<void> = Promise.resolve()
+  private runs = new Map<string, PersistedRunLog>()
 
   constructor(private readonly logsDir: string) {}
 
-  private getPath(runId: string): string {
-    return join(this.logsDir, `${runId}.json`)
+  private getSessionLogPath(): string {
+    return join(this.logsDir, SESSION_LOG_FILE)
+  }
+
+  private async withWriteLock(operation: () => Promise<void>): Promise<void> {
+    const next = this.writeChain.then(operation)
+    this.writeChain = next.catch(() => undefined)
+    await next
   }
 
   async create(runId: string): Promise<PersistedRunLog> {
@@ -21,41 +37,48 @@ export class RunLogStore {
       runId,
       success: false,
       steamOutputSummary: '',
-      logPath: this.getPath(runId),
+      logPath: this.getSessionLogPath(),
       lines: [],
       status: 'running'
     }
-    await this.withRunLock(runId, async () => {
-      await this.write(log)
+
+    await this.withWriteLock(async () => {
+      await mkdir(this.logsDir, { recursive: true })
+      // Requested behavior: keep only current session output.
+      await writeFile(this.getSessionLogPath(), '', 'utf8')
+      this.runs.clear()
+      this.runs.set(runId, cloneLog(log))
     })
-    return log
+
+    return cloneLog(log)
   }
 
   async appendLine(runId: string, line: string): Promise<void> {
-    await this.withRunLock(runId, async () => {
-      const current = (await this.get(runId)) ?? {
+    await this.withWriteLock(async () => {
+      const current = this.runs.get(runId) ?? {
         runId,
         success: false,
         steamOutputSummary: '',
-        logPath: this.getPath(runId),
+        logPath: this.getSessionLogPath(),
         lines: [],
         status: 'running' as const
       }
 
       current.lines.push(line)
       current.steamOutputSummary = current.lines.slice(-25).join('\n')
-      await this.write(current)
+      this.runs.set(runId, cloneLog(current))
+      await appendFile(this.getSessionLogPath(), `${line}\n`, 'utf8')
     })
   }
 
   async finalize(runId: string, update: Partial<PersistedRunLog>): Promise<PersistedRunLog> {
     let merged!: PersistedRunLog
-    await this.withRunLock(runId, async () => {
-      const current = (await this.get(runId)) ?? {
+    await this.withWriteLock(async () => {
+      const current = this.runs.get(runId) ?? {
         runId,
         success: false,
         steamOutputSummary: '',
-        logPath: this.getPath(runId),
+        logPath: this.getSessionLogPath(),
         lines: [],
         status: 'running' as const
       }
@@ -64,46 +87,21 @@ export class RunLogStore {
         ...current,
         ...update,
         runId,
-        logPath: this.getPath(runId)
+        logPath: this.getSessionLogPath()
       }
-      await this.write(merged)
+      this.runs.set(runId, cloneLog(merged))
     })
-    return merged
+    return cloneLog(merged)
   }
 
   async get(runId: string): Promise<PersistedRunLog | null> {
-    try {
-      const data = await readFile(this.getPath(runId), 'utf8')
-      return JSON.parse(data) as PersistedRunLog
-    } catch {
-      return null
-    }
+    const found = this.runs.get(runId)
+    return found ? cloneLog(found) : null
   }
 
   async list(): Promise<PersistedRunLog[]> {
-    await mkdir(this.logsDir, { recursive: true })
-    const files = await readdir(this.logsDir)
-    const logs = await Promise.all(
-      files
-        .filter((name) => name.endsWith('.json'))
-        .map(async (name) => {
-          const content = await readFile(join(this.logsDir, name), 'utf8')
-          return JSON.parse(content) as PersistedRunLog
-        })
-    )
-
-    return logs.sort((a, b) => b.runId.localeCompare(a.runId))
-  }
-
-  private async write(log: PersistedRunLog): Promise<void> {
-    await mkdir(dirname(this.getPath(log.runId)), { recursive: true })
-    await writeFile(this.getPath(log.runId), `${JSON.stringify(log, null, 2)}\n`, 'utf8')
-  }
-
-  private async withRunLock(runId: string, operation: () => Promise<void>): Promise<void> {
-    const current = this.writeChains.get(runId) ?? Promise.resolve()
-    const next = current.then(operation)
-    this.writeChains.set(runId, next.catch(() => undefined))
-    await next
+    return [...this.runs.values()]
+      .sort((a, b) => b.runId.localeCompare(a.runId))
+      .map((entry) => cloneLog(entry))
   }
 }

@@ -66,7 +66,7 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
         <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <select
             :value="visibilityFilter"
-            class="rounded border border-slate-300 px-2 py-2 text-xs sm:min-w-[150px]"
+            class="workshop-visibility-filter-select rounded border border-slate-300 px-2 py-2 text-xs sm:min-w-[150px]"
             @change="onVisibilityFilterInput"
           >
             <option value="all">Visibility: All</option>

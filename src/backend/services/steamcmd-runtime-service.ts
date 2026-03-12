@@ -34,19 +34,6 @@ interface LoginFailure {
   message: string
 }
 
-const TEMP_WORKSHOP_FETCH_DEBUG = true
-
-function debugWorkshopFetch(message: string, extra?: unknown): void {
-  if (!TEMP_WORKSHOP_FETCH_DEBUG) {
-    return
-  }
-  if (typeof extra === 'undefined') {
-    console.info(`[TEMP_FETCH_DEBUG] ${message}`)
-    return
-  }
-  console.info(`[TEMP_FETCH_DEBUG] ${message}`, extra)
-}
-
 function createRunId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
 }
@@ -277,38 +264,6 @@ export function mergeWorkshopItems(items: WorkshopItemSummary[]): WorkshopItemSu
   return [...merged.values()].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
 }
 
-function summarizeVisibility(items: WorkshopItemSummary[]): Record<string, number> {
-  const summary: Record<string, number> = {
-    public: 0,
-    friends: 0,
-    hidden: 0,
-    unlisted: 0,
-    unknown: 0
-  }
-
-  for (const item of items) {
-    if (item.visibility === 0) {
-      summary.public += 1
-      continue
-    }
-    if (item.visibility === 1) {
-      summary.friends += 1
-      continue
-    }
-    if (item.visibility === 2) {
-      summary.hidden += 1
-      continue
-    }
-    if (item.visibility === 3) {
-      summary.unlisted += 1
-      continue
-    }
-    summary.unknown += 1
-  }
-
-  return summary
-}
-
 export function buildWorkshopArgs(
   username: string,
   password: string | undefined,
@@ -362,6 +317,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
       const child = spawn(executablePath, args, { cwd: this.runtimeDir, stdio: 'pipe' })
       this.activeRuns.set(runId, child)
       let guardMobilePromptSent = false
+      let logWriteQueue: Promise<void> = Promise.resolve()
 
       const timeoutMs = options.timeoutMs ?? 5 * 60_000
       const timeout = setTimeout(() => {
@@ -414,7 +370,9 @@ export class SteamCmdRuntimeService extends EventEmitter {
         }
 
         lines.push(normalizedLine)
-        await this.runLogStore.appendLine(runId, normalizedLine)
+        logWriteQueue = logWriteQueue
+          .then(() => this.runLogStore.appendLine(runId, normalizedLine))
+          .catch(() => undefined)
         this.emitRunEvent({ runId, ts: Date.now(), type, line: normalizedLine, phase: options.phase })
 
       }
@@ -439,9 +397,12 @@ export class SteamCmdRuntimeService extends EventEmitter {
       })
 
       child.once('close', (exitCode) => {
-        clearTimeout(timeout)
-        this.activeRuns.delete(runId)
-        resolve({ lines, exitCode: exitCode ?? 1 })
+        void (async () => {
+          clearTimeout(timeout)
+          this.activeRuns.delete(runId)
+          await logWriteQueue
+          resolve({ lines, exitCode: exitCode ?? 1 })
+        })()
       })
     })
   }
@@ -551,47 +512,46 @@ export class SteamCmdRuntimeService extends EventEmitter {
     let webApiItems: WorkshopItemSummary[] = []
     let communityItems: WorkshopItemSummary[] = []
 
-    debugWorkshopFetch('Starting workshop fetch', {
-      steamId64: this.loginState.steamId64,
-      appId: normalizedAppId ?? null,
-      allowWebApi,
-      hasApiKey: Boolean(apiKey)
-    })
+    type WorkshopFetchOutcome =
+      | { source: 'web_api' | 'community'; ok: true; items: WorkshopItemSummary[] }
+      | { source: 'web_api' | 'community'; ok: false; error: unknown }
+
+    const tasks: Array<Promise<WorkshopFetchOutcome>> = []
 
     if (apiKey) {
-      try {
-        const items = await this.getMyWorkshopItemsWithWebApi(apiKey, normalizedAppId)
-        webApiItems = items
-        debugWorkshopFetch('Web API fetch completed', {
-          itemCount: items.length,
-          visibilityBreakdown: summarizeVisibility(items)
-        })
-      } catch (error) {
-        failures.push(`Web API: ${errorMessage(error)}`)
-        debugWorkshopFetch('Web API fetch failed', { error: errorMessage(error) })
-      }
+      tasks.push(
+        this.getMyWorkshopItemsWithWebApi(apiKey, normalizedAppId)
+          .then((items) => ({ source: 'web_api' as const, ok: true as const, items }))
+          .catch((error: unknown) => ({ source: 'web_api' as const, ok: false as const, error }))
+      )
     }
 
-    try {
-      const items = await this.getMyWorkshopItemsWithCommunity(normalizedAppId)
-      communityItems = items
-      debugWorkshopFetch('Community fetch completed', {
-        itemCount: items.length,
-        visibilityBreakdown: summarizeVisibility(items)
-      })
-    } catch (error) {
-      failures.push(`Community: ${errorMessage(error)}`)
-      debugWorkshopFetch('Community fetch failed', { error: errorMessage(error) })
+    tasks.push(
+      this.getMyWorkshopItemsWithCommunity(normalizedAppId)
+        .then((items) => ({ source: 'community' as const, ok: true as const, items }))
+        .catch((error: unknown) => ({ source: 'community' as const, ok: false as const, error }))
+    )
+
+    const outcomes = await Promise.all(tasks)
+    for (const outcome of outcomes) {
+      if (outcome.ok) {
+        if (outcome.source === 'web_api') {
+          webApiItems = outcome.items
+        } else {
+          communityItems = outcome.items
+        }
+        continue
+      }
+
+      if (outcome.source === 'web_api') {
+        failures.push(`Web API: ${errorMessage(outcome.error)}`)
+      } else {
+        failures.push(`Community: ${errorMessage(outcome.error)}`)
+      }
     }
 
     const combined = mergeWorkshopItems([...webApiItems, ...communityItems])
     if (combined.length > 0) {
-      debugWorkshopFetch('Combined fetch result', {
-        webApiItems: webApiItems.length,
-        communityItems: communityItems.length,
-        merged: combined.length,
-        visibilityBreakdown: summarizeVisibility(combined)
-      })
       return combined
     }
 
@@ -608,13 +568,13 @@ export class SteamCmdRuntimeService extends EventEmitter {
   private async getMyWorkshopItemsWithWebApi(apiKey: string, appId?: string): Promise<WorkshopItemSummary[]> {
     const perPage = 100
     const maxPages = 20
-    const privacyModes: Array<{ label: string; value?: string }> = [
-      { label: 'any' },
-      { label: 'public', value: '0' },
-      { label: 'friends', value: '1' },
-      { label: 'hidden', value: '2' },
-      { label: 'unlisted', value: '3' },
-      { label: 'private', value: '4' }
+    const privacyModes: Array<{ value?: string }> = [
+      {},
+      { value: '0' },
+      { value: '1' },
+      { value: '2' },
+      { value: '3' },
+      { value: '4' }
     ]
     const failures: string[] = []
     const collected: WorkshopItemSummary[] = []
@@ -641,24 +601,11 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
         if (!response.ok) {
           failures.push(`privacy=${mode.value ?? 'any'}, page=${page}, status=${response.status}`)
-          debugWorkshopFetch('Web API page failed', {
-            privacyMode: mode.label,
-            privacyValue: mode.value ?? null,
-            page,
-            status: response.status
-          })
           break
         }
 
         const payload = (await response.json()) as unknown
         const pageItems = normalizeWorkshopItems(payload)
-
-        debugWorkshopFetch('Web API page fetched', {
-          privacyMode: mode.label,
-          privacyValue: mode.value ?? null,
-          page,
-          pageItems: pageItems.length
-        })
 
         if (pageItems.length === 0) {
           break
@@ -674,11 +621,6 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
     const merged = mergeWorkshopItems(collected)
     if (merged.length > 0) {
-      debugWorkshopFetch('Web API merged item set', {
-        collected: collected.length,
-        merged: merged.length,
-        visibilityBreakdown: summarizeVisibility(merged)
-      })
       return merged
     }
 
