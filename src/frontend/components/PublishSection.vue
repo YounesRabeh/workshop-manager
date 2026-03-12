@@ -74,24 +74,49 @@ function visibilityTooltip(value: 0 | 1 | 2 | 3): string {
 }
 
 function visibilityCardClass(value: 0 | 1 | 2 | 3): string {
-  if (value === 0) return 'border-[#3f8f70] bg-[#162d29]'
-  if (value === 1) return 'border-[#d89a3d] bg-[#332515]'
-  if (value === 2) return 'border-[#b35f71] bg-[#3a1f28]'
-  return 'border-[#3f5467] bg-[#121d29]'
+  if (value === 0) {
+    return 'border-[#4eb787] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(78,183,135,0.34)_0%,rgba(50,111,90,0.18)_28%,rgba(19,36,55,0.96)_70%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(78,183,135,0.34),0_0_22px_rgba(41,136,99,0.22)]'
+  }
+  if (value === 1) {
+    return 'border-[#e2ab5f] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(226,171,95,0.33)_0%,rgba(126,84,36,0.2)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(226,171,95,0.34),0_0_22px_rgba(153,100,37,0.2)]'
+  }
+  if (value === 2) {
+    return 'border-[#cb7e95] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(203,126,149,0.35)_0%,rgba(112,52,71,0.2)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(203,126,149,0.35),0_0_22px_rgba(129,55,79,0.2)]'
+  }
+  return 'border-[#748ea6] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(116,142,166,0.34)_0%,rgba(55,74,94,0.2)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(116,142,166,0.34),0_0_20px_rgba(73,94,114,0.18)]'
 }
 
-function visibilityOptionClass(selected: boolean): string {
+function visibilityOptionClass(option: 0 | 1 | 2 | 3, selected: boolean): string {
   const base =
     'group relative flex h-9 w-[132px] items-center justify-center gap-1.5 rounded border px-2 text-xs font-semibold transition-colors duration-200'
 
-  if (selected) {
-    return `${base} border-[#66c0f4] bg-[#23415a] text-[#dff2ff] shadow-[inset_0_0_0_1px_rgba(102,192,244,0.3)]`
+  if (!selected) {
+    return `${base} border-[#3a5a76] bg-[#132334] text-[#9fb1bf] hover:bg-[#1a2d40]`
   }
-  return `${base} border-[#3a5a76] bg-[#132334] text-[#9fb1bf] hover:bg-[#1a2d40]`
+
+  if (option === 0) {
+    return `${base} border-[#55b88f] bg-[#235942] text-[#d9f5e8] shadow-[inset_0_0_0_1px_rgba(85,184,143,0.3)]`
+  }
+  if (option === 1) {
+    return `${base} border-[#e0ac5a] bg-[#5b3f1f] text-[#ffe8bf] shadow-[inset_0_0_0_1px_rgba(224,172,90,0.3)]`
+  }
+  if (option === 2) {
+    return `${base} border-[#ca7a90] bg-[#5a2738] text-[#ffdce6] shadow-[inset_0_0_0_1px_rgba(202,122,144,0.3)]`
+  }
+  return `${base} border-[#7c9ab2] bg-[#2c4255] text-[#d9e8f4] shadow-[inset_0_0_0_1px_rgba(124,154,178,0.3)]`
 }
 
-function visibilityActionClass(): string {
-  return 'border-[#4d8fb4] bg-[#2a5f80] hover:bg-[#3577a0]'
+function visibilityActionClass(value: 0 | 1 | 2 | 3): string {
+  if (value === 0) {
+    return 'border-[#57b58f] bg-[#2f7858] hover:bg-[#3a9470]'
+  }
+  if (value === 1) {
+    return 'border-[#dca252] bg-[#9c6222] hover:bg-[#ba7629]'
+  }
+  if (value === 2) {
+    return 'border-[#c7748a] bg-[#8d3550] hover:bg-[#a84463]'
+  }
+  return 'border-[#6f8ba3] bg-[#3f5b73] hover:bg-[#50718c]'
 }
 
 function onVisibilityOptionClick(value: 0 | 1 | 2 | 3): void {
@@ -140,7 +165,7 @@ function submitPrimaryAction(): void {
 
       <div
         v-if="isUpdateMode"
-        class="mt-3 rounded-xl border p-4 transition-colors duration-300"
+        class="mt-3 rounded-xl border p-4 transition-[background,border-color,box-shadow] duration-500 ease-out"
         :class="visibilityCardClass(visibilityPending)"
       >
         <div class="flex flex-col gap-4">
@@ -177,7 +202,7 @@ function submitPrimaryAction(): void {
                 type="button"
                 :title="visibilityTooltip(option)"
                 :aria-label="visibilityTooltip(option)"
-                :class="visibilityOptionClass(option === visibilityPending)"
+                :class="visibilityOptionClass(option, option === visibilityPending)"
                 @click="onVisibilityOptionClick(option)"
               >
                 <VisibilityIcon :visibility="option" class="h-4 w-4" />
@@ -198,7 +223,7 @@ function submitPrimaryAction(): void {
               </p>
               <button
                 class="min-w-[190px] rounded border px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
-                :class="visibilityActionClass()"
+                :class="visibilityActionClass(visibilityPending)"
                 :disabled="!canChangeVisibility"
                 @click="emit('update-visibility-only')"
               >

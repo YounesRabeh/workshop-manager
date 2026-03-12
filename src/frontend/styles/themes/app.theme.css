@@ -245,6 +245,28 @@ body {
   color: #e5eef7 !important;
 }
 
+.steam-theme .workshop-visibility-filter-select {
+  background-color: #0f1a25 !important;
+  border-color: #2a475e !important;
+  color: #e5eef7 !important;
+}
+
+.steam-theme .workshop-visibility-filter-select:focus {
+  border-color: #66c0f4 !important;
+  box-shadow: 0 0 0 1px rgba(102, 192, 244, 0.45);
+}
+
+.steam-theme .workshop-visibility-filter-select option {
+  background-color: #1b2838;
+  color: #e5eef7;
+}
+
+.steam-theme .workshop-visibility-filter-select option:checked {
+  background-color: #66c0f4;
+  color: #0b141e;
+  font-weight: 700;
+}
+
 .steam-theme input::placeholder,
 .steam-theme textarea::placeholder {
   color: #7f8a93 !important;

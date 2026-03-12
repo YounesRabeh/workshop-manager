@@ -24,10 +24,12 @@ interface ApiFailure {
 
 interface UiToast {
   id: number
-  tone: 'success' | 'error'
+  tone: 'success' | 'error' | 'warning' | 'info'
   title: string
   detail: string
 }
+
+type UiToastInput = Omit<UiToast, 'id'> & { durationMs?: number }
 
 const loginState = ref<'signed_out' | 'signed_in'>('signed_out')
 const steamGuardSessionId = ref<string | null>(null)
@@ -110,8 +112,8 @@ const uploadFiles = ref<string[]>([])
 const isUploadDropActive = ref(false)
 const isFullscreen = ref(false)
 const isAboutOpen = ref(false)
-const visibilityToast = ref<UiToast | null>(null)
-let visibilityToastTimer: ReturnType<typeof setTimeout> | null = null
+const activeToast = ref<UiToast | null>(null)
+let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 const selectedWorkshopItem = computed(() => workshopItems.value.find((item) => item.publishedFileId === selectedWorkshopItemId.value))
 const filteredWorkshopItems = computed(() => {
@@ -515,21 +517,35 @@ function closeAboutModal(): void {
   isAboutOpen.value = false
 }
 
-function showVisibilityToast(tone: UiToast['tone'], title: string, detail: string): void {
-  visibilityToast.value = {
+function toastToneClass(tone: UiToast['tone']): string {
+  if (tone === 'success') {
+    return 'border-emerald-400/60 bg-emerald-900/85 text-emerald-100'
+  }
+  if (tone === 'warning') {
+    return 'border-amber-300/70 bg-amber-900/85 text-amber-100'
+  }
+  if (tone === 'info') {
+    return 'border-sky-300/70 bg-sky-900/85 text-sky-100'
+  }
+  return 'border-rose-400/60 bg-rose-900/85 text-rose-100'
+}
+
+function showToast(toast: UiToastInput): void {
+  const durationMs = typeof toast.durationMs === 'number' && toast.durationMs > 0 ? toast.durationMs : 3800
+  activeToast.value = {
     id: Date.now(),
-    tone,
-    title,
-    detail
+    tone: toast.tone,
+    title: toast.title,
+    detail: toast.detail
   }
 
-  if (visibilityToastTimer) {
-    clearTimeout(visibilityToastTimer)
+  if (toastTimer) {
+    clearTimeout(toastTimer)
   }
-  visibilityToastTimer = setTimeout(() => {
-    visibilityToast.value = null
-    visibilityToastTimer = null
-  }, 3800)
+  toastTimer = setTimeout(() => {
+    activeToast.value = null
+    toastTimer = null
+  }, durationMs)
 }
 
 function selectWorkshopItem(item: WorkshopItemSummary): void {
@@ -962,11 +978,19 @@ async function updateVisibilityOnly(): Promise<void> {
         : item
     )
     statusMessage.value = `Visibility updated to ${visibilityLabel(targetVisibility)}: ${JSON.stringify(result)}`
-    showVisibilityToast('success', 'Visibility Updated', `Changed to ${visibilityLabel(targetVisibility)}.`)
+    showToast({
+      tone: 'success',
+      title: 'Visibility Updated',
+      detail: `Changed to ${visibilityLabel(targetVisibility)}.`
+    })
   } catch (error) {
     const parsed = normalizeError(error)
     statusMessage.value = `Visibility update failed (${parsed.code}): ${parsed.message}`
-    showVisibilityToast('error', 'Visibility Update Failed', parsed.message)
+    showToast({
+      tone: 'error',
+      title: 'Visibility Update Failed',
+      detail: parsed.message
+    })
   }
 }
 
@@ -1081,9 +1105,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState)
-  if (visibilityToastTimer) {
-    clearTimeout(visibilityToastTimer)
-    visibilityToastTimer = null
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+    toastTimer = null
   }
 })
 </script>
@@ -1117,16 +1141,12 @@ onUnmounted(() => {
     <template v-else>
       <div class="app-shell">
         <div
-          v-if="visibilityToast"
-          class="pointer-events-none fixed right-4 top-4 z-[70] w-[340px] max-w-[calc(100vw-2rem)] rounded-lg border px-4 py-3 shadow-2xl backdrop-blur-sm"
-          :class="
-            visibilityToast.tone === 'success'
-              ? 'border-emerald-400/60 bg-emerald-900/85 text-emerald-100'
-              : 'border-rose-400/60 bg-rose-900/85 text-rose-100'
-          "
+          v-if="activeToast"
+          class="pointer-events-none fixed left-1/2 top-4 z-[70] w-[340px] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg border px-4 py-3 text-center shadow-2xl backdrop-blur-sm"
+          :class="toastToneClass(activeToast.tone)"
         >
-          <p class="text-sm font-bold">{{ visibilityToast.title }}</p>
-          <p class="mt-1 text-xs opacity-95">{{ visibilityToast.detail }}</p>
+          <p class="text-sm font-bold">{{ activeToast.title }}</p>
+          <p class="mt-1 text-xs opacity-95">{{ activeToast.detail }}</p>
         </div>
 
         <AppTopBar
