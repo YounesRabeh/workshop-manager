@@ -91,6 +91,79 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     )
   })
 
+  it('keeps benign IPC latency warnings in logs while update succeeds', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-benign-warning-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>)
+      .mockImplementationOnce(() => createFakeChild(['Logged in OK']))
+      .mockImplementationOnce(() =>
+        createFakeChild([
+          'Preparing update...',
+          'Uploading content...',
+          'IPC function call IClientUGC::GetItemUpdateProgress took too long: 43 msec',
+          'Success.'
+        ])
+      )
+
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
+    await runtime.login('alice', 'secret')
+
+    const result = await runtime.upload(
+      {
+        appId: '480',
+        publishedFileId: '123',
+        contentFolder: '/mods',
+        title: 'My Mod',
+        tags: []
+      },
+      'update'
+    )
+
+    expect(result.success).toBe(true)
+    const persisted = await store.get(result.runId)
+    expect(persisted?.lines.join('\n')).toContain(
+      'IPC function call IClientUGC::GetItemUpdateProgress took too long: 43 msec'
+    )
+  })
+
+  it('returns specific transient failure message for manifest timeout during update', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-manifest-timeout-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>)
+      .mockImplementationOnce(() => createFakeChild(['Logged in OK']))
+      .mockImplementationOnce(() =>
+        createFakeChild(
+          [
+            'Preparing update...',
+            'Uploading content...',
+            '[2026-03-12 22:01:45]: ERROR! Timeout uploading manifest (size 967)',
+            'ERROR! Failed to update workshop item (Failure).'
+          ],
+          9
+        )
+      )
+
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
+    await runtime.login('alice', 'secret')
+
+    await expect(
+      runtime.upload(
+        {
+          appId: '480',
+          publishedFileId: '123',
+          contentFolder: '/mods',
+          title: 'My Mod',
+          tags: []
+        },
+        'update'
+      )
+    ).rejects.toThrow(
+      'Steam upload timed out while sending the manifest. Retry in a minute and check network/Steam service status.'
+    )
+  })
+
   it('creates runtime directory before login spawn', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-login-'))
     const runtimeDir = join(root, 'runtime')

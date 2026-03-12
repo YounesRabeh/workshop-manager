@@ -137,6 +137,10 @@ export function parseWorkshopRunFailure(
   return undefined
 }
 
+export function isBenignSteamLatencyWarning(line: string): boolean {
+  return /IPC function call IClient(?:UGC|Utils)::[A-Za-z0-9_]+ took too long:\s*\d+\s*msec/i.test(line)
+}
+
 function parsePublishedFileId(lines: string[]): string | undefined {
   const joined = lines.join('\n')
   const idMatch = joined.match(/published file id\s*[:=]\s*(\d+)/i)
@@ -350,7 +354,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
       const child = spawn(executablePath, args, { cwd: this.runtimeDir, stdio: 'pipe' })
       this.activeRuns.set(runId, child)
       let guardMobilePromptSent = false
-      let logWriteQueue: Promise<void> = Promise.resolve()
+      let lineQueue: Promise<void> = Promise.resolve()
       const shouldEmitOutputEvents = options.emitOutputEvents === true
       const isLoginPhase = options.phase === 'login'
 
@@ -417,26 +421,32 @@ export class SteamCmdRuntimeService extends EventEmitter {
         }
 
         lines.push(normalizedLine)
-        logWriteQueue = logWriteQueue
-          .then(() => this.runLogStore.appendLine(runId, normalizedLine))
-          .catch(() => undefined)
-        if (shouldEmitOutputEvents) {
+        void this.runLogStore.appendLine(runId, normalizedLine).catch(() => undefined)
+        if (shouldEmitOutputEvents && !isBenignSteamLatencyWarning(normalizedLine)) {
           this.emitRunEvent({ runId, ts: Date.now(), type, line: normalizedLine, phase: options.phase })
         }
 
       }
 
-      child.stdout.on('data', async (chunk: Buffer) => {
+      const enqueueLine = (line: string, type: 'stdout' | 'stderr') => {
+        lineQueue = lineQueue
+          .then(() => onLine(line, type))
+          .catch((error: unknown) => {
+            reject(error)
+          })
+      }
+
+      child.stdout.on('data', (chunk: Buffer) => {
         const value = chunk.toString('utf8').split(/\r?\n/).filter(Boolean)
         for (const line of value) {
-          await onLine(line, 'stdout')
+          enqueueLine(line, 'stdout')
         }
       })
 
-      child.stderr.on('data', async (chunk: Buffer) => {
+      child.stderr.on('data', (chunk: Buffer) => {
         const value = chunk.toString('utf8').split(/\r?\n/).filter(Boolean)
         for (const line of value) {
-          await onLine(line, 'stderr')
+          enqueueLine(line, 'stderr')
         }
       })
 
@@ -453,6 +463,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
         void (async () => {
           clearTimeout(timeout)
           this.activeRuns.delete(runId)
+          await lineQueue
           if (!finalized) {
             finalized = true
             const reason = timedOut ? 'timeout' : 'normal'
@@ -461,7 +472,6 @@ export class SteamCmdRuntimeService extends EventEmitter {
               formatRunMeta(`process closed exitCode=${exitCode ?? 1} reason=${reason}`)
             )
           }
-          await logWriteQueue
           resolve({ lines, exitCode: exitCode ?? 1 })
         })()
       })

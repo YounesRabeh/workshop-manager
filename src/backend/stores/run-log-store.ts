@@ -8,6 +8,8 @@ export interface PersistedRunLog extends RunResult {
 }
 
 const SESSION_LOG_FILE = 'steamcmd-output.log'
+const FLUSH_INTERVAL_MS = 120
+const FLUSH_BATCH_SIZE = 24
 
 function cloneLog(log: PersistedRunLog): PersistedRunLog {
   return {
@@ -19,6 +21,8 @@ function cloneLog(log: PersistedRunLog): PersistedRunLog {
 export class RunLogStore {
   private writeChain: Promise<void> = Promise.resolve()
   private runs = new Map<string, PersistedRunLog>()
+  private pendingLines: string[] = []
+  private flushTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(private readonly logsDir: string) {}
 
@@ -46,32 +50,48 @@ export class RunLogStore {
       await mkdir(this.logsDir, { recursive: true })
       // Requested behavior: keep only current session output.
       await writeFile(this.getSessionLogPath(), '', 'utf8')
+      if (this.flushTimer) {
+        clearTimeout(this.flushTimer)
+        this.flushTimer = null
+      }
+      this.pendingLines = []
       this.runs.clear()
-      this.runs.set(runId, cloneLog(log))
+      this.runs.set(runId, log)
     })
 
     return cloneLog(log)
   }
 
   async appendLine(runId: string, line: string): Promise<void> {
-    await this.withWriteLock(async () => {
-      const current = this.runs.get(runId) ?? {
-        runId,
-        success: false,
-        steamOutputSummary: '',
-        logPath: this.getSessionLogPath(),
-        lines: [],
-        status: 'running' as const
-      }
+    const current = this.runs.get(runId) ?? {
+      runId,
+      success: false,
+      steamOutputSummary: '',
+      logPath: this.getSessionLogPath(),
+      lines: [],
+      status: 'running' as const
+    }
 
-      current.lines.push(line)
-      current.steamOutputSummary = current.lines.slice(-25).join('\n')
-      this.runs.set(runId, cloneLog(current))
-      await appendFile(this.getSessionLogPath(), `${line}\n`, 'utf8')
-    })
+    current.lines.push(line)
+    current.steamOutputSummary = current.lines.slice(-25).join('\n')
+    this.runs.set(runId, current)
+    this.pendingLines.push(line)
+
+    if (this.pendingLines.length >= FLUSH_BATCH_SIZE) {
+      void this.flushPendingLines()
+      return
+    }
+
+    this.scheduleFlush()
   }
 
   async finalize(runId: string, update: Partial<PersistedRunLog>): Promise<PersistedRunLog> {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer)
+      this.flushTimer = null
+    }
+    await this.flushPendingLines()
+
     let merged!: PersistedRunLog
     await this.withWriteLock(async () => {
       const current = this.runs.get(runId) ?? {
@@ -89,7 +109,7 @@ export class RunLogStore {
         runId,
         logPath: this.getSessionLogPath()
       }
-      this.runs.set(runId, cloneLog(merged))
+      this.runs.set(runId, merged)
       const output = merged.lines.length > 0 ? `${merged.lines.join('\n')}\n` : ''
       await writeFile(this.getSessionLogPath(), output, 'utf8')
     })
@@ -105,5 +125,28 @@ export class RunLogStore {
     return [...this.runs.values()]
       .sort((a, b) => b.runId.localeCompare(a.runId))
       .map((entry) => cloneLog(entry))
+  }
+
+  private scheduleFlush(): void {
+    if (this.flushTimer) {
+      return
+    }
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null
+      void this.flushPendingLines()
+    }, FLUSH_INTERVAL_MS)
+  }
+
+  private async flushPendingLines(): Promise<void> {
+    if (this.pendingLines.length === 0) {
+      return
+    }
+
+    const lines = this.pendingLines
+    this.pendingLines = []
+    const content = `${lines.join('\n')}\n`
+    await this.withWriteLock(async () => {
+      await appendFile(this.getSessionLogPath(), content, 'utf8')
+    })
   }
 }

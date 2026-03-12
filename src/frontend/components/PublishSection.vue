@@ -248,7 +248,7 @@ function submitPrimaryAction(): void {
 </script>
 
 <template>
-  <section class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]">
+  <section class="mt-5 grid gap-5 min-[1220px]:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]">
     <article class="fade-in app-panel rounded-2xl border border-[#305070] bg-[#1b2838] p-5 shadow-[0_16px_40px_rgba(4,10,20,0.45)]">
       <div class="flex items-center justify-between gap-2">
         <h2 class="text-lg font-semibold text-slate-100">{{ sectionTitle }}</h2>

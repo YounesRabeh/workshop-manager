@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   buildWorkshopArgs,
   extractWorkshopFileIdsFromHtml,
+  isBenignSteamLatencyWarning,
   isSteamGuardPrompt,
   mergeWorkshopItems,
   normalizeWorkshopItems,
+  parseWorkshopRunFailure,
   parseSteamLoginFailure
 } from '../../src/backend/services/steamcmd-runtime-service'
 
@@ -159,5 +161,52 @@ describe('steamcmd runtime helpers', () => {
         updatedAt: 10
       }
     ])
+  })
+
+  it('classifies workshop manifest timeout failures', () => {
+    const failure = parseWorkshopRunFailure(
+      [
+        'Uploading content...',
+        '[2026-03-12 22:01:45]: ERROR! Timeout uploading manifest (size 967)',
+        'ERROR! Failed to update workshop item (Failure).'
+      ],
+      'update'
+    )
+
+    expect(failure).toBe(
+      'Steam upload timed out while sending the manifest. Retry in a minute and check network/Steam service status.'
+    )
+  })
+
+  it('classifies expired steam session on workshop operations', () => {
+    const failure = parseWorkshopRunFailure(
+      ['ERROR! Not logged on', 'Please use +login before running this command.'],
+      'upload'
+    )
+
+    expect(failure).toBe('Steam session is not valid anymore. Sign in again and retry.')
+  })
+
+  it('classifies Steam internal IPC latency lines as benign warnings', () => {
+    expect(
+      isBenignSteamLatencyWarning('IPC function call IClientUGC::GetItemUpdateProgress took too long: 79 msec')
+    ).toBe(true)
+    expect(
+      isBenignSteamLatencyWarning('IPC function call IClientUtils::GetAPICallResult took too long: 60 msec')
+    ).toBe(true)
+    expect(isBenignSteamLatencyWarning('Uploading content...')).toBe(false)
+  })
+
+  it('keeps real failure classification when benign warning also exists', () => {
+    const failure = parseWorkshopRunFailure(
+      [
+        'IPC function call IClientUGC::GetItemUpdateProgress took too long: 79 msec',
+        'ERROR! Timeout uploading manifest (size 967)'
+      ],
+      'update'
+    )
+    expect(failure).toBe(
+      'Steam upload timed out while sending the manifest. Retry in a minute and check network/Steam service status.'
+    )
   })
 })
