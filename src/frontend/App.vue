@@ -114,7 +114,6 @@ const committedVisibility = ref<0 | 1 | 2 | 3>(0)
 const pendingVisibility = ref<0 | 1 | 2 | 3>(0)
 
 const stagedContentFiles = ref<StagedContentFile[]>([])
-const isUploadDropActive = ref(false)
 const isFullscreen = ref(false)
 const isAboutOpen = ref(false)
 const activeToast = ref<UiToast | null>(null)
@@ -578,55 +577,6 @@ function clearWorkspace(): void {
   activeDraft.value.contentFolder = ''
   stagedContentFiles.value = []
   statusMessage.value = 'Mod content cleared.'
-}
-
-function onUploadDragOver(event: DragEvent): void {
-  event.preventDefault()
-  if (activeDraft.value.contentFolder.trim().length === 0) {
-    return
-  }
-  isUploadDropActive.value = true
-}
-
-function onUploadDragLeave(event: DragEvent): void {
-  event.preventDefault()
-  isUploadDropActive.value = false
-}
-
-async function onUploadDrop(event: DragEvent): Promise<void> {
-  event.preventDefault()
-  isUploadDropActive.value = false
-
-  if (activeDraft.value.contentFolder.trim().length === 0) {
-    statusMessage.value = 'Select content folder first.'
-    return
-  }
-
-  const files = event.dataTransfer?.files
-  if (!files || files.length === 0) {
-    return
-  }
-
-  const paths = Array.from(files)
-    .map((file) => (file as File & { path?: string }).path)
-    .filter((path): path is string => typeof path === 'string' && path.trim().length > 0)
-
-  if (paths.length > 0) {
-    try {
-      await stageSelectedContentFiles(paths)
-    } catch (error) {
-      const parsed = normalizeError(error)
-      statusMessage.value = `Failed to add dropped files (${parsed.code}): ${parsed.message}`
-      showToast({
-        tone: 'error',
-        title: 'Drop Failed',
-        detail: parsed.message
-      })
-    }
-    return
-  }
-
-  statusMessage.value = 'Dropped files did not include local paths. Use Add Files instead.'
 }
 
 function setStagedContentFilesFromFolder(contentFolder: string, files: StagedContentFile[]): void {
@@ -1469,7 +1419,6 @@ onUnmounted(() => {
           :staged-content-files="stagedContentFiles"
           :staged-content-tree="stagedContentTree"
           :total-staged-content-size-bytes="totalStagedContentSizeBytes"
-          :is-upload-drop-active="isUploadDropActive"
           :can-upload="canCreate()"
           :can-update="canUpdate()"
           @go-to-mods="goToStep('mods')"
@@ -1486,9 +1435,6 @@ onUnmounted(() => {
           @update-item="updateItem"
           @pick-upload-files="pickUploadFiles"
           @clear-upload-files="clearUploadFiles"
-          @upload-drag-over="onUploadDragOver"
-          @upload-drag-leave="onUploadDragLeave"
-          @upload-drop="onUploadDrop"
           @remove-staged-file="removeStagedFile"
         />
 

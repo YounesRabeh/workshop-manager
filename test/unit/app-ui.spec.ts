@@ -306,6 +306,8 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).toContain('readme.txt')
     expect(wrapper.text()).toContain('config.json')
     expect(wrapper.text()).toContain('24 B')
+    expect(wrapper.text()).not.toContain('Drag and drop files to add mod content')
+    expect(wrapper.text()).not.toContain('data/config.json')
   })
 
   it('clears content folder and staged files from mod content panel', async () => {

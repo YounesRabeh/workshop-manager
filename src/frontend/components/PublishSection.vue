@@ -17,7 +17,6 @@ const props = defineProps<{
   stagedContentFiles: StagedContentFile[]
   stagedContentTree: ContentTreeNode[]
   totalStagedContentSizeBytes: number
-  isUploadDropActive: boolean
   canUpload: boolean
   canUpdate: boolean
 }>()
@@ -37,9 +36,6 @@ const emit = defineEmits<{
   (e: 'update-visibility-only'): void
   (e: 'pick-upload-files'): void
   (e: 'clear-upload-files'): void
-  (e: 'upload-drag-over', event: DragEvent): void
-  (e: 'upload-drag-leave', event: DragEvent): void
-  (e: 'upload-drop', event: DragEvent): void
   (e: 'remove-staged-file', path: string): void
 }>()
 
@@ -195,7 +191,7 @@ function submitPrimaryAction(): void {
 </script>
 
 <template>
-  <section class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,6fr)_minmax(0,4fr)]">
+  <section class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]">
     <article class="fade-in app-panel rounded-2xl border border-[#305070] bg-[#1b2838] p-5 shadow-[0_16px_40px_rgba(4,10,20,0.45)]">
       <div class="flex items-center justify-between gap-2">
         <h2 class="text-lg font-semibold text-slate-100">{{ sectionTitle }}</h2>
@@ -391,11 +387,6 @@ function submitPrimaryAction(): void {
         </p>
       </div>
 
-      <div class="mt-4 cursor-pointer rounded-xl border-2 border-dashed p-5 transition" :class="isUploadDropActive ? 'border-[#ffb86b] bg-[#2c3f56]' : 'border-[#d0883f] bg-[#1f3248]'" @dragover="emit('upload-drag-over', $event)" @dragleave="emit('upload-drag-leave', $event)" @drop="emit('upload-drop', $event)" @click="emit('pick-upload-files')">
-        <p class="text-2xl font-semibold text-orange-200">Drag and drop files to add mod content</p>
-        <p class="mt-1 text-sm text-orange-100/85">Click to open native multi-file picker.</p>
-      </div>
-
       <div class="mt-4 rounded-lg border border-[#ad6f2f] bg-[#1f3248]">
         <div class="flex items-center justify-between border-b border-[#ad6f2f] px-3 py-2">
           <p class="text-base font-semibold text-slate-100">Mod Content</p>
@@ -403,30 +394,49 @@ function submitPrimaryAction(): void {
         </div>
         <div class="max-h-72 overflow-auto px-3 py-2 xl:max-h-[24rem]">
           <p v-if="stagedContentFiles.length === 0" class="text-sm text-slate-300">No files staged yet.</p>
-          <ul v-else class="space-y-1.5 text-sm text-slate-200">
+          <ul v-else class="space-y-2 text-sm text-slate-200">
             <li
               v-for="{ node, depth } in flattenedContentNodes"
               :key="node.id"
-              class="flex items-center justify-between gap-2 rounded border border-[#355874] bg-[#122638] px-2 py-1"
-              :style="{ paddingLeft: `${0.5 + depth * 0.75}rem` }"
+              class="group flex items-center justify-between gap-3 rounded-lg border border-[#355874] bg-[linear-gradient(120deg,#122638,#152d41)] px-3 py-2 transition-colors hover:border-[#5d88ab] hover:bg-[linear-gradient(120deg,#16314a,#1a3850)]"
+              :style="{ paddingLeft: `${0.75 + depth * 0.85}rem` }"
             >
-              <div class="min-w-0">
-                <p class="truncate font-semibold">
-                  <span class="mr-1 opacity-70">{{ node.type === 'folder' ? '[DIR]' : '[FILE]' }}</span>
-                  {{ node.name }}
+              <div class="min-w-0 flex-1">
+                <p class="flex items-center gap-2 whitespace-nowrap text-[14px] font-semibold text-slate-100">
+                  <svg
+                    v-if="node.type === 'folder'"
+                    class="h-4 w-4 shrink-0 text-sky-300/90"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                  >
+                    <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5l1.8 2H19.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-11Z" />
+                  </svg>
+                  <svg
+                    v-else
+                    class="h-4 w-4 shrink-0 text-cyan-200/90"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                  >
+                    <path d="M8 3h6l5 5v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+                    <path d="M14 3v6h6" />
+                  </svg>
+                  <span class="min-w-0 truncate">{{ node.name }}</span>
                 </p>
-                <p v-if="node.type === 'folder'" class="truncate text-slate-400">
+                <p v-if="node.type === 'folder'" class="mt-0.5 truncate text-[11px] text-slate-400">
                   {{ node.fileCount }} file(s) • {{ formatSizeLabel(node.sizeBytes) }}
                 </p>
-                <p v-else class="truncate text-slate-400">{{ node.relativePath }}</p>
               </div>
               <div class="flex items-center gap-2">
-                <span class="shrink-0 rounded border border-[#42617a] bg-[#0f1f2e] px-2 py-0.5 text-xs text-slate-200">
+                <span class="shrink-0 rounded-md border border-[#466887] bg-[#102335] px-2.5 py-0.5 text-xs font-medium text-slate-100">
                   {{ formatSizeLabel(node.sizeBytes) }}
                 </span>
                 <button
                   v-if="node.type === 'file' && node.absolutePath"
-                  class="h-6 w-6 shrink-0 rounded-full border border-rose-300/40 bg-rose-900/40 text-xs font-bold text-rose-200"
+                  class="h-6 w-6 shrink-0 rounded-full border border-rose-300/35 bg-rose-900/45 text-xs font-bold text-rose-100 transition-colors hover:bg-rose-800/70"
                   title="Remove file"
                   @click.stop="emit('remove-staged-file', node.absolutePath)"
                 >
