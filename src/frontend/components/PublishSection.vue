@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { WorkshopItemSummary } from '@shared/contracts'
+import { getUpdateDraftPath } from '@shared/workshop-requirements'
 import type { ContentTreeNode, PublishChecklistItem, StagedContentFile, UploadDraftState } from '../types/ui'
 import { formatSizeLabel } from '../utils/size-format'
 import VisibilityIcon from './VisibilityIcon.vue'
@@ -161,6 +162,37 @@ const primaryActionLabel = computed(() => (isUpdateMode.value ? 'Update Existing
 const primaryActionDisabled = computed(() => (isUpdateMode.value ? !props.canUpdate : !props.canUpload))
 const publishedFileIdValue = computed(() => props.selectedWorkshopItem?.publishedFileId || props.draft.publishedFileId || 'Not selected')
 const appIdValue = computed(() => props.selectedWorkshopItem?.appId || props.draft.appId || 'Not selected')
+const updateDraftPath = computed(() => getUpdateDraftPath(props.draft))
+const updateModeLabel = computed(() => {
+  if (!isUpdateMode.value) {
+    return ''
+  }
+  if (updateDraftPath.value === 'content_and_preview') {
+    return 'Update mode: Content + Preview'
+  }
+  if (updateDraftPath.value === 'content') {
+    return 'Update mode: Content update'
+  }
+  if (updateDraftPath.value === 'preview') {
+    return 'Update mode: Preview-only update'
+  }
+  return 'Update mode: Not selected'
+})
+const updateModeHint = computed(() => {
+  if (!isUpdateMode.value) {
+    return ''
+  }
+  if (updateDraftPath.value === 'content_and_preview') {
+    return 'Uploads content folder files and updates preview image.'
+  }
+  if (updateDraftPath.value === 'content') {
+    return 'Uploads content folder files and keeps current preview unless replaced.'
+  }
+  if (updateDraftPath.value === 'preview') {
+    return 'Updates only the Workshop preview image.'
+  }
+  return 'Select a content folder for content update or pick a preview file for image-only update.'
+})
 const collapsedFolderIds = ref<Set<string>>(new Set())
 const flattenedContentNodes = computed(() =>
   flattenContentTree(props.stagedContentTree, collapsedFolderIds.value)
@@ -262,6 +294,13 @@ function submitPrimaryAction(): void {
       </div>
 
       <p class="mt-2 text-sm text-slate-300">{{ sectionDescription }}</p>
+      <div
+        v-if="isUpdateMode"
+        class="mt-2 rounded-lg border border-[#355874] bg-[#15283b] px-3 py-2"
+      >
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-200">{{ updateModeLabel }}</p>
+        <p class="mt-1 text-xs text-slate-300">{{ updateModeHint }}</p>
+      </div>
 
       <div
         v-if="isUpdateMode"

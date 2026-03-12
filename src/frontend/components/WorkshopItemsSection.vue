@@ -58,15 +58,15 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
 <template>
   <section class="mt-5">
     <article class="fade-in app-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-md">
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <div class="flex flex-col gap-3">
         <div>
           <h2 class="text-lg font-semibold text-slate-800">My Workshop Items</h2>
           <p class="mt-1 text-sm text-slate-600">Click an item to auto-fill publish data.</p>
         </div>
-        <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+        <div class="flex w-full flex-wrap items-center gap-2">
           <select
             :value="visibilityFilter"
-            class="workshop-visibility-filter-select rounded border border-slate-300 px-2 py-2 text-xs sm:min-w-[150px]"
+            class="workshop-visibility-filter-select rounded border border-slate-300 px-2 py-2 text-xs min-[720px]:w-[170px]"
             @change="onVisibilityFilterInput"
           >
             <option value="all">Visibility: All</option>
@@ -79,7 +79,7 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
           <input
             :value="appId"
             placeholder="Filter by App ID (optional)"
-            class="w-full rounded border border-slate-300 px-2 py-2 text-xs sm:min-w-[220px]"
+            class="w-full min-w-[240px] flex-1 rounded border border-slate-300 px-2 py-2 text-xs"
             @input="onAppIdInput"
           />
           <button
@@ -101,11 +101,11 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
         No workshop items found for the current filters.
       </div>
 
-      <div v-else class="mt-4 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+      <div v-else class="mt-4 flex flex-wrap gap-4">
         <button
           v-for="item in workshopItems"
           :key="item.publishedFileId"
-          class="workshop-card w-full overflow-hidden rounded-xl border text-left transition"
+          class="workshop-card w-full min-[700px]:w-[320px] overflow-hidden rounded-xl border text-left transition"
           :class="selectedWorkshopItemId === item.publishedFileId ? 'workshop-card-selected' : 'border-slate-200 bg-white hover:bg-slate-50'"
           @click="emit('select-item', item)"
         >

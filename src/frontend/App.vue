@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { ContentFolderFileEntry, RunEvent, UploadDraft, WorkshopItemSummary } from '@shared/contracts'
+import { evaluateCreateRequirements, evaluateUpdateRequirements } from '@shared/workshop-requirements'
 import AppTopBar from './components/AppTopBar.vue'
 import LoginSection from './components/LoginSection.vue'
 import PublishSection from './components/PublishSection.vue'
@@ -169,11 +170,16 @@ const accountPersonaName = ref<string>('')
 const accountDisplayName = computed(() => accountPersonaName.value || loginForm.username.trim() || 'Steam account')
 const accountProfileImageUrl = ref<string | null>(null)
 const loginHeaderStatusMessage = computed(() => (isSteamCmdDetected.value ? 'SteamCMD found ✓' : ''))
+const createRequirements = computed(() => evaluateCreateRequirements(createDraft))
+const updateRequirements = computed(() => evaluateUpdateRequirements(updateDraft))
 
 const updateChecklist = computed<PublishChecklistItem[]>(() => {
   return [
-    { label: 'Title', ok: updateDraft.title.trim().length > 0 },
-    { label: 'Content folder', ok: updateDraft.contentFolder.trim().length > 0 },
+    { label: 'Workshop item selected', ok: selectedWorkshopItemId.value.trim().length > 0 },
+    { label: 'App ID', ok: updateRequirements.value.appId },
+    { label: 'Published File ID', ok: updateRequirements.value.publishedFileId },
+    { label: 'Content folder or preview image', ok: updateRequirements.value.contentOrPreview },
+    { label: 'Title', ok: updateDraft.title.trim().length > 0, optional: true },
     { label: 'Preview image', ok: updateDraft.previewFile.trim().length > 0, optional: true },
     { label: 'Release notes', ok: updateDraft.releaseNotes.trim().length > 0, optional: true }
   ]
@@ -181,8 +187,9 @@ const updateChecklist = computed<PublishChecklistItem[]>(() => {
 
 const createChecklist = computed<PublishChecklistItem[]>(() => {
   return [
-    { label: 'Title', ok: createDraft.title.trim().length > 0 },
-    { label: 'Content folder', ok: createDraft.contentFolder.trim().length > 0 },
+    { label: 'App ID', ok: createRequirements.value.appId },
+    { label: 'Content folder', ok: createRequirements.value.contentFolder },
+    { label: 'Title', ok: createRequirements.value.title },
     { label: 'Preview image', ok: createDraft.previewFile.trim().length > 0, optional: true },
     { label: 'Release notes', ok: createDraft.releaseNotes.trim().length > 0, optional: true }
   ]
@@ -751,6 +758,38 @@ function showToast(toast: UiToastInput): void {
   }, durationMs)
 }
 
+type ActionOperation = 'upload' | 'update' | 'visibility'
+
+function actionFailureTitle(operation: ActionOperation): string {
+  if (operation === 'upload') {
+    return 'Upload Failed'
+  }
+  if (operation === 'update') {
+    return 'Update Failed'
+  }
+  return 'Visibility Update Failed'
+}
+
+function actionFailureStatus(operation: ActionOperation): string {
+  if (operation === 'upload') {
+    return 'Upload failed. See popup.'
+  }
+  if (operation === 'update') {
+    return 'Update failed. See popup.'
+  }
+  return 'Visibility update failed. See popup.'
+}
+
+function handleActionFailure(operation: ActionOperation, error: unknown): void {
+  const parsed = normalizeError(error)
+  statusMessage.value = actionFailureStatus(operation)
+  showToast({
+    tone: 'error',
+    title: actionFailureTitle(operation),
+    detail: parsed.message
+  })
+}
+
 function selectWorkshopItem(item: WorkshopItemSummary): void {
   selectedWorkshopItemId.value = item.publishedFileId
   const cached = updateDraftCache.value[item.publishedFileId]
@@ -912,7 +951,7 @@ async function finalizeSuccessfulLogin(successMessage: string): Promise<void> {
   authIssue.value = null
   statusMessage.value = successMessage
   loginForm.password = ''
-  hasPersistedStoredSession.value = loginForm.rememberAuth && loginForm.rememberUsername
+  hasPersistedStoredSession.value = loginForm.rememberAuth
   flowStep.value = 'mods'
   await Promise.all([loadWorkshopItems(), refreshCurrentProfile()])
 }
@@ -1008,6 +1047,9 @@ async function login(): Promise<void> {
   }
 
   try {
+    const rememberAuth = loginForm.rememberAuth
+    const rememberUsername = loginForm.rememberUsername || rememberAuth
+    loginForm.rememberUsername = rememberUsername
     const usingSavedSession = loginForm.rememberAuth && loginForm.password.trim().length === 0
     isStoredSessionLoginAttempt.value = usingSavedSession
     authIssue.value = null
@@ -1022,8 +1064,8 @@ async function login(): Promise<void> {
     await window.workshop.login({
       username: loginForm.username,
       password: usingSavedSession ? '' : loginForm.password,
-      rememberUsername: loginForm.rememberUsername,
-      rememberAuth: loginForm.rememberAuth,
+      rememberUsername,
+      rememberAuth,
       useStoredAuth: usingSavedSession
     })
     await finalizeSuccessfulLogin(
@@ -1140,22 +1182,14 @@ async function pickPreviewFile(): Promise<void> {
 }
 
 function canCreate(): boolean {
-  return (
-    loginState.value === 'signed_in' &&
-    createDraft.appId.trim().length > 0 &&
-    createDraft.contentFolder.trim().length > 0 &&
-    createDraft.title.trim().length > 0
-  )
+  return loginState.value === 'signed_in' && createRequirements.value.valid
 }
 
 function canUpdate(): boolean {
   return (
     loginState.value === 'signed_in' &&
     selectedWorkshopItemId.value.trim().length > 0 &&
-    updateDraft.appId.trim().length > 0 &&
-    updateDraft.contentFolder.trim().length > 0 &&
-    updateDraft.title.trim().length > 0 &&
-    updateDraft.publishedFileId.trim().length > 0
+    updateRequirements.value.valid
   )
 }
 
@@ -1165,33 +1199,55 @@ async function upload(): Promise<void> {
     return
   }
 
-  const result = await window.workshop.uploadMod({
-    profileId: 'new-item',
-    draft: buildUploadDraft(createDraft, 'create')
-  })
+  try {
+    const result = (await window.workshop.uploadMod({
+      profileId: 'new-item',
+      draft: buildUploadDraft(createDraft, 'create')
+    })) as { publishedFileId?: string }
 
-  statusMessage.value = `Upload completed: ${JSON.stringify(result)}`
+    statusMessage.value = 'Upload completed successfully.'
+    showToast({
+      tone: 'success',
+      title: 'Upload Completed',
+      detail: result.publishedFileId
+        ? `Published File ID: ${result.publishedFileId}`
+        : 'Workshop item upload finished successfully.'
+    })
+  } catch (error) {
+    handleActionFailure('upload', error)
+  }
 }
 
 async function updateItem(): Promise<void> {
   if (!canUpdate()) {
-    statusMessage.value = 'Update blocked: publishedFileId is required.'
+    statusMessage.value = 'Update blocked: add content folder or preview image first.'
     return
   }
 
-  const result = await window.workshop.updateMod({
-    profileId: selectedWorkshopItemId.value || updateDraft.publishedFileId,
-    draft: buildUploadDraft(updateDraft, 'update', pendingVisibility.value)
-  })
+  try {
+    const result = (await window.workshop.updateMod({
+      profileId: selectedWorkshopItemId.value || updateDraft.publishedFileId,
+      draft: buildUploadDraft(updateDraft, 'update', pendingVisibility.value)
+    })) as { publishedFileId?: string }
 
-  committedVisibility.value = pendingVisibility.value
-  workshopItems.value = workshopItems.value.map((item) =>
-    item.publishedFileId === selectedWorkshopItemId.value
-      ? { ...item, visibility: committedVisibility.value }
-      : item
-  )
-  statusMessage.value = `Update completed: ${JSON.stringify(result)}`
-  delete updateDraftCache.value[selectedWorkshopItemId.value]
+    committedVisibility.value = pendingVisibility.value
+    workshopItems.value = workshopItems.value.map((item) =>
+      item.publishedFileId === selectedWorkshopItemId.value
+        ? { ...item, visibility: committedVisibility.value }
+        : item
+    )
+    statusMessage.value = 'Update completed successfully.'
+    showToast({
+      tone: 'success',
+      title: 'Update Completed',
+      detail: result.publishedFileId
+        ? `Updated item ID: ${result.publishedFileId}`
+        : 'Workshop item update finished successfully.'
+    })
+    delete updateDraftCache.value[selectedWorkshopItemId.value]
+  } catch (error) {
+    handleActionFailure('update', error)
+  }
 }
 
 async function updateVisibilityOnly(): Promise<void> {
@@ -1224,13 +1280,7 @@ async function updateVisibilityOnly(): Promise<void> {
       detail: `Changed to ${visibilityLabel(targetVisibility)}.`
     })
   } catch (error) {
-    const parsed = normalizeError(error)
-    statusMessage.value = `Visibility update failed (${parsed.code}): ${parsed.message}`
-    showToast({
-      tone: 'error',
-      title: 'Visibility Update Failed',
-      detail: parsed.message
-    })
+    handleActionFailure('visibility', error)
   }
 }
 
@@ -1330,15 +1380,7 @@ onMounted(async () => {
       steamGuardSessionId.value = null
       isStoredSessionLoginAttempt.value = false
     }
-    if (event.type === 'run_started' && event.phase !== 'login') {
-      statusMessage.value = `Run started (${event.phase ?? 'steamcmd'})`
-    }
-    if (event.type === 'run_finished' && event.phase !== 'login') {
-      statusMessage.value = `Run finished (${event.phase ?? 'steamcmd'})`
-    }
-    if (event.type === 'run_failed' && event.phase !== 'login') {
-      statusMessage.value = `Run failed (${event.errorCode ?? 'command_failed'})`
-    }
+    // Non-login phases have dedicated status/toast handling in action flows.
   })
 
   await ensureSteamCmdInstalled()

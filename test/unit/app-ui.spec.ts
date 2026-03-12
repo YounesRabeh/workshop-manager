@@ -132,6 +132,33 @@ describe('App UI validation gates', () => {
     expect(clearSessionButton?.attributes('disabled')).toBeDefined()
   })
 
+  it('forces rememberUsername when keep-signed-in is enabled', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    expect(checkboxes.length).toBeGreaterThanOrEqual(2)
+    await checkboxes[0].setValue(false)
+    await checkboxes[1].setValue(true)
+    await flushPromises()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(workshop.login).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'alice',
+        rememberAuth: true,
+        rememberUsername: true
+      })
+    )
+  })
+
   it('loads profile avatar/name after login', async () => {
     const wrapper = mount(App)
     await flushPromises()
@@ -266,6 +293,199 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).toContain('Changed to Hidden.')
   })
 
+  it('shows upload failed popup and uses short status text', async () => {
+    workshop.uploadMod.mockRejectedValueOnce(new Error('[command_failed] ERROR (No Connection)'))
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
+    expect(createTab).toBeDefined()
+    await createTab?.trigger('click')
+    await flushPromises()
+
+    const pickContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Choose Content Folder'))
+    expect(pickContentFolderButton).toBeDefined()
+    await pickContentFolderButton?.trigger('click')
+    await flushPromises()
+
+    const createButton = wrapper.findAll('button').find((button) => button.text().includes('Create New Item'))
+    expect(createButton).toBeDefined()
+    const publishArticle = createButton!.element.closest('article')
+    expect(publishArticle).toBeTruthy()
+    const publishInputs = publishArticle!.querySelectorAll('input')
+    expect(publishInputs.length).toBeGreaterThanOrEqual(2)
+    ;(publishInputs[0] as HTMLInputElement).value = '480'
+    publishInputs[0].dispatchEvent(new Event('input', { bubbles: true }))
+    ;(publishInputs[1] as HTMLInputElement).value = 'Created Mod'
+    publishInputs[1].dispatchEvent(new Event('input', { bubbles: true }))
+    await flushPromises()
+
+    await createButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.uploadMod).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Upload Failed')
+    expect(wrapper.text()).toContain('ERROR (No Connection)')
+    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Upload failed. See popup.')
+  })
+
+  it('shows update failed popup and uses short status text', async () => {
+    workshop.updateMod.mockRejectedValueOnce(
+      new Error('[command_failed] Steam connection failed after 4 retries. Check internet/Steam status and retry.')
+    )
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
+    expect(modButton).toBeDefined()
+    await modButton?.trigger('click')
+    await flushPromises()
+
+    const pickContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Choose Content Folder'))
+    expect(pickContentFolderButton).toBeDefined()
+    await pickContentFolderButton?.trigger('click')
+    await flushPromises()
+
+    const updateButton = wrapper.findAll('button').find((button) => button.text().includes('Update Existing Item'))
+    expect(updateButton).toBeDefined()
+    await updateButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.updateMod).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Update Failed')
+    expect(wrapper.text()).toContain('Steam connection failed after 4 retries')
+    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Update failed. See popup.')
+  })
+
+  it('allows update when only preview image is set (no content folder)', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
+    expect(modButton).toBeDefined()
+    await modButton?.trigger('click')
+    await flushPromises()
+
+    const updateButton = wrapper.findAll('button').find((button) => button.text().includes('Update Existing Item'))
+    expect(updateButton).toBeDefined()
+    expect(updateButton?.attributes('disabled')).toBeDefined()
+
+    const pickPreviewButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Pick')
+    expect(pickPreviewButton).toBeDefined()
+    await pickPreviewButton?.trigger('click')
+    await flushPromises()
+
+    expect(updateButton?.attributes('disabled')).toBeUndefined()
+    await updateButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.updateMod).toHaveBeenCalledTimes(1)
+    expect(workshop.updateMod).toHaveBeenCalledWith({
+      profileId: '123',
+      draft: expect.objectContaining({
+        appId: '480',
+        publishedFileId: '123',
+        contentFolder: '',
+        previewFile: '/mods/preview.png',
+        title: 'Test Item'
+      })
+    })
+  })
+
+  it('allows update when content folder is selected (preview not required)', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
+    expect(modButton).toBeDefined()
+    await modButton?.trigger('click')
+    await flushPromises()
+
+    const updateButton = wrapper.findAll('button').find((button) => button.text().includes('Update Existing Item'))
+    expect(updateButton).toBeDefined()
+    expect(updateButton?.attributes('disabled')).toBeDefined()
+
+    const pickContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Choose Content Folder'))
+    expect(pickContentFolderButton).toBeDefined()
+    await pickContentFolderButton?.trigger('click')
+    await flushPromises()
+
+    expect(updateButton?.attributes('disabled')).toBeUndefined()
+  })
+
+  it('shows concise update popup when selected content folder is empty', async () => {
+    workshop.updateMod.mockRejectedValueOnce(
+      new Error('[validation] Selected content folder is empty. Add files or use preview-only update.')
+    )
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
+    expect(modButton).toBeDefined()
+    await modButton?.trigger('click')
+    await flushPromises()
+
+    const pickContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Choose Content Folder'))
+    expect(pickContentFolderButton).toBeDefined()
+    await pickContentFolderButton?.trigger('click')
+    await flushPromises()
+
+    const updateButton = wrapper.findAll('button').find((button) => button.text().includes('Update Existing Item'))
+    expect(updateButton).toBeDefined()
+    await updateButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Update Failed')
+    expect(wrapper.text()).toContain('Selected content folder is empty')
+    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Update failed. See popup.')
+  })
+
   it('auto-loads mod content files after selecting a content folder', async () => {
     workshop.listContentFolderFiles.mockResolvedValueOnce([
       {
@@ -385,5 +605,6 @@ describe('App UI validation gates', () => {
     expect(workshop.updateVisibility).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Visibility Update Failed')
     expect(wrapper.text()).toContain('upstream failed')
+    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Visibility update failed. See popup.')
   })
 })

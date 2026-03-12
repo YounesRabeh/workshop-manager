@@ -1,11 +1,10 @@
 import type { UploadDraft } from '@shared/contracts'
+import {
+  evaluateCreateRequirements,
+  evaluateUpdateRequirements,
+  evaluateVisibilityRequirements
+} from '@shared/workshop-requirements'
 import { AppError } from './errors'
-
-const REQUIRED_FIELDS: Array<keyof UploadDraft> = [
-  'appId',
-  'contentFolder',
-  'title'
-]
 
 export function validateDraft(draft: UploadDraft, mode: 'upload' | 'update' | 'visibility'): void {
   if (draft.visibility !== undefined && ![0, 1, 2, 3].includes(draft.visibility)) {
@@ -13,29 +12,35 @@ export function validateDraft(draft: UploadDraft, mode: 'upload' | 'update' | 'v
   }
 
   if (mode === 'visibility') {
-    if (typeof draft.appId !== 'string' || draft.appId.trim().length === 0) {
+    const requirements = evaluateVisibilityRequirements(draft)
+    if (!requirements.appId) {
       throw new AppError('validation', 'appId is required for visibility updates')
     }
-    if (typeof draft.publishedFileId !== 'string' || draft.publishedFileId.trim().length === 0) {
+    if (!requirements.publishedFileId) {
       throw new AppError('validation', 'publishedFileId is required for visibility updates')
     }
-    if (draft.visibility === undefined) {
+    if (!requirements.visibility) {
       throw new AppError('validation', 'visibility is required for visibility updates')
     }
     return
   }
 
-  const missing = REQUIRED_FIELDS.filter((field) => {
-    const value = draft[field]
-    return typeof value !== 'string' || value.trim().length === 0
-  })
-
-  if (missing.length > 0) {
-    throw new AppError('validation', `Missing required fields: ${missing.join(', ')}`)
-  }
-
-  if (mode === 'update' && !draft.publishedFileId?.trim()) {
-    throw new AppError('validation', 'publishedFileId is required for updates')
+  if (mode === 'upload') {
+    const requirements = evaluateCreateRequirements(draft)
+    if (requirements.missing.length > 0) {
+      throw new AppError('validation', `Missing required fields: ${requirements.missing.join(', ')}`)
+    }
+  } else {
+    const requirements = evaluateUpdateRequirements(draft)
+    if (!requirements.appId) {
+      throw new AppError('validation', 'appId is required for updates')
+    }
+    if (!requirements.publishedFileId) {
+      throw new AppError('validation', 'publishedFileId is required for updates')
+    }
+    if (!requirements.contentOrPreview) {
+      throw new AppError('validation', 'Either contentFolder or previewFile is required for updates')
+    }
   }
 
   if (!Array.isArray(draft.tags)) {

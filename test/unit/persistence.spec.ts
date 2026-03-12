@@ -16,7 +16,6 @@ describe('profile and run-log persistence', () => {
       contentFolder: '/mods',
       previewFile: '/mods/preview.png',
       title: 'Profile',
-      description: 'Description',
       tags: ['a']
     })
     await store.setRememberedUsername('alice')

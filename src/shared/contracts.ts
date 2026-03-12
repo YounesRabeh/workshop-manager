@@ -13,7 +13,6 @@ export interface ModProfile {
   contentFolder: string
   previewFile?: string
   title: string
-  description?: string
   tags: string[]
 }
 
@@ -23,7 +22,6 @@ export interface UploadDraft {
   contentFolder: string
   previewFile?: string
   title: string
-  description?: string
   changenote?: string
   tags: string[]
   visibility?: 0 | 1 | 2 | 3

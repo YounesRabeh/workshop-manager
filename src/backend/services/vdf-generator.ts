@@ -36,17 +36,15 @@ export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update
     return `${lines.join('\n')}\n`
   }
 
-  const contentFolder = assertString('contentfolder', draft.contentFolder)
+  const trimmedContentFolder = draft.contentFolder?.trim()
   const previewFile = draft.previewFile?.trim()
-  const title = assertString('title', draft.title)
-  const description = draft.description?.trim()
+  const title = mode === 'upload' ? assertString('title', draft.title) : draft.title?.trim()
   const changeNote = draft.changenote?.trim()
 
-  const tagsBlock = draft.tags
+  const tagsList = draft.tags
     .map((tag) => tag.trim())
     .filter(Boolean)
-    .map((tag) => `\t\t\"${escapeVdf(tag)}\"\t\"1\"`)
-    .join('\n')
+  const tagsBlock = tagsList.map((tag) => `\t\t\"${escapeVdf(tag)}\"\t\"1\"`).join('\n')
 
   const headerLines = [
     '"workshopitem"',
@@ -65,19 +63,31 @@ export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update
     headerLines.push(`\t\"visibility\"\t\"${String(draft.visibility)}\"`)
   }
 
-  const lines = [
-    ...headerLines,
-    `\t\"contentfolder\"\t\"${escapeVdf(contentFolder)}\"`,
-    ...(previewFile ? [`\t\"previewfile\"\t\"${escapeVdf(previewFile)}\"`] : []),
-    `\t\"title\"\t\"${escapeVdf(title)}\"`,
-    ...(description ? [`\t\"description\"\t\"${escapeVdf(description)}\"`] : []),
-    ...(mode === 'update' && changeNote ? [`\t\"changenote\"\t\"${escapeVdf(changeNote)}\"`] : []),
-    '\t"tags"',
-    '\t{',
-    tagsBlock,
-    '\t}',
-    '}'
-  ]
+  const lines = [...headerLines]
+
+  if (mode === 'upload') {
+    lines.push(`\t\"contentfolder\"\t\"${escapeVdf(assertString('contentfolder', draft.contentFolder))}\"`)
+  } else if (trimmedContentFolder) {
+    lines.push(`\t\"contentfolder\"\t\"${escapeVdf(trimmedContentFolder)}\"`)
+  }
+
+  if (previewFile) {
+    lines.push(`\t\"previewfile\"\t\"${escapeVdf(previewFile)}\"`)
+  }
+
+  if (title) {
+    lines.push(`\t\"title\"\t\"${escapeVdf(title)}\"`)
+  }
+
+  if (mode === 'update' && changeNote) {
+    lines.push(`\t\"changenote\"\t\"${escapeVdf(changeNote)}\"`)
+  }
+
+  if (tagsList.length > 0) {
+    lines.push('\t"tags"', '\t{', tagsBlock, '\t}')
+  }
+
+  lines.push('}')
 
   return `${lines.filter((line) => line !== '').join('\n')}\n`
 }

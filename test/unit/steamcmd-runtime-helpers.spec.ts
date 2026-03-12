@@ -3,6 +3,7 @@ import {
   buildWorkshopArgs,
   extractWorkshopFileIdsFromHtml,
   isBenignSteamLatencyWarning,
+  isWorkshopSuccessLine,
   isSteamGuardPrompt,
   mergeWorkshopItems,
   normalizeWorkshopItems,
@@ -53,6 +54,18 @@ describe('steamcmd runtime helpers', () => {
     expect(failure).toEqual({
       code: 'steam_guard',
       message: 'Steam Guard code is invalid or expired. Enter a fresh code and retry.'
+    })
+  })
+
+  it('classifies missing cached credentials for saved-session login', () => {
+    const failure = parseSteamLoginFailure([
+      'Logging in using cached credentials.',
+      'Cached credentials not found.'
+    ])
+
+    expect(failure).toEqual({
+      code: 'auth',
+      message: 'Saved Steam session is not available. Enter password to sign in again.'
     })
   })
 
@@ -197,6 +210,12 @@ describe('steamcmd runtime helpers', () => {
     expect(isBenignSteamLatencyWarning('Uploading content...')).toBe(false)
   })
 
+  it('detects workshop success when Success. appears in a combined line', () => {
+    expect(isWorkshopSuccessLine('Committing update...Success.')).toBe(true)
+    expect(isWorkshopSuccessLine('Success.')).toBe(true)
+    expect(isWorkshopSuccessLine('Committing update...')).toBe(false)
+  })
+
   it('keeps real failure classification when benign warning also exists', () => {
     const failure = parseWorkshopRunFailure(
       [
@@ -208,5 +227,42 @@ describe('steamcmd runtime helpers', () => {
     expect(failure).toBe(
       'Steam upload timed out while sending the manifest. Retry in a minute and check network/Steam service status.'
     )
+  })
+
+  it('classifies no-connection failures with retry count', () => {
+    const failure = parseWorkshopRunFailure(
+      [
+        "Logging in user 'alice' to Steam Public...",
+        'Retrying...',
+        'Retrying...',
+        'Retrying...',
+        'Retrying...',
+        'ERROR (No Connection)'
+      ],
+      'update'
+    )
+
+    expect(failure).toBe('Steam connection failed after 4 retries. Check internet/Steam status and retry.')
+  })
+
+  it('classifies connection failures without retries', () => {
+    const failure = parseWorkshopRunFailure(
+      ['Preparing content...', 'ERROR (No Connection)'],
+      'upload'
+    )
+
+    expect(failure).toBe('Steam connection failed. Check internet/Steam status and retry.')
+  })
+
+  it('classifies missing content build failures with a short actionable message', () => {
+    const failure = parseWorkshopRunFailure(
+      [
+        '[2026-03-12 23:01:34]: ERROR! Build for workshop item has no content',
+        'ERROR! Failed to update workshop item (Failure).'
+      ],
+      'update'
+    )
+
+    expect(failure).toBe('No mod content found. Select a content folder with files, then retry.')
   })
 })

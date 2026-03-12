@@ -15,30 +15,86 @@ vi.mock('node:child_process', () => {
 
 import { spawn } from 'node:child_process'
 
-function createFakeChild(lines: string[], exitCode = 0): EventEmitter & {
+interface InteractiveResponse {
+  lines: string[]
+  closeCode?: number
+}
+
+interface InteractiveScenario {
+  login?: InteractiveResponse
+  workshopBuild?: InteractiveResponse
+  logout?: InteractiveResponse
+}
+
+function createInteractiveFakeChild(scenario: InteractiveScenario): EventEmitter & {
   stdout: PassThrough
   stderr: PassThrough
   stdin: PassThrough
+  commands: string[]
   kill: () => void
 } {
   const emitter = new EventEmitter() as EventEmitter & {
     stdout: PassThrough
     stderr: PassThrough
     stdin: PassThrough
+    commands: string[]
     kill: () => void
   }
 
   emitter.stdout = new PassThrough()
   emitter.stderr = new PassThrough()
   emitter.stdin = new PassThrough()
-  emitter.kill = () => undefined
+  emitter.commands = []
+  let stdinBuffer = ''
+  let closed = false
 
-  queueMicrotask(() => {
-    for (const line of lines) {
-      emitter.stdout.write(`${line}\n`)
+  const emitLines = (response: InteractiveResponse | undefined) => {
+    if (!response || closed) {
+      return
     }
-    emitter.emit('close', exitCode)
+    queueMicrotask(() => {
+      for (const line of response.lines) {
+        emitter.stdout.write(`${line}\n`)
+      }
+      if (typeof response.closeCode === 'number') {
+        closed = true
+        emitter.emit('close', response.closeCode)
+      }
+    })
+  }
+
+  emitter.stdin.on('data', (chunk: Buffer) => {
+    stdinBuffer += chunk.toString('utf8')
+    const commands = stdinBuffer.split(/\r?\n/)
+    stdinBuffer = commands.pop() ?? ''
+
+    for (const rawCommand of commands) {
+      const command = rawCommand.trim()
+      if (!command) {
+        continue
+      }
+      emitter.commands.push(command)
+      if (command.startsWith('login ')) {
+        emitLines(scenario.login)
+        continue
+      }
+      if (command.startsWith('workshop_build_item ')) {
+        emitLines(scenario.workshopBuild)
+        continue
+      }
+      if (command === 'logout') {
+        emitLines(scenario.logout)
+      }
+    }
   })
+
+  emitter.kill = () => {
+    if (closed) {
+      return
+    }
+    closed = true
+    emitter.emit('close', 0)
+  }
 
   return emitter
 }
@@ -60,7 +116,17 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     const store = new RunLogStore(join(root, 'runs'))
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() =>
-      createFakeChild(['Published File Id: 777'])
+      createInteractiveFakeChild({
+        login: {
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        },
+        workshopBuild: {
+          lines: ['Published File Id: 777', 'Success.']
+        }
+      })
     )
 
     const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
@@ -72,7 +138,6 @@ describe('SteamCmdRuntimeService lifecycle', () => {
         contentFolder: '/mods',
         previewFile: '/mods/preview.png',
         title: 'My Mod',
-        description: 'Desc',
         tags: ['tag-a']
       },
       'upload'
@@ -95,16 +160,24 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-benign-warning-'))
     const store = new RunLogStore(join(root, 'runs'))
 
-    ;(spawn as unknown as ReturnType<typeof vi.fn>)
-      .mockImplementationOnce(() => createFakeChild(['Logged in OK']))
-      .mockImplementationOnce(() =>
-        createFakeChild([
-          'Preparing update...',
-          'Uploading content...',
-          'IPC function call IClientUGC::GetItemUpdateProgress took too long: 43 msec',
-          'Success.'
-        ])
-      )
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() =>
+      createInteractiveFakeChild({
+        login: {
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        },
+        workshopBuild: {
+          lines: [
+            'Preparing update...',
+            'Uploading content...',
+            'IPC function call IClientUGC::GetItemUpdateProgress took too long: 43 msec',
+            'Success.'
+          ]
+        }
+      })
+    )
 
     const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
     await runtime.login('alice', 'secret')
@@ -113,7 +186,8 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       {
         appId: '480',
         publishedFileId: '123',
-        contentFolder: '/mods',
+        contentFolder: '',
+        previewFile: '/mods/preview.png',
         title: 'My Mod',
         tags: []
       },
@@ -131,19 +205,24 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-manifest-timeout-'))
     const store = new RunLogStore(join(root, 'runs'))
 
-    ;(spawn as unknown as ReturnType<typeof vi.fn>)
-      .mockImplementationOnce(() => createFakeChild(['Logged in OK']))
-      .mockImplementationOnce(() =>
-        createFakeChild(
-          [
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() =>
+      createInteractiveFakeChild({
+        login: {
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        },
+        workshopBuild: {
+          lines: [
             'Preparing update...',
             'Uploading content...',
             '[2026-03-12 22:01:45]: ERROR! Timeout uploading manifest (size 967)',
             'ERROR! Failed to update workshop item (Failure).'
-          ],
-          9
-        )
-      )
+          ]
+        }
+      })
+    )
 
     const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
     await runtime.login('alice', 'secret')
@@ -153,7 +232,8 @@ describe('SteamCmdRuntimeService lifecycle', () => {
         {
           appId: '480',
           publishedFileId: '123',
-          contentFolder: '/mods',
+          contentFolder: '',
+          previewFile: '/mods/preview.png',
           title: 'My Mod',
           tags: []
         },
@@ -170,7 +250,14 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     const store = new RunLogStore(join(root, 'runs'))
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() =>
-      createFakeChild(['Logged in OK'])
+      createInteractiveFakeChild({
+        login: {
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        }
+      })
     )
 
     const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, runtimeDir)
@@ -179,12 +266,89 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     await expect(access(runtimeDir)).resolves.toBeUndefined()
   })
 
+  it('restores active session after UI sign-out without re-running Steam login', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-restore-session-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    let childRef:
+      | (EventEmitter & {
+          stdout: PassThrough
+          stderr: PassThrough
+          stdin: PassThrough
+          commands: string[]
+          kill: () => void
+        })
+      | undefined
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      childRef = createInteractiveFakeChild({
+        login: {
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        }
+      })
+      return childRef
+    })
+
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
+    await runtime.login('alice', 'secret')
+    runtime.logout()
+
+    const restored = await runtime.login('alice', '', true)
+    const persisted = await store.get(restored.sessionId)
+
+    expect(persisted?.lines.join('\n')).toContain('restored active SteamCMD session without re-running login command')
+    expect(childRef?.commands.filter((command) => command.startsWith('login '))).toHaveLength(1)
+  })
+
+  it('fails update early when selected content folder has no files', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-empty-folder-'))
+    const store = new RunLogStore(join(root, 'runs'))
+    const emptyContentFolder = await mkdtemp(join(root, 'empty-content-'))
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() =>
+      createInteractiveFakeChild({
+        login: {
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        }
+      })
+    )
+
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
+    await runtime.login('alice', 'secret')
+
+    await expect(
+      runtime.upload(
+        {
+          appId: '480',
+          publishedFileId: '123',
+          contentFolder: emptyContentFolder,
+          previewFile: '',
+          title: '',
+          tags: []
+        },
+        'update'
+      )
+    ).rejects.toThrow('Selected content folder is empty. Add files or use preview-only update.')
+  })
+
   it('combines web api + community results with full item metadata', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-workshop-'))
     const store = new RunLogStore(join(root, 'runs'))
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() =>
-      createFakeChild(["Logging in user 'alice' [U:1:42] to Steam Public..."])
+      createInteractiveFakeChild({
+        login: {
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        }
+      })
     )
 
     const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))

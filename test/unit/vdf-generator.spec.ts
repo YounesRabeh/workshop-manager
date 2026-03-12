@@ -9,7 +9,6 @@ describe('generateWorkshopVdf', () => {
         contentFolder: '/mods/base',
         previewFile: '/mods/preview.png',
         title: 'My "Quoted" Mod',
-        description: 'Line 1\nLine 2',
         tags: ['fun', 'coop']
       },
       'upload'
@@ -17,7 +16,6 @@ describe('generateWorkshopVdf', () => {
 
     expect(output).toContain('"appid"\t"480"')
     expect(output).toContain('"title"\t"My \\"Quoted\\" Mod"')
-    expect(output).toContain('"description"\t"Line 1\\nLine 2"')
     expect(output).toContain('"fun"\t"1"')
     expect(output).not.toContain('publishedfileid')
   })
@@ -30,7 +28,6 @@ describe('generateWorkshopVdf', () => {
           contentFolder: '/mods/base',
           previewFile: '/mods/preview.png',
           title: 'Test',
-          description: 'Test',
           tags: []
         },
         'update'
@@ -38,14 +35,13 @@ describe('generateWorkshopVdf', () => {
     ).toThrowError(/publishedfileid/i)
   })
 
-  it('omits optional preview and description fields when empty', () => {
+  it('omits optional preview fields when empty', () => {
     const output = generateWorkshopVdf(
       {
         appId: '480',
         contentFolder: '/mods/base',
         previewFile: '',
         title: 'No Optional Fields',
-        description: '',
         tags: []
       },
       'upload'
@@ -53,7 +49,6 @@ describe('generateWorkshopVdf', () => {
 
     expect(output).toContain('"title"\t"No Optional Fields"')
     expect(output).not.toContain('"previewfile"')
-    expect(output).not.toContain('"description"')
   })
 
   it('includes changenote for update mode when provided', () => {
@@ -71,5 +66,45 @@ describe('generateWorkshopVdf', () => {
 
     expect(output).toContain('"publishedfileid"\t"12345"')
     expect(output).toContain('"changenote"\t"Balance tweaks and crash fixes"')
+    expect(output).toContain('"contentfolder"\t"/mods/base"')
+  })
+
+  it('supports preview-only update without contentfolder', () => {
+    const output = generateWorkshopVdf(
+      {
+        appId: '480',
+        publishedFileId: '12345',
+        contentFolder: '',
+        previewFile: '/mods/new-preview.png',
+        title: 'Update Target',
+        tags: []
+      },
+      'update'
+    )
+
+    expect(output).toContain('"publishedfileid"\t"12345"')
+    expect(output).toContain('"previewfile"\t"/mods/new-preview.png"')
+    expect(output).not.toContain('"contentfolder"')
+  })
+
+  it('emits visibility-only VDF structure', () => {
+    const output = generateWorkshopVdf(
+      {
+        appId: '480',
+        publishedFileId: '12345',
+        contentFolder: '',
+        title: '',
+        tags: [],
+        visibility: 2
+      },
+      'visibility'
+    )
+
+    expect(output).toContain('"appid"\t"480"')
+    expect(output).toContain('"publishedfileid"\t"12345"')
+    expect(output).toContain('"visibility"\t"2"')
+    expect(output).not.toContain('"contentfolder"')
+    expect(output).not.toContain('"title"')
+    expect(output).not.toContain('"tags"')
   })
 })

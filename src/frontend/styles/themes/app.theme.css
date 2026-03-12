@@ -345,7 +345,9 @@ body {
 }
 
 .workshop-preview {
-  max-height: 300px;
+  aspect-ratio: 1 / 1;
+  max-height: none;
+  width: 100%;
   overflow: hidden;
 }
 

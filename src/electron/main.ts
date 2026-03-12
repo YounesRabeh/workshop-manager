@@ -166,8 +166,9 @@ app.whenReady().then(async () => {
     try {
       const useStoredAuth = payload.useStoredAuth === true
       const state = await runtimeService.login(payload.username, payload.password, useStoredAuth)
-      const rememberUsername = payload.rememberUsername === true
-      const rememberAuth = rememberUsername && payload.rememberAuth === true
+      // Stored session needs username next launch, so keep username when rememberAuth is enabled.
+      const rememberAuth = payload.rememberAuth === true
+      const rememberUsername = payload.rememberUsername === true || rememberAuth
       await profileStore.setRememberedUsername(rememberUsername ? payload.username : undefined)
       await profileStore.setRememberAuth(rememberAuth)
       return {
@@ -180,13 +181,15 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle(IPC_CHANNELS.logout, async () => {
+    // UI sign-out should not invalidate remembered SteamCMD session.
     runtimeService.logout()
     return { ok: true }
   })
 
   ipcMain.handle(IPC_CHANNELS.clearStoredSession, async () => {
     try {
-      runtimeService.logout()
+      // Explicit clear must invalidate SteamCMD cached auth.
+      runtimeService.logout({ clearStoredAuth: true })
       await profileStore.setRememberAuth(false)
       return { ok: true }
     } catch (error) {
@@ -228,7 +231,6 @@ app.whenReady().then(async () => {
           contentFolder: '',
           previewFile: '',
           title: '',
-          description: '',
           tags: [],
           visibility: payload.visibility
         },
