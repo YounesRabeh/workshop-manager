@@ -18,6 +18,7 @@ import { RunLogStore } from '@backend/stores/run-log-store'
 import { SteamCmdInstallManager } from '@backend/services/steamcmd-install-manager'
 import { SteamCmdRuntimeService } from '@backend/services/steamcmd-runtime-service'
 import { getAppPaths } from '@backend/services/path-provider'
+import { listContentFolderFiles } from '@backend/services/content-folder-scanner'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -183,6 +184,16 @@ app.whenReady().then(async () => {
     return { ok: true }
   })
 
+  ipcMain.handle(IPC_CHANNELS.clearStoredSession, async () => {
+    try {
+      runtimeService.logout()
+      await profileStore.setRememberAuth(false)
+      return { ok: true }
+    } catch (error) {
+      throw toIpcError(error)
+    }
+  })
+
   ipcMain.handle(IPC_CHANNELS.submitSteamGuardCode, async (_event, payload: SteamGuardInput) => {
     try {
       runtimeService.submitSteamGuardCode(payload.sessionId, payload.code)
@@ -316,6 +327,14 @@ app.whenReady().then(async () => {
         }
       }
       return await runtimeService.getMyWorkshopItems(payload.appId, savedWebApiKey, webApiEnabled)
+    } catch (error) {
+      throw toIpcError(error)
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.listContentFolderFiles, async (_event, payload: { folderPath: string }) => {
+    try {
+      return await listContentFolderFiles(payload.folderPath)
     } catch (error) {
       throw toIpcError(error)
     }

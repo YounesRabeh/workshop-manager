@@ -8,6 +8,7 @@ const workshop = {
   ensureSteamCmdInstalled: vi.fn(async () => ({ installed: true })),
   login: vi.fn(async () => ({ sessionId: 's1' })),
   logout: vi.fn(async () => ({ ok: true })),
+  clearStoredSession: vi.fn(async () => ({ ok: true })),
   submitSteamGuardCode: vi.fn(async () => ({ ok: true })),
   uploadMod: vi.fn(async () => ({ runId: 'r1', success: true })),
   updateMod: vi.fn(async () => ({ runId: 'r2', success: true })),
@@ -37,6 +38,9 @@ const workshop = {
       previewUrl: 'https://example.invalid/preview.jpg'
     }
   ]),
+  listContentFolderFiles: vi.fn(
+    async () => [] as Array<{ absolutePath: string; relativePath: string; sizeBytes: number }>
+  ),
   saveProfile: vi.fn(async ({ profile }) => profile),
   deleteProfile: vi.fn(async () => ({ ok: true })),
   getRunLogs: vi.fn(async () => []),
@@ -89,6 +93,42 @@ describe('App UI validation gates', () => {
 
     expect((usernameInput.element as HTMLInputElement).value).toBe('alice')
     expect((passwordInput.element as HTMLInputElement).value).toBe('')
+  })
+
+  it('clears saved session from login panel', async () => {
+    workshop.getProfiles.mockResolvedValueOnce({
+      profiles: [],
+      rememberedUsername: 'alice',
+      rememberAuth: true
+    })
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const clearSessionButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Clear saved session'))
+    expect(clearSessionButton).toBeDefined()
+    await clearSessionButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.clearStoredSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps clear saved session disabled when only checkbox is ticked locally', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    expect(checkboxes.length).toBeGreaterThanOrEqual(2)
+    await checkboxes[1].setValue(true)
+    await flushPromises()
+
+    const clearSessionButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Clear saved session'))
+    expect(clearSessionButton).toBeDefined()
+    expect(clearSessionButton?.attributes('disabled')).toBeDefined()
   })
 
   it('loads profile avatar/name after login', async () => {
@@ -223,6 +263,90 @@ describe('App UI validation gates', () => {
     expect(workshop.updateVisibility).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Visibility Updated')
     expect(wrapper.text()).toContain('Changed to Hidden.')
+  })
+
+  it('auto-loads mod content files after selecting a content folder', async () => {
+    workshop.listContentFolderFiles.mockResolvedValueOnce([
+      {
+        absolutePath: '/mods/readme.txt',
+        relativePath: 'readme.txt',
+        sizeBytes: 6
+      },
+      {
+        absolutePath: '/mods/data/config.json',
+        relativePath: 'data/config.json',
+        sizeBytes: 18
+      }
+    ])
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
+    expect(modButton).toBeDefined()
+    await modButton?.trigger('click')
+    await flushPromises()
+
+    const pickContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Select Content Folder'))
+    expect(pickContentFolderButton).toBeDefined()
+    await pickContentFolderButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.listContentFolderFiles).toHaveBeenCalledWith({ folderPath: '/mods' })
+    expect(wrapper.text()).toContain('Mod Content')
+    expect(wrapper.text()).toContain('readme.txt')
+    expect(wrapper.text()).toContain('config.json')
+    expect(wrapper.text()).toContain('24 B')
+  })
+
+  it('clears content folder and staged files from mod content panel', async () => {
+    workshop.listContentFolderFiles.mockResolvedValueOnce([
+      {
+        absolutePath: '/mods/readme.txt',
+        relativePath: 'readme.txt',
+        sizeBytes: 6
+      }
+    ])
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
+    expect(modButton).toBeDefined()
+    await modButton?.trigger('click')
+    await flushPromises()
+
+    const pickContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Select Content Folder'))
+    expect(pickContentFolderButton).toBeDefined()
+    await pickContentFolderButton?.trigger('click')
+    await flushPromises()
+
+    const clearContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Clear Content Folder'))
+    expect(clearContentFolderButton).toBeDefined()
+    await clearContentFolderButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No files staged yet.')
   })
 
   it('shows error popup when visibility change fails', async () => {

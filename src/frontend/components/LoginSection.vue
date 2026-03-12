@@ -18,6 +18,7 @@ const props = defineProps<{
   steamGuardPromptType: SteamGuardPromptType
   steamGuardCode: string
   isStoredSessionLoginAttempt: boolean
+  canClearStoredSession: boolean
   isAdvancedOptionsOpen: boolean
   advancedSettings: AdvancedSettingsState
   isWebApiKeyPeek: boolean
@@ -33,6 +34,7 @@ const emit = defineEmits<{
   (e: 'set-web-api-key-peek', value: boolean): void
   (e: 'save-advanced-settings'): void
   (e: 'clear-web-api-key'): void
+  (e: 'clear-stored-session'): void
 }>()
 
 function authIssueClasses(tone: AuthIssueTone): string {
@@ -228,6 +230,14 @@ watch(
         <p class="mt-1 text-[11px] text-slate-500">
           Uses SteamCMD cached login session. Password is never stored by this app.
         </p>
+        <button
+          type="button"
+          class="login-peek mt-2 w-full rounded border border-slate-300 px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="isLoginSubmitting || !canClearStoredSession"
+          @click="emit('clear-stored-session')"
+        >
+          Clear saved session
+        </button>
         <button
           type="button"
           class="login-peek mt-3 w-full rounded border border-slate-300 px-3 py-2 text-xs font-semibold"

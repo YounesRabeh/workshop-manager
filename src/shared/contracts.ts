@@ -142,3 +142,9 @@ export interface SteamProfileSummary {
   avatarUrl?: string
   profileUrl: string
 }
+
+export interface ContentFolderFileEntry {
+  absolutePath: string
+  relativePath: string
+  sizeBytes: number
+}

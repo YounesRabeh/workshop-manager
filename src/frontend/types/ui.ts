@@ -52,6 +52,23 @@ export interface UploadDraftState {
   tags: string[]
 }
 
+export interface StagedContentFile {
+  absolutePath: string
+  relativePath: string
+  sizeBytes: number
+}
+
+export interface ContentTreeNode {
+  id: string
+  name: string
+  type: 'folder' | 'file'
+  relativePath: string
+  sizeBytes: number
+  fileCount: number
+  absolutePath?: string
+  children?: ContentTreeNode[]
+}
+
 export interface PublishChecklistItem {
   label: string
   ok: boolean
