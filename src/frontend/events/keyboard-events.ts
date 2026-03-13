@@ -7,13 +7,66 @@ interface AppGlobalKeyboardDeps {
   toggleFullscreen: () => void
   closeAbout: () => void
   goToStep: StepNavigator
+  scrollViewport: (direction: 1 | -1) => void
   canGoBack: () => boolean
   goBack: () => void
   isAuthenticated: () => boolean
 }
 
+function isTextEditingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+  if (target.isContentEditable) {
+    return true
+  }
+  if (target instanceof HTMLTextAreaElement) {
+    return true
+  }
+  if (target instanceof HTMLInputElement) {
+    const type = (target.type || 'text').toLowerCase()
+    return !['button', 'checkbox', 'radio', 'submit', 'reset', 'file', 'range', 'color'].includes(type)
+  }
+  return false
+}
+
+function getFocusableElements(): HTMLElement[] {
+  const selector = 'button,input,textarea,select,a[href],[tabindex]:not([tabindex="-1"])'
+  return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter((element) => {
+    if (element.hasAttribute('disabled')) {
+      return false
+    }
+    if (element.getAttribute('aria-hidden') === 'true') {
+      return false
+    }
+    return element.getClientRects().length > 0
+  })
+}
+
+function moveFocusByDirection(direction: 1 | -1): void {
+  const focusable = getFocusableElements()
+  if (focusable.length === 0) {
+    return
+  }
+
+  const activeElement = document.activeElement as HTMLElement | null
+  const currentIndex = activeElement ? focusable.indexOf(activeElement) : -1
+  if (currentIndex < 0) {
+    const fallbackIndex = direction > 0 ? 0 : focusable.length - 1
+    focusable[fallbackIndex]?.focus()
+    return
+  }
+
+  const nextIndex = Math.min(Math.max(currentIndex + direction, 0), focusable.length - 1)
+  focusable[nextIndex]?.focus()
+}
+
 export function createAppGlobalKeyDownHandler(deps: AppGlobalKeyboardDeps): (event: KeyboardEvent) => void {
   return (event: KeyboardEvent): void => {
+    if (event.defaultPrevented) {
+      return
+    }
+
     if (event.key === 'F11') {
       event.preventDefault()
       deps.toggleFullscreen()
@@ -38,6 +91,34 @@ export function createAppGlobalKeyDownHandler(deps: AppGlobalKeyboardDeps): (eve
         event.preventDefault()
         deps.goBack()
       }
+      return
+    }
+
+    if (
+      (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey
+    ) {
+      if (event.key === 'ArrowUp') {
+        if (isTextEditingTarget(event.target)) {
+          return
+        }
+        event.preventDefault()
+        deps.scrollViewport(-1)
+        return
+      }
+      if (event.key === 'ArrowDown') {
+        if (isTextEditingTarget(event.target)) {
+          return
+        }
+        event.preventDefault()
+        deps.scrollViewport(1)
+        return
+      }
+      event.preventDefault()
+      moveFocusByDirection(event.key === 'ArrowRight' ? 1 : -1)
       return
     }
 

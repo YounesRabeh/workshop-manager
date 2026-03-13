@@ -523,7 +523,7 @@ describe('App UI validation gates', () => {
     await flushPromises()
 
     expect(workshop.listContentFolderFiles).toHaveBeenCalledWith({ folderPath: '/mods' })
-    expect(wrapper.text()).toContain('Content Hierarchy')
+    expect(wrapper.text()).toContain('Content Explorer')
     expect(wrapper.text()).toContain('readme.txt')
     expect(wrapper.text()).toContain('config.json')
     expect(wrapper.text()).toContain('24 B')
@@ -569,7 +569,7 @@ describe('App UI validation gates', () => {
     await clearContentFolderButton?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('No files staged yet.')
+    expect(wrapper.text()).toContain('No files found in selected content folder.')
   })
 
   it('shows error popup when visibility change fails', async () => {

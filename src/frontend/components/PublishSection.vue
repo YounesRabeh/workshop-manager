@@ -34,10 +34,6 @@ const emit = defineEmits<{
   (e: 'update-item'): void
   (e: 'change-visibility-selection', value: 0 | 1 | 2 | 3): void
   (e: 'update-visibility-only'): void
-  (e: 'pick-upload-files'): void
-  (e: 'clear-upload-files'): void
-  (e: 'remove-staged-file', path: string): void
-  (e: 'open-content-folder'): void
 }>()
 
 interface FlattenedContentNode {
@@ -169,6 +165,8 @@ const flattenedContentNodes = computed(() =>
 const totalContentSizeLabel = computed(() => formatSizeLabel(props.totalStagedContentSizeBytes))
 const requiredPublishChecklist = computed(() => props.publishChecklist.filter((item) => !item.optional))
 const optionalPublishChecklist = computed(() => props.publishChecklist.filter((item) => item.optional))
+const isContentExplorerCollapsed = ref(false)
+const fileOnlyTreeToggleState = ref(false)
 
 const allFolderIds = computed(() => {
   const ids = new Set<string>()
@@ -185,6 +183,8 @@ const allFolderIds = computed(() => {
   walk(props.stagedContentTree)
   return ids
 })
+
+const hasAnyFolders = computed(() => allFolderIds.value.size > 0)
 
 watch(
   allFolderIds,
@@ -212,6 +212,36 @@ function toggleFolder(folderId: string): void {
     next.add(folderId)
   }
   collapsedFolderIds.value = next
+}
+
+function toggleContentExplorerCollapsed(): void {
+  isContentExplorerCollapsed.value = !isContentExplorerCollapsed.value
+}
+
+function collapseAllFolders(): void {
+  collapsedFolderIds.value = new Set(allFolderIds.value)
+}
+
+function expandAllFolders(): void {
+  collapsedFolderIds.value = new Set()
+}
+
+const isAnyFolderCollapsed = computed(() => collapsedFolderIds.value.size > 0)
+const isTreeToggleCollapsed = computed(() =>
+  hasAnyFolders.value ? isAnyFolderCollapsed.value : fileOnlyTreeToggleState.value
+)
+
+function toggleAllFolders(): void {
+  if (!hasAnyFolders.value) {
+    fileOnlyTreeToggleState.value = !fileOnlyTreeToggleState.value
+    return
+  }
+
+  if (isAnyFolderCollapsed.value) {
+    expandAllFolders()
+    return
+  }
+  collapseAllFolders()
 }
 
 function readinessItemClass(item: PublishChecklistItem): string {
@@ -439,38 +469,17 @@ function submitPrimaryAction(): void {
           Choose Content Folder
         </button>
         <button
-          class="flex min-h-[3.25rem] items-center justify-center rounded border border-[#6ecbff] bg-[#59b9f8] px-3 text-center text-sm font-semibold leading-tight text-[#05253a] disabled:opacity-40"
-          :disabled="!hasContentFolder"
-          @click="emit('pick-upload-files')"
-        >
-          Add Files to Content
-        </button>
-        <button
           class="flex min-h-[3.25rem] items-center justify-center rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 text-center text-sm font-semibold leading-tight text-slate-100 disabled:opacity-40"
           :disabled="!hasContentFolder && stagedContentFiles.length === 0"
           @click="emit('clear-workspace')"
         >
           Reset Folder
         </button>
-        <button
-          class="steam-btn-muted flex min-h-[3.25rem] items-center justify-center rounded px-3 text-center text-sm font-semibold leading-tight disabled:opacity-40"
-          :disabled="stagedContentFiles.length === 0"
-          @click="emit('clear-upload-files')"
-        >
-          Clear File List
-        </button>
       </div>
 
       <div class="mt-4 rounded-lg border border-[#ad6f2f] bg-[#1f3248] px-3 py-3">
         <div class="flex items-center justify-between gap-2">
           <p class="text-sm text-orange-100/85">Selected Content Folder</p>
-          <button
-            class="rounded border border-[#4d7ca0] bg-[#2c4d67] px-2 py-1 text-xs font-semibold text-slate-100 disabled:opacity-40"
-            :disabled="!hasContentFolder"
-            @click="emit('open-content-folder')"
-          >
-            Open Folder
-          </button>
         </div>
         <p class="mt-1 select-text break-all text-lg font-semibold text-orange-100">
           {{ hasContentFolder ? contentFolderValue : 'Not selected' }}
@@ -478,14 +487,47 @@ function submitPrimaryAction(): void {
       </div>
 
       <div class="mt-4 rounded-lg border border-[#ad6f2f] bg-[#1f3248]">
-        <div class="flex w-full items-center justify-between border-b border-[#ad6f2f] px-3 py-2 text-left">
+        <div
+          class="flex w-full items-center justify-between px-3 py-2 text-left"
+          :class="isContentExplorerCollapsed ? '' : 'border-b border-[#ad6f2f]'"
+        >
           <span class="text-base font-semibold text-slate-100">Content Explorer</span>
-          <span class="flex items-center gap-2 text-sm text-slate-300">
-            {{ stagedContentFiles.length }} item(s) • {{ totalContentSizeLabel }}
-          </span>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-slate-300">{{ stagedContentFiles.length }} item(s) • {{ totalContentSizeLabel }}</span>
+            <button
+              type="button"
+              class="inline-flex w-[92px] items-center justify-center gap-1 rounded border border-[#4d7ca0] bg-[#2c4d67] px-2 py-0.5 text-xs font-semibold text-slate-100"
+              :aria-label="isTreeToggleCollapsed ? 'Expand all folders' : 'Collapse all folders'"
+              @click="toggleAllFolders"
+            >
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5l1.8 2H19.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-11Z" />
+                <path d="M8 12h8" />
+                <path v-if="isTreeToggleCollapsed" d="M12 8v8" />
+              </svg>
+              {{ isTreeToggleCollapsed ? 'Expand' : 'Collapse' }}
+            </button>
+            <button
+              type="button"
+              class="inline-flex h-6 w-7 items-center justify-center rounded border border-[#4d7ca0] bg-[#2c4d67] text-slate-100"
+              :aria-label="isContentExplorerCollapsed ? 'Expand content explorer' : 'Collapse content explorer'"
+              @click="toggleContentExplorerCollapsed"
+            >
+              <svg
+                class="h-3.5 w-3.5 transition-transform duration-150"
+                :class="isContentExplorerCollapsed ? 'rotate-0' : 'rotate-180'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+          </div>
         </div>
-        <div class="max-h-72 overflow-auto px-3 py-2 xl:max-h-[24rem]">
-          <p v-if="stagedContentFiles.length === 0" class="text-sm text-slate-300">No files staged yet.</p>
+        <div v-show="!isContentExplorerCollapsed" class="max-h-72 overflow-auto px-3 py-2 xl:max-h-[24rem]">
+          <p v-if="stagedContentFiles.length === 0" class="text-sm text-slate-300">No files found in selected content folder.</p>
           <ul v-else class="space-y-2 text-sm text-slate-200">
             <li
               v-for="{ node, depth } in flattenedContentNodes"
@@ -529,14 +571,6 @@ function submitPrimaryAction(): void {
                 <span class="shrink-0 rounded-md border border-[#466887] bg-[#102335] px-2.5 py-0.5 text-xs font-medium text-slate-100">
                   {{ formatSizeLabel(node.sizeBytes) }}
                 </span>
-                <button
-                  v-if="node.type === 'file' && node.absolutePath"
-                  class="h-6 w-6 shrink-0 rounded-full border border-rose-300/35 bg-rose-900/45 text-xs font-bold text-rose-100 transition-colors hover:bg-rose-800/70"
-                  title="Remove file"
-                  @click.stop="emit('remove-staged-file', node.absolutePath)"
-                >
-                  x
-                </button>
               </div>
             </li>
           </ul>

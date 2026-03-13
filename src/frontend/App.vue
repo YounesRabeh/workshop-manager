@@ -721,6 +721,16 @@ function goBackFlow(): void {
   }
 }
 
+function scrollViewport(direction: 1 | -1): void {
+  const topOffset = direction * 140
+  const scrollingElement = document.scrollingElement
+  if (scrollingElement) {
+    scrollingElement.scrollBy({ top: topOffset, behavior: 'smooth' })
+    return
+  }
+  window.scrollBy({ top: topOffset, behavior: 'smooth' })
+}
+
 const onGlobalKeyDown = createAppGlobalKeyDownHandler({
   isAboutOpen: () => isAboutOpen.value,
   toggleFullscreen: () => {
@@ -728,6 +738,7 @@ const onGlobalKeyDown = createAppGlobalKeyDownHandler({
   },
   closeAbout: closeAboutModal,
   goToStep,
+  scrollViewport,
   canGoBack: canGoBackFlow,
   goBack: goBackFlow,
   isAuthenticated: () => isAuthenticated.value
@@ -1504,10 +1515,6 @@ onUnmounted(() => {
           @update-visibility-only="updateVisibilityOnly"
           @upload="upload"
           @update-item="updateItem"
-          @pick-upload-files="pickUploadFiles"
-          @clear-upload-files="clearUploadFiles"
-          @remove-staged-file="removeStagedFile"
-          @open-content-folder="openCurrentContentFolder"
         />
 
         <div

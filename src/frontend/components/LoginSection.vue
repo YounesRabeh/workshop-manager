@@ -168,9 +168,9 @@ watch(
   <section class="fade-in login-shell">
     <div class="login-panel">
       <header>
-        <p class="login-kicker">STEAM WORKSHOP MANAGER</p>
-        <h1 class="text-5xl font-extrabold tracking-tight text-slate-900">Sign in</h1>
-        <p class="mt-2 text-sm text-slate-600">Use your Steam account to unlock mod management !</p>
+        <p class="login-kicker text-[16px] font-extrabold tracking-[0.18em] text-sky-500">STEAM WORKSHOP MANAGER</p>
+        <h1 class="text-4xl font-extrabold tracking-tight text-slate-900">Sign in</h1>
+        <p class="mt-2 text-sm text-slate-600">Use your Steam account to unlock mod management.</p>
         <p v-if="statusMessage" class="login-status">{{ statusMessage }}</p>
       </header>
 
