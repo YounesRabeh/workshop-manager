@@ -2,6 +2,12 @@
 
 Desktop app built with Electron + Vite + Vue 3 + TypeScript + Tailwind for Steam Workshop publish/update workflows.
 
+## Screenshots
+
+| Screenshot 1 | Screenshot 2 |
+| --- | --- |
+| ![Steam Workshop Manager Screenshot 1](github/photo01.png) | ![Steam Workshop Manager Screenshot 2](github/photo02.png) |
+
 ## Included in V1
 
 - SteamCMD install manager with auto-download attempt and manual fallback path support.
