@@ -1,6 +1,6 @@
-# Steam Workshop Manager (V1)
+# Steam Workshop Manager
 
-Desktop app built with Electron + Vite + Vue 3 + TypeScript + Tailwind for Steam Workshop publish/update workflows.
+Cross-platform desktop app for Steam Workshop publish/update workflows, built with Electron, Vue 3, TypeScript, and Tailwind.
 
 ## Screenshots
 
@@ -10,12 +10,12 @@ Desktop app built with Electron + Vite + Vue 3 + TypeScript + Tailwind for Steam
 
 ## Included in V1
 
-- SteamCMD install manager with auto-download attempt and manual fallback path support.
-- Steam login with Steam Guard event detection and code submission flow.
-- Upload new item and update existing item through generated VDF files.
-- JSON-backed local profile persistence.
-- Timestamped per-run log persistence with live stream and replay.
-- Secure Electron boundary: `nodeIntegration: false`, `contextIsolation: true`, strict preload API.
+- SteamCMD install manager with auto-download and manual fallback path support.
+- Steam login with Steam Guard handling.
+- Upload new items and update existing items through generated VDF files.
+- Local JSON-backed persistence for app/profile data.
+- Per-run SteamCMD log persistence.
+- Secure Electron boundary (`nodeIntegration: false`, `contextIsolation: true`, preload bridge only).
 
 ## Project Layout
 
@@ -28,17 +28,18 @@ Desktop app built with Electron + Vite + Vue 3 + TypeScript + Tailwind for Steam
 ## Run From Source
 
 1. Install dependencies:
-   - `npx -y pnpm@10 install`
+   - `pnpm install`
 2. Start development app:
-   - `npx -y pnpm@10 dev`
+   - `pnpm dev`
 3. Run tests:
-   - `npx -y pnpm@10 test`
+   - `pnpm test`
 4. Type-check:
-   - `npx -y pnpm@10 typecheck`
+   - `pnpm typecheck`
+5. Build:
+   - `pnpm build`
 
 ## Notes
 
 - Username persistence is supported when selected; password is kept in memory only.
 - V1 intentionally excludes Workshop stats dashboard and `workshop_download_item`.
 - Linux and Windows are the target runtime platforms.
-- Workshop listing limitation and future plan: `src/backend/services/steamcmd-workshop-listing-notes.md`.
