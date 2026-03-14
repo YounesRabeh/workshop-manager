@@ -138,12 +138,53 @@ app.whenReady().then(async () => {
     paths.runtimeDir
   )
 
-  const getAdvancedSettings = async (): Promise<AdvancedSettings> => {
+  const resolveSavedWebApiKey = async (): Promise<{
+    key?: string
+    hasUsableKey: boolean
+    secureStorageAvailable: boolean
+  }> => {
     const encryptedKey = await profileStore.getWebApiKeyEncrypted()
+    const secureStorageAvailable = isSecureStorageAvailable()
+    if (!encryptedKey || encryptedKey.trim().length === 0 || !secureStorageAvailable) {
+      return {
+        hasUsableKey: false,
+        secureStorageAvailable
+      }
+    }
+
+    try {
+      const key = decryptSecret(encryptedKey).trim()
+      if (!key) {
+        return {
+          hasUsableKey: false,
+          secureStorageAvailable
+        }
+      }
+      return {
+        key,
+        hasUsableKey: true,
+        secureStorageAvailable
+      }
+    } catch {
+      return {
+        hasUsableKey: false,
+        secureStorageAvailable
+      }
+    }
+  }
+
+  const getAdvancedSettings = async (): Promise<AdvancedSettings> => {
+    const storedWebApiEnabled = await profileStore.getWebApiEnabled()
+    const resolvedKey = await resolveSavedWebApiKey()
+    const effectiveWebApiEnabled = storedWebApiEnabled && resolvedKey.hasUsableKey
+    if (storedWebApiEnabled !== effectiveWebApiEnabled) {
+      await profileStore.setWebApiEnabled(effectiveWebApiEnabled)
+    }
+
     return {
-      webApiEnabled: await profileStore.getWebApiEnabled(),
-      hasWebApiKey: Boolean(encryptedKey && encryptedKey.trim().length > 0),
-      secureStorageAvailable: isSecureStorageAvailable()
+      webApiEnabled: effectiveWebApiEnabled,
+      hasWebApiKey: resolvedKey.hasUsableKey,
+      secureStorageAvailable: resolvedKey.secureStorageAvailable
     }
   }
 
@@ -242,10 +283,14 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle(IPC_CHANNELS.getProfiles, async () => {
+    const rememberedUsername = await profileStore.getRememberedUsername()
+    const rememberAuth = await profileStore.getRememberAuth()
+    const shouldCheckStoredAuth = rememberAuth && Boolean(rememberedUsername?.trim())
     return {
       profiles: await profileStore.getProfiles(),
-      rememberedUsername: await profileStore.getRememberedUsername(),
-      rememberAuth: await profileStore.getRememberAuth()
+      rememberedUsername,
+      rememberAuth,
+      hasStoredAuth: shouldCheckStoredAuth ? await runtimeService.hasStoredAuthFor(rememberedUsername) : false
     }
   })
 
@@ -316,19 +361,14 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.getMyWorkshopItems, async (_event, payload: { appId?: string }) => {
     try {
-      const webApiEnabled = await profileStore.getWebApiEnabled()
-      let savedWebApiKey: string | undefined
-      if (webApiEnabled) {
-        const encrypted = await profileStore.getWebApiKeyEncrypted()
-        if (encrypted && encrypted.trim().length > 0) {
-          try {
-            savedWebApiKey = decryptSecret(encrypted)
-          } catch {
-            savedWebApiKey = undefined
-          }
-        }
+      const storedWebApiEnabled = await profileStore.getWebApiEnabled()
+      const resolvedKey = await resolveSavedWebApiKey()
+      const allowWebApi = storedWebApiEnabled && resolvedKey.hasUsableKey
+      if (storedWebApiEnabled !== allowWebApi) {
+        await profileStore.setWebApiEnabled(allowWebApi)
       }
-      return await runtimeService.getMyWorkshopItems(payload.appId, savedWebApiKey, webApiEnabled)
+
+      return await runtimeService.getMyWorkshopItems(payload.appId, allowWebApi ? resolvedKey.key : undefined, allowWebApi)
     } catch (error) {
       throw toIpcError(error)
     }

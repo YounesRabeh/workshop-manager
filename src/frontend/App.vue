@@ -117,6 +117,7 @@ const pendingVisibility = ref<0 | 1 | 2 | 3>(0)
 const stagedContentFiles = ref<StagedContentFile[]>([])
 const isFullscreen = ref(false)
 const isAboutOpen = ref(false)
+const isBootstrapping = ref(true)
 const activeToast = ref<UiToast | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -872,9 +873,10 @@ async function refreshRememberedLoginState(): Promise<void> {
   if (payload.rememberedUsername) {
     loginForm.username = payload.rememberedUsername
   }
-  loginForm.rememberAuth = payload.rememberAuth === true
-  hasPersistedStoredSession.value = payload.rememberAuth === true
-  if (payload.rememberAuth === true) {
+  const hasStoredAuth = payload.hasStoredAuth === true
+  loginForm.rememberAuth = payload.rememberAuth === true && hasStoredAuth
+  hasPersistedStoredSession.value = hasStoredAuth
+  if (loginForm.rememberAuth) {
     loginForm.rememberUsername = true
   }
 }
@@ -1330,6 +1332,7 @@ onMounted(async () => {
 
   if (!(window as Window & { workshop?: unknown }).workshop) {
     statusMessage.value = 'Bridge error (bridge_unavailable): preload API not found. Restart the app/dev server.'
+    isBootstrapping.value = false
     return
   }
 
@@ -1405,9 +1408,11 @@ onMounted(async () => {
     // Non-login phases have dedicated status/toast handling in action flows.
   })
 
-  await ensureSteamCmdInstalled()
-  await refreshRememberedLoginState()
-  await loadAdvancedSettings()
+  try {
+    await Promise.all([ensureSteamCmdInstalled(), refreshRememberedLoginState(), loadAdvancedSettings()])
+  } finally {
+    isBootstrapping.value = false
+  }
 })
 
 onUnmounted(() => {
@@ -1424,8 +1429,22 @@ onUnmounted(() => {
 
 <template>
   <main class="steam-theme">
+    <section v-if="isBootstrapping" class="fade-in splash-screen">
+      <div class="splash-panel">
+        <p class="splash-kicker">STEAM WORKSHOP MANAGER</p>
+        <h1 class="splash-title">Initializing</h1>
+        <p class="splash-subtitle">Preparing SteamCMD and saved session data...</p>
+        <div class="splash-loader" role="status" aria-label="Loading">
+          <span class="splash-loader-dot"></span>
+          <span class="splash-loader-dot"></span>
+          <span class="splash-loader-dot"></span>
+        </div>
+      </div>
+      <p class="splash-disclaimer">* Not an official Steam product.</p>
+    </section>
+
     <LoginSection
-      v-if="!isAuthenticated"
+      v-else-if="!isAuthenticated"
       :status-message="loginHeaderStatusMessage"
       :is-login-submitting="isLoginSubmitting"
       :login-form="loginForm"

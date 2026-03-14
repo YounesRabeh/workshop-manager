@@ -22,7 +22,12 @@ export interface WorkshopApi {
   uploadMod: (payload: { profileId: string; draft: UploadDraft }) => Promise<unknown>
   updateMod: (payload: { profileId: string; draft: UploadDraft }) => Promise<unknown>
   updateVisibility: (payload: VisibilityUpdateInput) => Promise<unknown>
-  getProfiles: () => Promise<{ profiles: ModProfile[]; rememberedUsername?: string; rememberAuth?: boolean }>
+  getProfiles: () => Promise<{
+    profiles: ModProfile[]
+    rememberedUsername?: string
+    rememberAuth?: boolean
+    hasStoredAuth?: boolean
+  }>
   getAdvancedSettings: () => Promise<AdvancedSettings>
   saveAdvancedSettings: (payload: SaveAdvancedSettingsInput) => Promise<AdvancedSettings>
   saveProfile: (payload: { profile: ModProfile }) => Promise<ModProfile>

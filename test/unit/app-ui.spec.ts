@@ -13,7 +13,7 @@ const workshop = {
   uploadMod: vi.fn(async () => ({ runId: 'r1', success: true })),
   updateMod: vi.fn(async () => ({ runId: 'r2', success: true })),
   updateVisibility: vi.fn(async () => ({ runId: 'r3', success: true })),
-  getProfiles: vi.fn(async () => ({ profiles: [], rememberedUsername: 'alice', rememberAuth: false })),
+  getProfiles: vi.fn(async () => ({ profiles: [], rememberedUsername: 'alice', rememberAuth: false, hasStoredAuth: false })),
   getAdvancedSettings: vi.fn(async () => ({
     webApiEnabled: false,
     hasWebApiKey: false,
@@ -100,7 +100,8 @@ describe('App UI validation gates', () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
       rememberedUsername: 'alice',
-      rememberAuth: true
+      rememberAuth: true,
+      hasStoredAuth: true
     })
 
     const wrapper = mount(App)

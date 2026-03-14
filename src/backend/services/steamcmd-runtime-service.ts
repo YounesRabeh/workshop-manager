@@ -880,6 +880,89 @@ export class SteamCmdRuntimeService extends EventEmitter {
     }
   }
 
+  async hasStoredAuthFor(username: string | undefined): Promise<boolean> {
+    const normalizedUsername = username?.trim()
+    if (!normalizedUsername) {
+      return false
+    }
+
+    const activeUsername = this.loginState?.username?.trim()
+    if (activeUsername && activeUsername === normalizedUsername) {
+      return true
+    }
+
+    const rememberedUsername = this.lastAuthenticatedState?.username?.trim()
+    if (rememberedUsername && rememberedUsername === normalizedUsername) {
+      return true
+    }
+
+    // App restarts clear in-memory state; probe SteamCMD cached auth directly.
+    let executablePath = ''
+    try {
+      executablePath = await this.steamCmdExecutablePath()
+      await mkdir(this.runtimeDir, { recursive: true })
+    } catch {
+      return false
+    }
+
+    const args = ['+login', normalizedUsername, '+quit']
+
+    return await new Promise<boolean>((resolve) => {
+      const child = spawn(executablePath, args, {
+        cwd: this.runtimeDir,
+        stdio: 'pipe'
+      })
+
+      let stdout = ''
+      let stderr = ''
+      const timeout = setTimeout(() => {
+        child.kill('SIGTERM')
+        resolve(false)
+      }, 6_000)
+
+      const decide = (exitCode: number | null): boolean => {
+        const lines = `${stdout}\n${stderr}`
+          .split(/\r?\n/)
+          .map((line) => stripAnsi(line).trim())
+          .filter((line) => line.length > 0)
+
+        const joined = lines.join('\n')
+
+        if (/cached credentials not found|no cached credentials/i.test(joined)) {
+          return false
+        }
+        if (/logging in using cached credentials/i.test(joined)) {
+          return true
+        }
+        if (/waiting for confirmation|steam guard mobile authenticator|auth(?:entication)?\s*code|two-factor/i.test(joined)) {
+          return true
+        }
+
+        const parsedFailure = parseSteamLoginFailure(lines)
+        if (parsedFailure?.code === 'auth') {
+          return false
+        }
+
+        return exitCode === 0
+      }
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        stdout += chunk.toString('utf8')
+      })
+      child.stderr.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString('utf8')
+      })
+      child.once('error', () => {
+        clearTimeout(timeout)
+        resolve(false)
+      })
+      child.once('close', (exitCode) => {
+        clearTimeout(timeout)
+        resolve(decide(exitCode))
+      })
+    })
+  }
+
   async getCurrentProfile(): Promise<SteamProfileSummary> {
     if (!this.loginState?.steamId64) {
       throw new AppError('auth', 'Login is required before loading profile info')
