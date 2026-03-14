@@ -97,6 +97,23 @@
   color: #ffffff;
 }
 
+.app-top-bar .menu-tab:focus-visible {
+  outline: none;
+  color: #ffffff;
+}
+
+.app-top-bar .menu-tab:focus-visible::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -9px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.35);
+}
+
 .app-top-bar .menu-tab-active {
   color: #66c0f4;
 }
@@ -110,4 +127,5 @@
   height: 3px;
   border-radius: 999px;
   background: #66c0f4;
+  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.45);
 }
