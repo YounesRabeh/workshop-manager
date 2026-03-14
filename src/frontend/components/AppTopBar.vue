@@ -11,6 +11,7 @@ const props = defineProps<{
   accountDisplayName: string
   workshopItemsCount: number
   isFullscreen: boolean
+  isDevMode: boolean
   profileImageUrl?: string | null
 }>()
 
@@ -30,7 +31,21 @@ const avatarSrc = computed(() => props.profileImageUrl?.trim() || profilePlaceho
       <div class="session-media flex min-w-0 items-center gap-5">
         <img :src="avatarSrc" :alt="`${accountDisplayName} avatar`" class="session-avatar" />
         <div class="min-w-0">
-          <p class="session-label text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500">Signed in as</p>
+          <div class="session-header flex items-center gap-2">
+            <p class="session-label text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500">Signed in as</p>
+            <span
+              v-if="isDevMode"
+              class="dev-badge"
+              aria-label="Dev mode enabled"
+            >
+              DEV
+              <span class="dev-tooltip" role="tooltip">
+                Steam Web API key is active.
+                <br />
+                Advanced mode enables features like non-public item visibility (where supported).
+              </span>
+            </span>
+          </div>
           <p class="session-name truncate text-[2rem] font-extrabold leading-tight text-slate-900">{{ accountDisplayName }}</p>
           <p class="session-meta mt-1 text-base text-slate-600">Workshop items loaded: {{ workshopItemsCount }}</p>
         </div>

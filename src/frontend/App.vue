@@ -1486,6 +1486,7 @@ onUnmounted(() => {
           :account-display-name="accountDisplayName"
           :workshop-items-count="workshopItems.length"
           :is-fullscreen="isFullscreen"
+          :is-dev-mode="advancedSettings.hasWebApiKey"
           :profile-image-url="accountProfileImageUrl"
           @navigate="goToStep"
           @open-about="openAboutModal"
