@@ -94,15 +94,15 @@ function visibilityTooltip(value: 0 | 1 | 2 | 3): string {
 
 function visibilityCardClass(value: 0 | 1 | 2 | 3): string {
   if (value === 0) {
-    return 'border-[#4eb787] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(78,183,135,0.34)_0%,rgba(50,111,90,0.18)_28%,rgba(19,36,55,0.96)_70%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(78,183,135,0.34),0_0_22px_rgba(41,136,99,0.22)]'
+    return 'border-[#58c796] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(88,199,150,0.44)_0%,rgba(60,130,105,0.28)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(88,199,150,0.38),0_0_24px_rgba(45,152,112,0.26)]'
   }
   if (value === 1) {
-    return 'border-[#e2ab5f] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(226,171,95,0.33)_0%,rgba(126,84,36,0.2)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(226,171,95,0.34),0_0_22px_rgba(153,100,37,0.2)]'
+    return 'border-[#f0bc71] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(240,188,113,0.44)_0%,rgba(150,100,44,0.28)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(240,188,113,0.38),0_0_24px_rgba(178,118,44,0.26)]'
   }
   if (value === 2) {
-    return 'border-[#cb7e95] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(203,126,149,0.35)_0%,rgba(112,52,71,0.2)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(203,126,149,0.35),0_0_22px_rgba(129,55,79,0.2)]'
+    return 'border-[#da8faa] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(218,143,170,0.44)_0%,rgba(130,62,84,0.28)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(218,143,170,0.38),0_0_24px_rgba(153,66,96,0.26)]'
   }
-  return 'border-[#9f81df] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(159,129,223,0.36)_0%,rgba(104,75,168,0.22)_32%,rgba(19,36,55,0.96)_74%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(159,129,223,0.35),0_0_24px_rgba(105,75,170,0.22)]'
+  return 'border-[#9f81df] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(159,129,223,0.36)_0%,rgba(104,75,168,0.22)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(159,129,223,0.35),0_0_22px_rgba(105,75,170,0.22)]'
 }
 
 function visibilityOptionClass(option: 0 | 1 | 2 | 3, selected: boolean): string {
@@ -114,26 +114,26 @@ function visibilityOptionClass(option: 0 | 1 | 2 | 3, selected: boolean): string
   }
 
   if (option === 0) {
-    return `${base} border-[#55b88f] bg-[#235942] text-[#d9f5e8] shadow-[inset_0_0_0_1px_rgba(85,184,143,0.3)]`
+    return `${base} border-[#61c799] bg-[#2d6d52] text-[#e4fff1] shadow-[inset_0_0_0_1px_rgba(97,199,153,0.34)]`
   }
   if (option === 1) {
-    return `${base} border-[#e0ac5a] bg-[#5b3f1f] text-[#ffe8bf] shadow-[inset_0_0_0_1px_rgba(224,172,90,0.3)]`
+    return `${base} border-[#edbb6d] bg-[#7a4f21] text-[#fff0cd] shadow-[inset_0_0_0_1px_rgba(237,187,109,0.34)]`
   }
   if (option === 2) {
-    return `${base} border-[#ca7a90] bg-[#5a2738] text-[#ffdce6] shadow-[inset_0_0_0_1px_rgba(202,122,144,0.3)]`
+    return `${base} border-[#d78da5] bg-[#733247] text-[#ffe5ed] shadow-[inset_0_0_0_1px_rgba(215,141,165,0.34)]`
   }
   return `${base} border-[#9d83d8] bg-[#4a356f] text-[#f0e8ff] shadow-[inset_0_0_0_1px_rgba(157,131,216,0.34)]`
 }
 
 function visibilityActionClass(value: 0 | 1 | 2 | 3): string {
   if (value === 0) {
-    return 'border-[#57b58f] bg-[#2f7858] hover:bg-[#3a9470]'
+    return 'border-[#61c799] bg-[#3c8f6a] hover:bg-[#4ca982]'
   }
   if (value === 1) {
-    return 'border-[#dca252] bg-[#9c6222] hover:bg-[#ba7629]'
+    return 'border-[#edbb6d] bg-[#ba7527] hover:bg-[#cf8733]'
   }
   if (value === 2) {
-    return 'border-[#c7748a] bg-[#8d3550] hover:bg-[#a84463]'
+    return 'border-[#d78da5] bg-[#a94a67] hover:bg-[#bf5d7c]'
   }
   return 'border-[#9379c8] bg-[#5b448d] hover:bg-[#7156a8]'
 }
@@ -178,7 +178,7 @@ const sectionTitle = computed(() => (isUpdateMode.value ? 'Update Selected Works
 const readinessTitle = computed(() => (isUpdateMode.value ? 'Update Readiness' : 'Create Readiness'))
 const contentFolderValue = computed(() => props.draft.contentFolder.trim())
 const hasContentFolder = computed(() => contentFolderValue.value.length > 0)
-const primaryActionLabel = computed(() => (isUpdateMode.value ? 'Update Existing Item' : 'Create New Item'))
+const primaryActionLabel = computed(() => (isUpdateMode.value ? 'Update Item' : 'Create New Item'))
 const primaryActionDisabled = computed(() => (isUpdateMode.value ? !props.canUpdate : !props.canUpload))
 const publishedFileIdValue = computed(() => props.selectedWorkshopItem?.publishedFileId || props.draft.publishedFileId || 'Not selected')
 const appIdValue = computed(() => props.selectedWorkshopItem?.appId || props.draft.appId || 'Not selected')

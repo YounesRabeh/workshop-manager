@@ -1,8 +1,13 @@
 import type { UploadDraft } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
 
-function escapeVdf(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r?\n/g, '\\n')
+function escapeVdf(value: string, preserveNewlines = false): string {
+  const normalized = value.replace(/\r\n/g, '\n')
+  const escaped = normalized.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  if (preserveNewlines) {
+    return escaped
+  }
+  return escaped.replace(/\n/g, '\\n')
 }
 
 function assertString(name: string, value: string | undefined): string {
@@ -80,7 +85,7 @@ export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update
   }
 
   if (mode === 'update' && changeNote) {
-    lines.push(`\t\"changenote\"\t\"${escapeVdf(changeNote)}\"`)
+    lines.push(`\t\"changenote\"\t\"${escapeVdf(changeNote, true)}\"`)
   }
 
   if (tagsList.length > 0) {
