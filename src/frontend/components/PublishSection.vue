@@ -23,6 +23,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'go-to-mods'): void
+  (e: 'refresh-workshop-item'): void
   (e: 'open-workshop-item'): void
   (e: 'pick-content-folder'): void
   (e: 'pick-workspace-root'): void
@@ -374,20 +375,32 @@ function onUploadPreviewError(): void {
           </button>
           <h2 class="text-lg font-semibold text-slate-100">{{ sectionTitle }}</h2>
         </div>
-        <button
-          v-if="isUpdateMode"
-          type="button"
-          class="inline-flex h-8 items-center justify-center gap-1 rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 text-xs font-semibold text-slate-100 transition-colors hover:bg-[#365d7b]"
-          @click="emit('open-workshop-item')"
-        >
-          <span>View Workshop Page</span>
-          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 5h5v5" />
-            <path d="M10 14 19 5" />
-            <path d="M19 14v5h-5" />
-            <path d="M5 10V5h5" />
-          </svg>
-        </button>
+        <div v-if="isUpdateMode" class="flex items-center gap-2">
+          <button
+            type="button"
+            class="inline-flex h-8 items-center justify-center gap-1 rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 text-xs font-semibold text-slate-100 transition-colors hover:bg-[#365d7b]"
+            @click="emit('open-workshop-item')"
+          >
+            <span>View Workshop Page</span>
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 5h5v5" />
+              <path d="M10 14 19 5" />
+              <path d="M19 14v5h-5" />
+              <path d="M5 10V5h5" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="inline-flex h-8 items-center justify-center gap-1 rounded border border-[#4d7ca0] bg-[#2c4d67] px-2.5 text-xs font-semibold text-slate-100 transition-colors hover:bg-[#365d7b]"
+            @click="emit('refresh-workshop-item')"
+          >
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 3v6h-6" />
+            </svg>
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       <div

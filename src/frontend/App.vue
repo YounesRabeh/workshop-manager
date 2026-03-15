@@ -1239,6 +1239,38 @@ async function openSelectedWorkshopItem(): Promise<void> {
   }
 }
 
+async function refreshSelectedWorkshopItem(): Promise<void> {
+  if (!canAccessMods.value) {
+    statusMessage.value = 'Login first to load workshop items.'
+    return
+  }
+
+  const currentSelectedId = selectedWorkshopItemId.value.trim()
+
+  try {
+    const items = await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value || undefined })
+    workshopItems.value = items
+
+    if (currentSelectedId) {
+      const refreshedItem = items.find((item) => item.publishedFileId === currentSelectedId)
+      if (refreshedItem) {
+        selectWorkshopItem(refreshedItem)
+        statusMessage.value = 'Workshop item refreshed.'
+        return
+      }
+    }
+
+    if (items.length === 0) {
+      statusMessage.value = 'No workshop items found for this account/filter.'
+      return
+    }
+    statusMessage.value = `Loaded ${items.length} workshop item(s).`
+  } catch (error) {
+    const parsed = normalizeError(error)
+    statusMessage.value = `Workshop refresh failed (${parsed.code}): ${parsed.message}`
+  }
+}
+
 async function pickPreviewFile(): Promise<void> {
   const path = await window.workshop.pickFile()
   if (path) {
@@ -1293,6 +1325,8 @@ async function updateItem(): Promise<void> {
     return
   }
 
+  const updatedItemId = selectedWorkshopItemId.value.trim() || updateDraft.publishedFileId.trim()
+
   try {
     const result = (await window.workshop.updateMod({
       profileId: selectedWorkshopItemId.value || updateDraft.publishedFileId,
@@ -1305,7 +1339,6 @@ async function updateItem(): Promise<void> {
         ? { ...item, visibility: committedVisibility.value }
         : item
     )
-    statusMessage.value = 'Update completed successfully.'
     showToast({
       tone: 'success',
       title: 'Update Completed',
@@ -1313,7 +1346,25 @@ async function updateItem(): Promise<void> {
         ? `Updated item ID: ${result.publishedFileId}`
         : 'Workshop item update finished successfully.'
     })
-    delete updateDraftCache.value[selectedWorkshopItemId.value]
+    if (updatedItemId) {
+      delete updateDraftCache.value[updatedItemId]
+    }
+
+    try {
+      const refreshedItems = await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value || undefined })
+      workshopItems.value = refreshedItems
+
+      const refreshedItem = updatedItemId
+        ? refreshedItems.find((item) => item.publishedFileId === updatedItemId)
+        : undefined
+      if (refreshedItem) {
+        selectWorkshopItem(refreshedItem)
+      }
+      statusMessage.value = 'Update completed successfully. Update page refreshed.'
+    } catch (refreshError) {
+      const parsed = normalizeError(refreshError)
+      statusMessage.value = `Update completed, but refresh failed (${parsed.code}): ${parsed.message}`
+    }
   } catch (error) {
     handleActionFailure('update', error)
   }
@@ -1502,7 +1553,7 @@ onUnmounted(() => {
           <span class="splash-loader-dot"></span>
         </div>
       </div>
-      <p class="splash-disclaimer">* Not an official Steam product.</p>
+      <p class="splash-disclaimer">* Not an official Steam product</p>
     </section>
 
     <LoginSection
@@ -1586,6 +1637,7 @@ onUnmounted(() => {
           :can-upload="canCreate()"
           :can-update="canUpdate()"
           @go-to-mods="goToStep('mods')"
+          @refresh-workshop-item="refreshSelectedWorkshopItem"
           @open-workshop-item="openSelectedWorkshopItem"
           @pick-content-folder="pickContentFolder"
           @pick-workspace-root="pickContentFolder"
