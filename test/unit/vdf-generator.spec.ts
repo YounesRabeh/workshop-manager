@@ -69,6 +69,23 @@ describe('generateWorkshopVdf', () => {
     expect(output).toContain('"contentfolder"\t"/mods/base"')
   })
 
+  it('preserves changenote line breaks for update mode', () => {
+    const output = generateWorkshopVdf(
+      {
+        appId: '480',
+        publishedFileId: '12345',
+        contentFolder: '/mods/base',
+        title: 'Update Target',
+        changenote: 'line one\nline two',
+        tags: []
+      },
+      'update'
+    )
+
+    expect(output).toContain('"changenote"\t"line one\nline two"')
+    expect(output).not.toContain('"changenote"\t"line one\\nline two"')
+  })
+
   it('supports preview-only update without contentfolder', () => {
     const output = generateWorkshopVdf(
       {
