@@ -28,6 +28,7 @@ const emit = defineEmits<{
   (e: 'pick-workspace-root'): void
   (e: 'clear-workspace'): void
   (e: 'pick-preview-file'): void
+  (e: 'clear-preview-file'): void
   (e: 'change-tag-input', value: string): void
   (e: 'add-tag'): void
   (e: 'remove-tag', tag: string): void
@@ -101,7 +102,7 @@ function visibilityCardClass(value: 0 | 1 | 2 | 3): string {
   if (value === 2) {
     return 'border-[#cb7e95] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(203,126,149,0.35)_0%,rgba(112,52,71,0.2)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(203,126,149,0.35),0_0_22px_rgba(129,55,79,0.2)]'
   }
-  return 'border-[#748ea6] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(116,142,166,0.34)_0%,rgba(55,74,94,0.2)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(116,142,166,0.34),0_0_20px_rgba(73,94,114,0.18)]'
+  return 'border-[#9f81df] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(159,129,223,0.36)_0%,rgba(104,75,168,0.22)_32%,rgba(19,36,55,0.96)_74%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(159,129,223,0.35),0_0_24px_rgba(105,75,170,0.22)]'
 }
 
 function visibilityOptionClass(option: 0 | 1 | 2 | 3, selected: boolean): string {
@@ -121,7 +122,7 @@ function visibilityOptionClass(option: 0 | 1 | 2 | 3, selected: boolean): string
   if (option === 2) {
     return `${base} border-[#ca7a90] bg-[#5a2738] text-[#ffdce6] shadow-[inset_0_0_0_1px_rgba(202,122,144,0.3)]`
   }
-  return `${base} border-[#7c9ab2] bg-[#2c4255] text-[#d9e8f4] shadow-[inset_0_0_0_1px_rgba(124,154,178,0.3)]`
+  return `${base} border-[#9d83d8] bg-[#4a356f] text-[#f0e8ff] shadow-[inset_0_0_0_1px_rgba(157,131,216,0.34)]`
 }
 
 function visibilityActionClass(value: 0 | 1 | 2 | 3): string {
@@ -134,7 +135,7 @@ function visibilityActionClass(value: 0 | 1 | 2 | 3): string {
   if (value === 2) {
     return 'border-[#c7748a] bg-[#8d3550] hover:bg-[#a84463]'
   }
-  return 'border-[#6f8ba3] bg-[#3f5b73] hover:bg-[#50718c]'
+  return 'border-[#9379c8] bg-[#5b448d] hover:bg-[#7156a8]'
 }
 
 function onVisibilityOptionClick(value: 0 | 1 | 2 | 3): void {
@@ -174,11 +175,6 @@ function toLocalFileUrl(path: string): string {
 }
 
 const sectionTitle = computed(() => (isUpdateMode.value ? 'Update Selected Workshop Item' : 'Create Workshop Item'))
-const sectionDescription = computed(() =>
-  isUpdateMode.value
-    ? 'Review and publish changes to this item.'
-    : 'Create a new Workshop item. A Published File ID will be assigned by Steam after upload.'
-)
 const readinessTitle = computed(() => (isUpdateMode.value ? 'Update Readiness' : 'Create Readiness'))
 const contentFolderValue = computed(() => props.draft.contentFolder.trim())
 const hasContentFolder = computed(() => contentFolderValue.value.length > 0)
@@ -195,6 +191,7 @@ const requiredPublishChecklist = computed(() => props.publishChecklist.filter((i
 const optionalPublishChecklist = computed(() => props.publishChecklist.filter((item) => item.optional))
 const isContentExplorerCollapsed = ref(false)
 const fileOnlyTreeToggleState = ref(false)
+const isReadinessCollapsed = ref(false)
 
 let previewLoadRequestId = 0
 
@@ -281,6 +278,10 @@ function toggleContentExplorerCollapsed(): void {
   isContentExplorerCollapsed.value = !isContentExplorerCollapsed.value
 }
 
+function toggleReadinessCollapsed(): void {
+  isReadinessCollapsed.value = !isReadinessCollapsed.value
+}
+
 function collapseAllFolders(): void {
   collapsedFolderIds.value = new Set(allFolderIds.value)
 }
@@ -356,34 +357,42 @@ function onUploadPreviewError(): void {
 <template>
   <section class="mt-5 grid gap-5 min-[1220px]:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]">
     <article class="fade-in app-panel rounded-2xl border border-[#305070] bg-[#1b2838] p-5 shadow-[0_16px_40px_rgba(4,10,20,0.45)]">
-      <div class="flex items-center justify-between gap-2">
-        <h2 class="text-lg font-semibold text-slate-100">{{ sectionTitle }}</h2>
-        <div v-if="isUpdateMode" class="flex items-center gap-2">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
           <button
-            class="rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 py-1 text-xs font-semibold text-slate-100"
-            @click="emit('open-workshop-item')"
-          >
-            View Workshop Page
-          </button>
-          <button 
+            v-if="isUpdateMode"
             type="button"
             title="Back to mod list"
             aria-label="Back to mod list"
-            class="inline-flex h-7 items-center justify-center gap-1 rounded border border-[#78c2f7] bg-[#59b9f8] px-2 text-[11px] font-semibold text-[#05253a]"
+            class="inline-flex h-8 items-center justify-center gap-1 rounded border border-[#4d7ca0] bg-transparent px-2.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-[#22374b]"
             @click="emit('go-to-mods')"
           >
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="m15 18-6-6 6-6" />
             </svg>
-            <span>Back</span>
+            <span>Mod List</span>
           </button>
+          <h2 class="text-lg font-semibold text-slate-100">{{ sectionTitle }}</h2>
         </div>
+        <button
+          v-if="isUpdateMode"
+          type="button"
+          class="inline-flex h-8 items-center justify-center gap-1 rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 text-xs font-semibold text-slate-100 transition-colors hover:bg-[#365d7b]"
+          @click="emit('open-workshop-item')"
+        >
+          <span>View Workshop Page</span>
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 5h5v5" />
+            <path d="M10 14 19 5" />
+            <path d="M19 14v5h-5" />
+            <path d="M5 10V5h5" />
+          </svg>
+        </button>
       </div>
 
-      <p class="mt-2 text-sm text-slate-300">{{ sectionDescription }}</p>
       <div
         v-if="isUpdateMode"
-        class="mt-3 rounded-xl border p-4 transition-[background,border-color,box-shadow] duration-500 ease-out"
+        class="mt-4 rounded-xl border p-4 transition-[background,border-color,box-shadow] duration-500 ease-out"
         :class="visibilityCardClass(visibilityPending)"
       >
         <div class="flex flex-col gap-4">
@@ -454,8 +463,27 @@ function onUploadPreviewError(): void {
       </div>
 
       <div class="mt-4 rounded-xl border border-[#2f4f69] bg-[#1a2b3e] p-4">
-        <p class="text-sm font-semibold text-slate-100">{{ readinessTitle }}</p>
-        <ul class="mt-3 grid gap-2 text-sm text-slate-200 sm:grid-cols-2">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-sm font-semibold text-slate-100">{{ readinessTitle }}</p>
+          <button
+            type="button"
+            class="inline-flex h-6 w-6 items-center justify-center text-slate-100/85 transition-colors hover:text-slate-100"
+            :aria-label="isReadinessCollapsed ? `Expand ${readinessTitle}` : `Collapse ${readinessTitle}`"
+            @click="toggleReadinessCollapsed"
+          >
+            <svg
+              class="h-3.5 w-3.5 transition-transform duration-150"
+              :class="isReadinessCollapsed ? 'rotate-0' : 'rotate-180'"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        </div>
+        <ul v-show="!isReadinessCollapsed" class="mt-3 grid gap-2 text-sm text-slate-200 sm:grid-cols-2">
           <li
             v-for="item in requiredPublishChecklist"
             :key="item.label"
@@ -466,10 +494,10 @@ function onUploadPreviewError(): void {
             <span class="text-xs font-semibold" :class="readinessStatusClass(item)">{{ readinessStatusLabel(item) }}</span>
           </li>
         </ul>
-        <div v-if="optionalPublishChecklist.length > 0" class="mt-3 pb-2">
+        <div v-show="!isReadinessCollapsed && optionalPublishChecklist.length > 0" class="mt-3 pb-2">
           <div class="border-t border-[#365572]/70"></div>
         </div>
-        <ul v-if="optionalPublishChecklist.length > 0" class="grid gap-2 text-sm text-slate-200 sm:grid-cols-2">
+        <ul v-show="!isReadinessCollapsed && optionalPublishChecklist.length > 0" class="grid gap-2 text-sm text-slate-200 sm:grid-cols-2">
           <li
             v-for="item in optionalPublishChecklist"
             :key="item.label"
@@ -530,10 +558,22 @@ function onUploadPreviewError(): void {
               </div>
             </div>
           </button>
-          <p class="mt-2 truncate text-xs text-slate-400">
-            {{ previewFileValue || 'No preview file selected' }}
-          </p>
-        </div>
+          <div class="mt-2 flex items-center justify-between gap-2">
+            <p class="truncate text-xs text-slate-400">
+              {{ previewFileValue || 'No preview file selected' }}
+            </p>
+            <button
+              v-if="previewFileValue"
+              type="button"
+              title="Clear selected image"
+              aria-label="Clear selected image"
+              class="shrink-0 rounded border border-[#6e3f4a] bg-transparent px-2 py-0.5 text-[11px] font-semibold text-[#e9b6c2] transition-colors hover:bg-[#45212a]"
+              @click="emit('clear-preview-file')"
+            >
+              Clear
+            </button>
+          </div>
+       </div>
 
         <div>
           <label class="text-sm text-slate-300">Tags</label>

@@ -1243,6 +1243,10 @@ async function pickPreviewFile(): Promise<void> {
   }
 }
 
+function clearPreviewFile(): void {
+  activeDraft.value.previewFile = ''
+}
+
 function canCreate(): boolean {
   return loginState.value === 'signed_in' && createRequirements.value.valid
 }
@@ -1567,6 +1571,7 @@ onUnmounted(() => {
           @pick-workspace-root="pickContentFolder"
           @clear-workspace="clearWorkspace"
           @pick-preview-file="pickPreviewFile"
+          @clear-preview-file="clearPreviewFile"
           @change-tag-input="onChangeTagInput"
           @add-tag="addTag"
           @remove-tag="removeTag"
