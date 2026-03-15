@@ -60,7 +60,7 @@ function onWebApiKeyInput(event: Event): void {
 const canSubmitLogin = computed(() => {
   const hasUsername = props.loginForm.username.trim().length > 0
   const hasPassword = props.loginForm.password.trim().length > 0
-  const canUseSavedSession = props.loginForm.rememberAuth && !hasPassword
+  const canUseSavedSession = props.canClearStoredSession && props.loginForm.rememberAuth && !hasPassword
   return !props.isLoginSubmitting && hasUsername && (hasPassword || canUseSavedSession)
 })
 
@@ -68,10 +68,24 @@ const submitLabel = computed(() => {
   if (props.isLoginSubmitting) {
     return 'Signing in...'
   }
-  if (props.loginForm.rememberAuth && props.loginForm.password.trim().length === 0) {
+  if (props.canClearStoredSession && props.loginForm.rememberAuth && props.loginForm.password.trim().length === 0) {
     return 'Sign in with saved session'
   }
   return 'Sign in'
+})
+
+const passwordPlaceholder = computed(() => {
+  if (props.canClearStoredSession && props.loginForm.rememberAuth && props.loginForm.password.trim().length === 0) {
+    return '********'
+  }
+  return ''
+})
+
+const missingStoredSessionHint = computed(() => {
+  if (!props.loginForm.rememberAuth || props.canClearStoredSession) {
+    return ''
+  }
+  return 'No saved session found yet. Enter password to sign in and create one.'
 })
 
 const canSaveAdvancedSettings = computed(() => {
@@ -109,7 +123,7 @@ function onLoginControlArrowKey(event: KeyboardEvent, index: number): void {
 function resolveDefaultFocusTarget(): number {
   const hasUsername = props.loginForm.username.trim().length > 0
   const hasPassword = props.loginForm.password.trim().length > 0
-  const canUseSavedSession = props.loginForm.rememberAuth && !hasPassword
+  const canUseSavedSession = props.canClearStoredSession && props.loginForm.rememberAuth && !hasPassword
 
   if (!hasUsername) {
     return 0
@@ -143,7 +157,13 @@ onMounted(() => {
 })
 
 watch(
-  () => [props.loginForm.username, props.loginForm.password, props.loginForm.rememberAuth, props.isLoginSubmitting],
+  () => [
+    props.loginForm.username,
+    props.loginForm.password,
+    props.loginForm.rememberAuth,
+    props.canClearStoredSession,
+    props.isLoginSubmitting
+  ],
   () => {
     if (!hasAppliedDefaultFocus.value) {
       applyDefaultFocus()
@@ -190,7 +210,7 @@ watch(
             ref="passwordInputRef"
             v-model="loginForm.password"
             :type="isPasswordPeek ? 'text' : 'password'"
-            :placeholder="loginForm.rememberAuth && loginForm.password.trim().length === 0 ? '********' : ''"
+            :placeholder="passwordPlaceholder"
             autocomplete="current-password"
             class="login-input w-full rounded border border-slate-300 px-3 py-2"
             @keydown="onLoginControlArrowKey($event, 1)"
@@ -229,6 +249,9 @@ watch(
         </label>
         <p class="mt-1 text-[11px] text-slate-500">
           Uses SteamCMD cached login session. Password is never stored by this app.
+        </p>
+        <p v-if="missingStoredSessionHint" class="mt-1 text-[11px] text-slate-500">
+          {{ missingStoredSessionHint }}
         </p>
         <button
           type="button"

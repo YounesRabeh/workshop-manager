@@ -329,6 +329,10 @@ function isSavedSessionFallbackError(error: ApiFailure): boolean {
   return error.code === 'auth' || error.code === 'timeout' || error.code === 'command_failed'
 }
 
+function canUseStoredSessionForLogin(): boolean {
+  return loginForm.rememberAuth && hasPersistedStoredSession.value
+}
+
 function goToStep(step: FlowStep): void {
   if (!isAuthenticated.value) {
     statusMessage.value = 'Login required.'
@@ -981,7 +985,7 @@ async function finalizeSuccessfulLogin(successMessage: string): Promise<void> {
 }
 
 async function tryAutoLoginWithStoredSession(): Promise<void> {
-  if (!loginForm.rememberAuth || loginForm.username.trim().length === 0) {
+  if (!canUseStoredSessionForLogin() || loginForm.username.trim().length === 0) {
     return
   }
 
@@ -1070,11 +1074,24 @@ async function login(): Promise<void> {
     return
   }
 
+  const hasUsername = loginForm.username.trim().length > 0
+  const hasPassword = loginForm.password.trim().length > 0
+  const usingSavedSession = canUseStoredSessionForLogin() && !hasPassword
+
+  if (!hasUsername) {
+    statusMessage.value = 'Enter your Steam account name.'
+    return
+  }
+
+  if (!hasPassword && !usingSavedSession) {
+    statusMessage.value = 'Enter your password to sign in.'
+    return
+  }
+
   try {
     const rememberAuth = loginForm.rememberAuth
     const rememberUsername = loginForm.rememberUsername || rememberAuth
     loginForm.rememberUsername = rememberUsername
-    const usingSavedSession = loginForm.rememberAuth && loginForm.password.trim().length === 0
     isStoredSessionLoginAttempt.value = usingSavedSession
     authIssue.value = null
     isLoginSubmitting.value = true
@@ -1101,7 +1118,7 @@ async function login(): Promise<void> {
     const parsed = normalizeError(error)
     steamGuardPromptType.value = 'none'
     steamGuardSessionId.value = null
-    if (isSavedSessionFallbackError(parsed) && loginForm.rememberAuth && loginForm.password.trim().length === 0) {
+    if (isSavedSessionFallbackError(parsed) && usingSavedSession) {
       statusMessage.value = 'Saved session unavailable. Enter password to sign in again.'
       authIssue.value = null
       return

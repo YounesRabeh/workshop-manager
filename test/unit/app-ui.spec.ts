@@ -133,6 +133,67 @@ describe('App UI validation gates', () => {
     expect(clearSessionButton?.attributes('disabled')).toBeDefined()
   })
 
+  it('keeps normal password login when keep-signed-in is checked without stored session', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const usernameInput = wrapper.find('input')
+    await usernameInput.setValue('alice')
+
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    expect(checkboxes.length).toBeGreaterThanOrEqual(2)
+    await checkboxes[1].setValue(true)
+    await flushPromises()
+
+    const passwordInput = wrapper.find('input[type="password"]')
+    expect(passwordInput.attributes('placeholder') ?? '').toBe('')
+    expect(wrapper.text()).toContain('No saved session found yet. Enter password to sign in and create one.')
+
+    const submitButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Sign in')
+    expect(submitButton).toBeDefined()
+    expect(submitButton?.attributes('disabled')).toBeDefined()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(workshop.login).not.toHaveBeenCalled()
+    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Enter your password to sign in.')
+  })
+
+  it('uses saved-session mode only when stored auth exists', async () => {
+    workshop.getProfiles.mockResolvedValueOnce({
+      profiles: [],
+      rememberedUsername: 'alice',
+      rememberAuth: true,
+      hasStoredAuth: true
+    })
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const passwordInput = wrapper.find('input[type="password"]')
+    expect(passwordInput.attributes('placeholder')).toBe('********')
+    expect(wrapper.text()).not.toContain('No saved session found yet. Enter password to sign in and create one.')
+
+    const submitButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Sign in with saved session'))
+    expect(submitButton).toBeDefined()
+    expect(submitButton?.attributes('disabled')).toBeUndefined()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(workshop.login).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'alice',
+        password: '',
+        rememberAuth: true,
+        useStoredAuth: true
+      })
+    )
+  })
+
   it('forces rememberUsername when keep-signed-in is enabled', async () => {
     const wrapper = mount(App)
     await flushPromises()
