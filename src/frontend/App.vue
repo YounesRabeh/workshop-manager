@@ -117,6 +117,7 @@ const pendingVisibility = ref<0 | 1 | 2 | 3>(0)
 const stagedContentFiles = ref<StagedContentFile[]>([])
 const isFullscreen = ref(false)
 const isAboutOpen = ref(false)
+const isUpdateConfirmOpen = ref(false)
 const isBootstrapping = ref(true)
 const activeToast = ref<UiToast | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
@@ -1318,6 +1319,23 @@ async function updateItem(): Promise<void> {
   }
 }
 
+function openUpdateConfirmation(): void {
+  if (!canUpdate()) {
+    statusMessage.value = 'Update blocked: add content folder or preview image first.'
+    return
+  }
+  isUpdateConfirmOpen.value = true
+}
+
+function closeUpdateConfirmation(): void {
+  isUpdateConfirmOpen.value = false
+}
+
+async function confirmUpdateItem(): Promise<void> {
+  isUpdateConfirmOpen.value = false
+  await updateItem()
+}
+
 async function updateVisibilityOnly(): Promise<void> {
   if (!canChangeVisibility.value) {
     statusMessage.value = 'Select a different visibility first.'
@@ -1580,8 +1598,35 @@ onUnmounted(() => {
           @change-visibility-selection="setPendingVisibility"
           @update-visibility-only="updateVisibilityOnly"
           @upload="upload"
-          @update-item="updateItem"
+          @update-item="openUpdateConfirmation"
         />
+
+        <div
+          v-if="isUpdateConfirmOpen"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
+          @click.self="closeUpdateConfirmation"
+        >
+          <article class="w-full max-w-md rounded-xl border border-[#2a475e] bg-[#162534] p-5 shadow-2xl">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Confirm Update</p>
+            <h2 class="mt-1 text-xl font-bold text-slate-100">Update Workshop Item?</h2>
+            <p class="mt-2 text-sm text-slate-300">
+              You are about to update:
+              <span class="font-semibold text-slate-100">{{ selectedWorkshopItem?.title || updateDraft.title || 'Selected item' }}</span>
+            </p>
+            <p class="mt-2 text-xs text-slate-400">This will push your current draft metadata/content to Steam Workshop.</p>
+            <div class="mt-4 flex justify-end gap-2">
+              <button class="steam-btn-muted rounded px-3 py-1.5 text-xs font-semibold" @click="closeUpdateConfirmation">
+                Cancel
+              </button>
+              <button
+                class="rounded border border-[#78c2f7] bg-[#2c7fb2] px-3 py-1.5 text-xs font-semibold text-slate-100"
+                @click="confirmUpdateItem"
+              >
+                Update Item
+              </button>
+            </div>
+          </article>
+        </div>
 
         <div
           v-if="isAboutOpen"
