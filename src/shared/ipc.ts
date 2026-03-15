@@ -18,6 +18,7 @@ export const IPC_CHANNELS = {
   getMyWorkshopItems: 'workshop:getMyWorkshopItems',
   listContentFolderFiles: 'workshop:listContentFolderFiles',
   openPath: 'workshop:openPath',
+  getLocalImagePreview: 'workshop:getLocalImagePreview',
   pickFolder: 'workshop:pickFolder',
   pickFile: 'workshop:pickFile',
   pickFiles: 'workshop:pickFiles',

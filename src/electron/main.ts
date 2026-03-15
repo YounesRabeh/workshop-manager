@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron'
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -393,6 +393,19 @@ app.whenReady().then(async () => {
     } catch (error) {
       throw toIpcError(error)
     }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.getLocalImagePreview, async (_event, payload: { path: string }) => {
+    const targetPath = payload.path?.trim()
+    if (!targetPath) {
+      return undefined
+    }
+
+    const image = nativeImage.createFromPath(targetPath)
+    if (image.isEmpty()) {
+      return undefined
+    }
+    return image.toDataURL()
   })
 
   ipcMain.handle(IPC_CHANNELS.pickFolder, async () => {
