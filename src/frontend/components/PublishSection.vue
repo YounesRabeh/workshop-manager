@@ -23,6 +23,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'go-to-mods'): void
+  (e: 'open-workshop-item'): void
   (e: 'pick-content-folder'): void
   (e: 'pick-workspace-root'): void
   (e: 'clear-workspace'): void
@@ -148,6 +149,30 @@ const selectedItemPreviewUrl = computed(() => props.selectedWorkshopItem?.previe
 const previewFileValue = computed(() => props.draft.previewFile.trim())
 const previewImageLoadFailed = ref(false)
 const uploadPreviewImageSrc = ref('')
+
+function toLocalFileUrl(path: string): string {
+  if (!path) {
+    return ''
+  }
+  if (
+    path.startsWith('http://') ||
+    path.startsWith('https://') ||
+    path.startsWith('file://') ||
+    path.startsWith('data:')
+  ) {
+    return path
+  }
+
+  const normalizedPath = path.replace(/\\/g, '/')
+  if (/^[A-Za-z]:\//.test(normalizedPath)) {
+    return `file:///${encodeURI(normalizedPath)}`
+  }
+  if (normalizedPath.startsWith('/')) {
+    return `file://${encodeURI(normalizedPath)}`
+  }
+  return ''
+}
+
 const sectionTitle = computed(() => (isUpdateMode.value ? 'Update Selected Workshop Item' : 'Create Workshop Item'))
 const sectionDescription = computed(() =>
   isUpdateMode.value
@@ -184,17 +209,25 @@ watch(previewFileValue, async (path) => {
     return
   }
 
+  const fallbackFileUrl = toLocalFileUrl(path)
+  const previewLoader = window.workshop.getLocalImagePreview
+  if (typeof previewLoader !== 'function') {
+    uploadPreviewImageSrc.value = fallbackFileUrl
+    return
+  }
+
   try {
-    const nextImage = await window.workshop.getLocalImagePreview({ path })
+    const nextImage = await previewLoader({ path })
     if (requestId !== previewLoadRequestId) {
       return
     }
-    uploadPreviewImageSrc.value = nextImage || ''
+    uploadPreviewImageSrc.value = nextImage || fallbackFileUrl
+    previewImageLoadFailed.value = false
   } catch {
     if (requestId !== previewLoadRequestId) {
       return
     }
-    previewImageLoadFailed.value = true
+    uploadPreviewImageSrc.value = fallbackFileUrl
   }
 }, { immediate: true })
 
@@ -325,13 +358,26 @@ function onUploadPreviewError(): void {
     <article class="fade-in app-panel rounded-2xl border border-[#305070] bg-[#1b2838] p-5 shadow-[0_16px_40px_rgba(4,10,20,0.45)]">
       <div class="flex items-center justify-between gap-2">
         <h2 class="text-lg font-semibold text-slate-100">{{ sectionTitle }}</h2>
-        <button
-          v-if="isUpdateMode"
-          class="rounded border border-[#78c2f7] bg-[#59b9f8] px-3 py-1 text-xs font-semibold text-[#05253a]"
-          @click="emit('go-to-mods')"
-        >
-          Choose Another Mod
-        </button>
+        <div v-if="isUpdateMode" class="flex items-center gap-2">
+          <button
+            class="rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 py-1 text-xs font-semibold text-slate-100"
+            @click="emit('open-workshop-item')"
+          >
+            View Workshop Page
+          </button>
+          <button 
+            type="button"
+            title="Back to mod list"
+            aria-label="Back to mod list"
+            class="inline-flex h-7 items-center justify-center gap-1 rounded border border-[#78c2f7] bg-[#59b9f8] px-2 text-[11px] font-semibold text-[#05253a]"
+            @click="emit('go-to-mods')"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            <span>Back</span>
+          </button>
+        </div>
       </div>
 
       <p class="mt-2 text-sm text-slate-300">{{ sectionDescription }}</p>

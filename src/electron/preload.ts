@@ -38,6 +38,7 @@ export interface WorkshopApi {
   getMyWorkshopItems: (payload: { appId?: string }) => Promise<WorkshopItemSummary[]>
   listContentFolderFiles: (payload: { folderPath: string }) => Promise<ContentFolderFileEntry[]>
   openPath: (payload: { path: string }) => Promise<{ ok: true; error?: string }>
+  openExternal: (payload: { url: string }) => Promise<{ ok: true; error?: string }>
   getLocalImagePreview: (payload: { path: string }) => Promise<string | undefined>
   pickFolder: () => Promise<string | undefined>
   pickFile: () => Promise<string | undefined>
@@ -65,6 +66,7 @@ const api: WorkshopApi = {
   getMyWorkshopItems: (payload) => ipcRenderer.invoke(IPC_CHANNELS.getMyWorkshopItems, payload),
   listContentFolderFiles: (payload) => ipcRenderer.invoke(IPC_CHANNELS.listContentFolderFiles, payload),
   openPath: (payload) => ipcRenderer.invoke(IPC_CHANNELS.openPath, payload),
+  openExternal: (payload) => ipcRenderer.invoke(IPC_CHANNELS.openExternal, payload),
   getLocalImagePreview: (payload) => ipcRenderer.invoke(IPC_CHANNELS.getLocalImagePreview, payload),
   pickFolder: () => ipcRenderer.invoke(IPC_CHANNELS.pickFolder),
   pickFile: () => ipcRenderer.invoke(IPC_CHANNELS.pickFile),

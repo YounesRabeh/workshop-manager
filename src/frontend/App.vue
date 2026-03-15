@@ -1215,6 +1215,27 @@ async function openCurrentContentFolder(): Promise<void> {
   }
 }
 
+async function openSelectedWorkshopItem(): Promise<void> {
+  const publishedFileId = selectedWorkshopItemId.value.trim()
+  if (!publishedFileId) {
+    statusMessage.value = 'Select a workshop item first.'
+    return
+  }
+
+  const workshopUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${encodeURIComponent(publishedFileId)}`
+  try {
+    const result = await window.workshop.openExternal({ url: workshopUrl })
+    if (result.error) {
+      statusMessage.value = `Could not open workshop page: ${result.error}`
+      return
+    }
+    statusMessage.value = 'Opened workshop page in your browser.'
+  } catch (error) {
+    const parsed = normalizeError(error)
+    statusMessage.value = `Open workshop page failed (${parsed.code}): ${parsed.message}`
+  }
+}
+
 async function pickPreviewFile(): Promise<void> {
   const path = await window.workshop.pickFile()
   if (path) {
@@ -1541,6 +1562,7 @@ onUnmounted(() => {
           :can-upload="canCreate()"
           :can-update="canUpdate()"
           @go-to-mods="goToStep('mods')"
+          @open-workshop-item="openSelectedWorkshopItem"
           @pick-content-folder="pickContentFolder"
           @pick-workspace-root="pickContentFolder"
           @clear-workspace="clearWorkspace"

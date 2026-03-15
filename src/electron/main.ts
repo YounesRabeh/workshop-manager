@@ -1,6 +1,6 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron'
-import { join } from 'node:path'
-import { mkdir } from 'node:fs/promises'
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron'
+import { extname, join } from 'node:path'
+import { mkdir, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { IPC_CHANNELS } from '@shared/ipc'
 import type {
@@ -39,6 +39,15 @@ function resolvePreloadPath(): string {
     return jsPath
   }
   return join(__dirname, '../preload/index.mjs')
+}
+
+function toImageMimeType(path: string): string {
+  const ext = extname(path).toLowerCase()
+  if (ext === '.png') return 'image/png'
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
+  if (ext === '.webp') return 'image/webp'
+  if (ext === '.gif') return 'image/gif'
+  return 'application/octet-stream'
 }
 
 function toPlainError(error: unknown): { message: string; code: string } {
@@ -395,17 +404,32 @@ app.whenReady().then(async () => {
     }
   })
 
+  ipcMain.handle(IPC_CHANNELS.openExternal, async (_event, payload: { url: string }) => {
+    try {
+      const targetUrl = payload.url?.trim()
+      if (!targetUrl) {
+        throw new AppError('validation', 'URL is required')
+      }
+      await shell.openExternal(targetUrl)
+      return { ok: true }
+    } catch (error) {
+      throw toIpcError(error)
+    }
+  })
+
   ipcMain.handle(IPC_CHANNELS.getLocalImagePreview, async (_event, payload: { path: string }) => {
     const targetPath = payload.path?.trim()
     if (!targetPath) {
       return undefined
     }
 
-    const image = nativeImage.createFromPath(targetPath)
-    if (image.isEmpty()) {
+    try {
+      const bytes = await readFile(targetPath)
+      const mime = toImageMimeType(targetPath)
+      return `data:${mime};base64,${bytes.toString('base64')}`
+    } catch {
       return undefined
     }
-    return image.toDataURL()
   })
 
   ipcMain.handle(IPC_CHANNELS.pickFolder, async () => {
