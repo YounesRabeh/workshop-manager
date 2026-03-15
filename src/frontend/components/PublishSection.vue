@@ -145,6 +145,9 @@ const visibilityOptions = [0, 1, 2, 3] as const
 const isUpdateMode = computed(() => props.mode === 'update')
 const selectedItemDisplay = computed(() => props.selectedWorkshopItem?.title || props.selectedWorkshopItem?.publishedFileId || 'No item selected')
 const selectedItemPreviewUrl = computed(() => props.selectedWorkshopItem?.previewUrl || '')
+const previewFileValue = computed(() => props.draft.previewFile.trim())
+const previewImageLoadFailed = ref(false)
+const uploadPreviewImageSrc = ref('')
 const sectionTitle = computed(() => (isUpdateMode.value ? 'Update Selected Workshop Item' : 'Create Workshop Item'))
 const sectionDescription = computed(() =>
   isUpdateMode.value
@@ -167,6 +170,33 @@ const requiredPublishChecklist = computed(() => props.publishChecklist.filter((i
 const optionalPublishChecklist = computed(() => props.publishChecklist.filter((item) => item.optional))
 const isContentExplorerCollapsed = ref(false)
 const fileOnlyTreeToggleState = ref(false)
+
+let previewLoadRequestId = 0
+
+watch(previewFileValue, async (path) => {
+  previewLoadRequestId += 1
+  const requestId = previewLoadRequestId
+
+  previewImageLoadFailed.value = false
+  uploadPreviewImageSrc.value = ''
+
+  if (!path) {
+    return
+  }
+
+  try {
+    const nextImage = await window.workshop.getLocalImagePreview({ path })
+    if (requestId !== previewLoadRequestId) {
+      return
+    }
+    uploadPreviewImageSrc.value = nextImage || ''
+  } catch {
+    if (requestId !== previewLoadRequestId) {
+      return
+    }
+    previewImageLoadFailed.value = true
+  }
+}, { immediate: true })
 
 const allFolderIds = computed(() => {
   const ids = new Set<string>()
@@ -283,6 +313,10 @@ function submitPrimaryAction(): void {
     return
   }
   emit('upload')
+}
+
+function onUploadPreviewError(): void {
+  previewImageLoadFailed.value = true
 }
 </script>
 
@@ -424,26 +458,48 @@ function submitPrimaryAction(): void {
         class="mt-1 min-h-[3.5rem] w-full resize-y rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100 disabled:cursor-not-allowed disabled:border-[#33465a] disabled:bg-[#0c1623] disabled:text-slate-500"
       />
 
-      <div class="mt-3 grid gap-3 md:grid-cols-2">
-        <div class="md:col-span-2">
-          <label class="text-sm text-slate-300">Preview File (optional)</label>
-          <div class="mt-1 flex gap-2">
-            <input v-model="draft.previewFile" class="w-full rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100" />
-            <button class="rounded border border-[#4d7ca0] bg-[#2c4d67] px-3 py-1 text-sm font-semibold text-slate-100" @click="emit('pick-preview-file')">Pick</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-3">
-        <label class="text-sm text-slate-300">Tags</label>
-        <div class="mt-1 flex gap-2">
-          <input :value="tagInput" class="w-full rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100" @input="onTagInput" @keyup.enter="emit('add-tag')" />
-          <button class="rounded border border-[#6ecbff] bg-[#59b9f8] px-3 py-1 text-sm font-semibold text-[#05253a]" @click="emit('add-tag')">Add</button>
-        </div>
-        <div class="mt-2 flex flex-wrap gap-2">
-          <button v-for="tag in draft.tags" :key="tag" class="rounded-full border border-[#386487] bg-[#122638] px-3 py-1 text-xs font-semibold text-sky-200" @click="emit('remove-tag', tag)">
-            {{ tag }} x
+      <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
+        <div>
+          <label class="text-sm text-slate-300">Thumbnail (optional)</label>
+          <button
+            type="button"
+            class="mt-1 block w-full overflow-hidden rounded-lg border border-[#4b708e] bg-[#102233] text-left transition-colors hover:border-[#6ecbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6ecbff]"
+            @click="emit('pick-preview-file')"
+          >
+            <div class="aspect-square w-full">
+              <img
+                v-if="uploadPreviewImageSrc && !previewImageLoadFailed"
+                :src="uploadPreviewImageSrc"
+                alt="Workshop preview thumbnail"
+                class="h-full w-full object-cover"
+                @error="onUploadPreviewError"
+              />
+              <div v-else class="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-xs text-slate-300">
+                <svg class="h-12 w-12 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+                  <circle cx="9" cy="10" r="1.5" />
+                  <path d="m6.5 16 3.3-3.5 2.7 2.6 2.1-2.2 2.9 3.1" />
+                </svg>
+                <span>Click to choose an image</span>
+              </div>
+            </div>
           </button>
+          <p class="mt-2 truncate text-xs text-slate-400">
+            {{ previewFileValue || 'No preview file selected' }}
+          </p>
+        </div>
+
+        <div>
+          <label class="text-sm text-slate-300">Tags</label>
+          <div class="mt-1 flex gap-2">
+            <input :value="tagInput" class="w-full rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100" @input="onTagInput" @keyup.enter="emit('add-tag')" />
+            <button class="rounded border border-[#6ecbff] bg-[#59b9f8] px-3 py-1 text-sm font-semibold text-[#05253a]" @click="emit('add-tag')">Add</button>
+          </div>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button v-for="tag in draft.tags" :key="tag" class="rounded-full border border-[#386487] bg-[#122638] px-3 py-1 text-xs font-semibold text-sky-200" @click="emit('remove-tag', tag)">
+              {{ tag }} x
+            </button>
+          </div>
         </div>
       </div>
 
