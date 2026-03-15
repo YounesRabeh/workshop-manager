@@ -846,13 +846,15 @@ function buildUploadDraft(
   mode: 'update' | 'create',
   visibility?: 0 | 1 | 2 | 3
 ): UploadDraft {
+  const normalizedReleaseNote = source.releaseNotes.replace(/\r\n/g, '\n').trim()
+
   return {
     appId: source.appId,
     publishedFileId: mode === 'update' ? source.publishedFileId || undefined : undefined,
     contentFolder: source.contentFolder,
     previewFile: source.previewFile,
     title: source.title,
-    changenote: source.releaseNotes.trim().length > 0 ? source.releaseNotes.trim() : undefined,
+    changenote: normalizedReleaseNote.length > 0 ? normalizedReleaseNote : undefined,
     tags: [...source.tags],
     visibility
   }
