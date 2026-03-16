@@ -17,6 +17,29 @@ function assertString(name: string, value: string | undefined): string {
   return value.trim()
 }
 
+function normalizeTags(tags: string[]): string[] {
+  const seen = new Set<string>()
+  const normalized: string[] = []
+
+  for (const tag of tags) {
+    const parts = tag.split(/[;,]/g)
+    for (const rawPart of parts) {
+      const part = rawPart.trim()
+      if (!part) {
+        continue
+      }
+      const dedupeKey = part.toLowerCase()
+      if (seen.has(dedupeKey)) {
+        continue
+      }
+      seen.add(dedupeKey)
+      normalized.push(part)
+    }
+  }
+
+  return normalized
+}
+
 export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update' | 'visibility'): string {
   const appId = assertString('appid', draft.appId)
   const hasVisibility = draft.visibility !== undefined
@@ -46,10 +69,8 @@ export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update
   const title = mode === 'upload' ? assertString('title', draft.title) : draft.title?.trim()
   const changeNote = draft.changenote?.trim()
 
-  const tagsList = draft.tags
-    .map((tag) => tag.trim())
-    .filter(Boolean)
-  const tagsBlock = tagsList.map((tag) => `\t\t\"${escapeVdf(tag)}\"\t\"1\"`).join('\n')
+  const tagsList = normalizeTags(draft.tags)
+  const tagsBlock = tagsList.map((tag, index) => `\t\t\"${index}\"\t\"${escapeVdf(tag)}\"`).join('\n')
 
   const headerLines = [
     '"workshopitem"',
@@ -88,7 +109,9 @@ export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update
     lines.push(`\t\"changenote\"\t\"${escapeVdf(changeNote, true)}\"`)
   }
 
-  if (tagsList.length > 0) {
+  const shouldWriteTags = tagsList.length > 0 || (mode === 'update' && draft.forceTagsUpdate === true)
+
+  if (shouldWriteTags) {
     lines.push('\t"tags"', '\t{', tagsBlock, '\t}')
   }
 

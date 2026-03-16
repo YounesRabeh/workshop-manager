@@ -176,6 +176,60 @@ describe('steamcmd runtime helpers', () => {
     ])
   })
 
+  it('extracts and deduplicates tags from steam payloads', () => {
+    const normalized = normalizeWorkshopItems({
+      response: {
+        publishedfiledetails: [
+          {
+            publishedfileid: '11',
+            title: 'Tagged item',
+            consumer_appid: '255710',
+            time_updated: 10,
+            tags: [{ tag: 'MOD' }, { tag: 'mod' }, { tag: 'Maps' }]
+          }
+        ]
+      }
+    })
+
+    expect(normalized).toEqual([
+      {
+        publishedFileId: '11',
+        title: 'Tagged item',
+        appId: '255710',
+        updatedAt: 10,
+        tags: ['MOD', 'Maps']
+      }
+    ])
+  })
+
+  it('keeps known tags when replacement item omits them', () => {
+    const merged = mergeWorkshopItems([
+      {
+        publishedFileId: '9',
+        title: 'Known Tags',
+        appId: '480',
+        tags: ['Mod'],
+        updatedAt: 200
+      },
+      {
+        publishedFileId: '9',
+        title: 'Known Tags',
+        appId: '480',
+        updatedAt: 200
+      }
+    ])
+
+    expect(merged).toEqual([
+      {
+        publishedFileId: '9',
+        title: 'Known Tags',
+        appId: '480',
+        tags: ['Mod'],
+        updatedAt: 200
+      }
+    ])
+  })
+
   it('classifies workshop manifest timeout failures', () => {
     const failure = parseWorkshopRunFailure(
       [

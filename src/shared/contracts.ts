@@ -24,6 +24,7 @@ export interface UploadDraft {
   title: string
   changenote?: string
   tags: string[]
+  forceTagsUpdate?: boolean
   visibility?: 0 | 1 | 2 | 3
   validationErrors?: string[]
 }
@@ -132,6 +133,7 @@ export interface WorkshopItemSummary {
   appId?: string
   updatedAt?: number
   visibility?: 0 | 1 | 2 | 3
+  tags?: string[]
 }
 
 export interface SteamProfileSummary {

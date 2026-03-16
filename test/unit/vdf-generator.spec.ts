@@ -16,7 +16,8 @@ describe('generateWorkshopVdf', () => {
 
     expect(output).toContain('"appid"\t"480"')
     expect(output).toContain('"title"\t"My \\"Quoted\\" Mod"')
-    expect(output).toContain('"fun"\t"1"')
+    expect(output).toContain('"0"\t"fun"')
+    expect(output).toContain('"1"\t"coop"')
     expect(output).not.toContain('publishedfileid')
   })
 
@@ -104,6 +105,25 @@ describe('generateWorkshopVdf', () => {
     expect(output).not.toContain('"contentfolder"')
   })
 
+  it('emits empty tags block when update explicitly requests tag sync', () => {
+    const output = generateWorkshopVdf(
+      {
+        appId: '480',
+        publishedFileId: '12345',
+        contentFolder: '',
+        previewFile: '/mods/new-preview.png',
+        title: 'Update Target',
+        tags: [],
+        forceTagsUpdate: true
+      },
+      'update'
+    )
+
+    expect(output).toContain('"publishedfileid"\t"12345"')
+    expect(output).toContain('"tags"')
+    expect(output).toContain('\t"tags"\n\t{\n\t}')
+  })
+
   it('emits visibility-only VDF structure', () => {
     const output = generateWorkshopVdf(
       {
@@ -123,5 +143,25 @@ describe('generateWorkshopVdf', () => {
     expect(output).not.toContain('"contentfolder"')
     expect(output).not.toContain('"title"')
     expect(output).not.toContain('"tags"')
+  })
+
+  it('splits and deduplicates tags before generating VDF', () => {
+    const output = generateWorkshopVdf(
+      {
+        appId: '480',
+        contentFolder: '/mods/base',
+        previewFile: '/mods/preview.png',
+        title: 'My Mod',
+        tags: ['fun, coop', 'coop', 'PVP ; Builder', '  builder  ']
+      },
+      'upload'
+    )
+
+    expect(output).toContain('"0"\t"fun"')
+    expect(output).toContain('"1"\t"coop"')
+    expect(output).toContain('"2"\t"PVP"')
+    expect(output).toContain('"3"\t"Builder"')
+    expect((output.match(/\"coop\"/g) ?? []).length).toBe(1)
+    expect((output.match(/\"Builder\"/g) ?? []).length).toBe(1)
   })
 })

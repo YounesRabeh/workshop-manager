@@ -69,6 +69,14 @@ function onTagInput(event: Event): void {
   emit('change-tag-input', target?.value ?? '')
 }
 
+function onTagKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Enter' && event.key !== ',' && event.key !== ';') {
+    return
+  }
+  event.preventDefault()
+  emit('add-tag')
+}
+
 function visibilityLabel(value: 0 | 1 | 2 | 3): string {
   if (value === 0) return 'Public'
   if (value === 1) return 'Friends-only'
@@ -591,11 +599,17 @@ function onUploadPreviewError(): void {
         <div>
           <label class="text-sm text-slate-300">Tags</label>
           <div class="mt-1 flex gap-2">
-            <input :value="tagInput" class="w-full rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100" @input="onTagInput" @keyup.enter="emit('add-tag')" />
-            <button class="rounded border border-[#6ecbff] bg-[#59b9f8] px-3 py-1 text-sm font-semibold text-[#05253a]" @click="emit('add-tag')">Add</button>
+            <input
+              :value="tagInput"
+              placeholder="Add tags (Enter, comma, or semicolon)"
+              class="w-full rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100"
+              @input="onTagInput"
+              @keydown="onTagKeydown"
+            />
+            <button type="button" class="rounded border border-[#6ecbff] bg-[#59b9f8] px-3 py-1 text-sm font-semibold text-[#05253a]" @click="emit('add-tag')">Add</button>
           </div>
           <div class="mt-2 flex flex-wrap gap-2">
-            <button v-for="tag in draft.tags" :key="tag" class="rounded-full border border-[#386487] bg-[#122638] px-3 py-1 text-xs font-semibold text-sky-200" @click="emit('remove-tag', tag)">
+            <button type="button" v-for="tag in draft.tags" :key="tag" class="rounded-full border border-[#386487] bg-[#122638] px-3 py-1 text-xs font-semibold text-sky-200" @click="emit('remove-tag', tag)">
               {{ tag }} x
             </button>
           </div>
