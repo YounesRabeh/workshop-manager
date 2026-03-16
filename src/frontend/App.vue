@@ -105,6 +105,7 @@ const createDraft = reactive<UploadDraftState>(createEmptyDraft())
 const updateDraft = reactive<UploadDraftState>(createEmptyDraft())
 const updateDraftCache = ref<Record<string, UploadDraftState>>({})
 const isHydratingUpdateDraft = ref(false)
+const updateTagsTouched = ref(false)
 const workshopFilterAppId = ref('')
 const workshopVisibilityFilter = ref<WorkshopVisibilityFilter>('all')
 const updateTagInput = ref('')
@@ -624,11 +625,31 @@ function setContentFolderSelectionError(contentFolder: string, message: string):
 }
 
 function addTag(): void {
-  const value = activeTagInput.value.trim()
-  if (!value) {
+  const normalizedTags = activeTagInput.value
+    .split(/[;,]/g)
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+
+  if (normalizedTags.length === 0) {
     return
   }
-  activeDraft.value.tags.push(value)
+
+  const existing = new Set(activeDraft.value.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))
+  let addedCount = 0
+  for (const tag of normalizedTags) {
+    const dedupeKey = tag.toLowerCase()
+    if (existing.has(dedupeKey)) {
+      continue
+    }
+    activeDraft.value.tags.push(tag)
+    existing.add(dedupeKey)
+    addedCount += 1
+  }
+
+  if (activePublishMode.value === 'update' && addedCount > 0) {
+    updateTagsTouched.value = true
+  }
+
   if (activePublishMode.value === 'create') {
     createTagInput.value = ''
     return
@@ -637,7 +658,11 @@ function addTag(): void {
 }
 
 function removeTag(tag: string): void {
+  const before = activeDraft.value.tags.length
   activeDraft.value.tags = activeDraft.value.tags.filter((value) => value !== tag)
+  if (activePublishMode.value === 'update' && activeDraft.value.tags.length < before) {
+    updateTagsTouched.value = true
+  }
 }
 
 function onChangeAppId(value: string): void {
@@ -831,10 +856,12 @@ function selectWorkshopItem(item: WorkshopItemSummary): void {
       ...createEmptyDraft(),
       appId: item.appId ?? '',
       publishedFileId: item.publishedFileId,
-      title: item.title
+      title: item.title,
+      tags: item.tags ? [...item.tags] : []
     })
   }
   isHydratingUpdateDraft.value = false
+  updateTagsTouched.value = false
 
   committedVisibility.value = visibility
   pendingVisibility.value = visibility
@@ -857,6 +884,7 @@ function buildUploadDraft(
     title: source.title,
     changenote: normalizedReleaseNote.length > 0 ? normalizedReleaseNote : undefined,
     tags: [...source.tags],
+    forceTagsUpdate: mode === 'update' ? updateTagsTouched.value : undefined,
     visibility
   }
 }
@@ -1154,6 +1182,7 @@ async function signOut(): Promise<void> {
   applyDraft(createDraft, createEmptyDraft())
   applyDraft(updateDraft, createEmptyDraft())
   updateDraftCache.value = {}
+  updateTagsTouched.value = false
   createTagInput.value = ''
   updateTagInput.value = ''
   flowStep.value = 'mods'

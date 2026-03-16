@@ -267,6 +267,44 @@ function normalizeNumericString(value: unknown): string | undefined {
   return undefined
 }
 
+function extractWorkshopTags(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+
+  const seen = new Set<string>()
+  const tags: string[] = []
+
+  for (const entry of value) {
+    let rawTag: unknown = undefined
+    if (typeof entry === 'string') {
+      rawTag = entry
+    } else if (entry && typeof entry === 'object') {
+      const record = entry as Record<string, unknown>
+      rawTag = record['tag'] ?? record['name'] ?? record['value']
+    }
+
+    if (typeof rawTag !== 'string') {
+      continue
+    }
+
+    const trimmed = rawTag.trim()
+    if (!trimmed) {
+      continue
+    }
+
+    const dedupeKey = trimmed.toLowerCase()
+    if (seen.has(dedupeKey)) {
+      continue
+    }
+
+    seen.add(dedupeKey)
+    tags.push(trimmed)
+  }
+
+  return tags.length > 0 ? tags : undefined
+}
+
 export function normalizeWorkshopItems(payload: unknown): WorkshopItemSummary[] {
   if (!payload || typeof payload !== 'object') {
     return []
@@ -298,6 +336,7 @@ export function normalizeWorkshopItems(payload: unknown): WorkshopItemSummary[] 
         Number.isInteger(visibilityValue) && visibilityValue >= 0 && visibilityValue <= 3
           ? (visibilityValue as 0 | 1 | 2 | 3)
           : undefined
+      const tags = extractWorkshopTags(item['tags'])
 
       if (!publishedFileId || !title) {
         return null
@@ -309,7 +348,8 @@ export function normalizeWorkshopItems(payload: unknown): WorkshopItemSummary[] 
         previewUrl,
         appId,
         updatedAt,
-        visibility
+        visibility,
+        tags
       }
     })
     .filter((item): item is WorkshopItemSummary => item !== null)
@@ -332,15 +372,17 @@ export function mergeWorkshopItems(items: WorkshopItemSummary[]): WorkshopItemSu
     const shouldReplace =
       candidateUpdated > existingUpdated ||
       (candidateUpdated === existingUpdated &&
-        typeof existing.visibility === 'undefined' &&
-        typeof item.visibility !== 'undefined')
+        ((typeof existing.visibility === 'undefined' && typeof item.visibility !== 'undefined') ||
+          ((existing.tags?.length ?? 0) === 0 && (item.tags?.length ?? 0) > 0)))
 
     if (shouldReplace) {
       merged.set(item.publishedFileId, {
         ...existing,
         ...item,
         // Keep a known visibility when the replacement item omits it.
-        visibility: typeof item.visibility === 'undefined' ? existing.visibility : item.visibility
+        visibility: typeof item.visibility === 'undefined' ? existing.visibility : item.visibility,
+        // Keep known tags when replacement item omits them.
+        tags: item.tags && item.tags.length > 0 ? item.tags : existing.tags
       })
     }
   }
