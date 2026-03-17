@@ -117,6 +117,9 @@ export function createAppGlobalKeyDownHandler(deps: AppGlobalKeyboardDeps): (eve
         deps.scrollViewport(1)
         return
       }
+      if (isTextEditingTarget(event.target)) {
+        return
+      }
       event.preventDefault()
       moveFocusByDirection(event.key === 'ArrowRight' ? 1 : -1)
       return

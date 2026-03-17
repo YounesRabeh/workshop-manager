@@ -52,6 +52,27 @@ const workshop = {
 }
 
 describe('App UI validation gates', () => {
+  const findPrimaryActionButton = (
+    wrapper: ReturnType<typeof mount>,
+    label: string
+  ) =>
+    wrapper
+      .findAll('button')
+      .find(
+        (button) =>
+          button.text().trim() === label &&
+          (button.attributes('class') ?? '').includes('w-full')
+      )
+
+  const findConfirmUpdateButton = (wrapper: ReturnType<typeof mount>) =>
+    wrapper
+      .findAll('button')
+      .find(
+        (button) =>
+          button.text().trim() === 'Update Item' &&
+          !(button.attributes('class') ?? '').includes('w-full')
+      )
+
   beforeEach(() => {
     vi.clearAllMocks()
     ;(window as unknown as { workshop: typeof workshop }).workshop = workshop
@@ -73,7 +94,7 @@ describe('App UI validation gates', () => {
     await modButton?.trigger('click')
     await flushPromises()
 
-    const updateButton = wrapper.findAll('button').find((button) => button.text().includes('Update Existing Item'))
+    const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
     expect(updateButton?.attributes('disabled')).toBeDefined()
 
     const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
@@ -158,6 +179,29 @@ describe('App UI validation gates', () => {
 
     expect(workshop.login).not.toHaveBeenCalled()
     expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Enter your password to sign in.')
+  })
+
+  it('does not auto-focus sign in while typing credentials without stored session', async () => {
+    const wrapper = mount(App, { attachTo: document.body })
+    try {
+      await flushPromises()
+
+      const passwordInput = wrapper.find('input[type="password"]')
+      expect(passwordInput.exists()).toBe(true)
+      ;(passwordInput.element as HTMLInputElement).focus()
+      expect(document.activeElement).toBe(passwordInput.element)
+
+      await passwordInput.setValue('s')
+      await flushPromises()
+
+      expect(document.activeElement).toBe(passwordInput.element)
+
+      const submitButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Sign in')
+      expect(submitButton).toBeDefined()
+      expect(document.activeElement).not.toBe(submitButton?.element ?? null)
+    } finally {
+      wrapper.unmount()
+    }
   })
 
   it('uses saved-session mode only when stored auth exists', async () => {
@@ -428,9 +472,14 @@ describe('App UI validation gates', () => {
     await pickContentFolderButton?.trigger('click')
     await flushPromises()
 
-    const updateButton = wrapper.findAll('button').find((button) => button.text().includes('Update Existing Item'))
+    const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
     expect(updateButton).toBeDefined()
     await updateButton?.trigger('click')
+    await flushPromises()
+
+    const confirmUpdateButton = findConfirmUpdateButton(wrapper)
+    expect(confirmUpdateButton).toBeDefined()
+    await confirmUpdateButton?.trigger('click')
     await flushPromises()
 
     expect(workshop.updateMod).toHaveBeenCalledTimes(1)
@@ -455,17 +504,24 @@ describe('App UI validation gates', () => {
     await modButton?.trigger('click')
     await flushPromises()
 
-    const updateButton = wrapper.findAll('button').find((button) => button.text().includes('Update Existing Item'))
+    const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
     expect(updateButton).toBeDefined()
     expect(updateButton?.attributes('disabled')).toBeDefined()
 
-    const pickPreviewButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Pick')
+    const pickPreviewButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Click to choose an image'))
     expect(pickPreviewButton).toBeDefined()
     await pickPreviewButton?.trigger('click')
     await flushPromises()
 
     expect(updateButton?.attributes('disabled')).toBeUndefined()
     await updateButton?.trigger('click')
+    await flushPromises()
+
+    const confirmUpdateButton = findConfirmUpdateButton(wrapper)
+    expect(confirmUpdateButton).toBeDefined()
+    await confirmUpdateButton?.trigger('click')
     await flushPromises()
 
     expect(workshop.updateMod).toHaveBeenCalledTimes(1)
@@ -497,7 +553,7 @@ describe('App UI validation gates', () => {
     await modButton?.trigger('click')
     await flushPromises()
 
-    const updateButton = wrapper.findAll('button').find((button) => button.text().includes('Update Existing Item'))
+    const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
     expect(updateButton).toBeDefined()
     expect(updateButton?.attributes('disabled')).toBeDefined()
 
@@ -538,9 +594,14 @@ describe('App UI validation gates', () => {
     await pickContentFolderButton?.trigger('click')
     await flushPromises()
 
-    const updateButton = wrapper.findAll('button').find((button) => button.text().includes('Update Existing Item'))
+    const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
     expect(updateButton).toBeDefined()
     await updateButton?.trigger('click')
+    await flushPromises()
+
+    const confirmUpdateButton = findConfirmUpdateButton(wrapper)
+    expect(confirmUpdateButton).toBeDefined()
+    await confirmUpdateButton?.trigger('click')
     await flushPromises()
 
     expect(wrapper.text()).toContain('Update Failed')

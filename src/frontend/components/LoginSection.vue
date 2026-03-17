@@ -171,10 +171,16 @@ watch(
     }
 
     // If cached credentials hydrate after mount, move focus from fields to Sign in once.
+    const shouldAutoFocusSubmitForSavedSession =
+      props.canClearStoredSession &&
+      props.loginForm.rememberAuth &&
+      props.loginForm.password.trim().length === 0
+
     if (
       !hasUserEditedCredentials.value &&
       lastDefaultFocusTarget.value !== 4 &&
       resolveDefaultFocusTarget() === 4 &&
+      shouldAutoFocusSubmitForSavedSession &&
       !props.isLoginSubmitting
     ) {
       applyDefaultFocus()
