@@ -147,6 +147,19 @@ function visibilityActionClass(value: 0 | 1 | 2 | 3): string {
   return 'border-[#9379c8] bg-[#5b448d] hover:bg-[#7156a8]'
 }
 
+function previewBorderClass(value: 0 | 1 | 2 | 3): string {
+  if (value === 0) {
+    return 'border-[#58c796] shadow-[0_0_0_1px_rgba(88,199,150,0.3)]'
+  }
+  if (value === 1) {
+    return 'border-[#f0bc71] shadow-[0_0_0_1px_rgba(240,188,113,0.3)]'
+  }
+  if (value === 2) {
+    return 'border-[#da8faa] shadow-[0_0_0_1px_rgba(218,143,170,0.3)]'
+  }
+  return 'border-[#9f81df] shadow-[0_0_0_1px_rgba(159,129,223,0.3)]'
+}
+
 function onVisibilityOptionClick(value: 0 | 1 | 2 | 3): void {
   emit('change-visibility-selection', value)
 }
@@ -418,7 +431,10 @@ function onUploadPreviewError(): void {
       >
         <div class="flex flex-col gap-4">
           <div class="flex min-w-0 flex-1 items-center gap-4">
-            <div class="h-32 w-32 shrink-0 overflow-hidden rounded-lg border-2 border-[#5b84a6] bg-[#0f2130]">
+            <div
+              class="h-32 w-32 shrink-0 overflow-hidden rounded-lg border-2 bg-[#0f2130] transition-colors duration-300"
+              :class="previewBorderClass(visibilityPending)"
+            >
               <img
                 v-if="selectedItemPreviewUrl"
                 :src="selectedItemPreviewUrl"

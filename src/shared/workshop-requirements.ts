@@ -8,7 +8,7 @@ UploadDraft,
 >
 
 type CreateMissingField = 'appId' | 'contentFolder' | 'title'
-type UpdateMissingField = 'appId' | 'publishedFileId' | 'contentOrPreview'
+type UpdateMissingField = 'appId' | 'publishedFileId' | 'title'
 type VisibilityMissingField = 'appId' | 'publishedFileId' | 'visibility'
 
 function hasText(value: string | undefined): boolean {
@@ -65,6 +65,7 @@ export function evaluateCreateRequirements(fields: RequirementFields): {
 export function evaluateUpdateRequirements(fields: RequirementFields): {
   appId: boolean
   publishedFileId: boolean
+  title: boolean
   contentOrPreview: boolean
   updatePath: UpdateDraftPath
   valid: boolean
@@ -72,6 +73,7 @@ export function evaluateUpdateRequirements(fields: RequirementFields): {
 } {
   const appId = hasText(fields.appId)
   const publishedFileId = hasText(fields.publishedFileId)
+  const title = hasText(fields.title)
   const updatePath = getUpdateDraftPath(fields)
   const contentOrPreview = updatePath !== 'none'
   const missing: UpdateMissingField[] = []
@@ -82,13 +84,14 @@ export function evaluateUpdateRequirements(fields: RequirementFields): {
   if (!publishedFileId) {
     missing.push('publishedFileId')
   }
-  if (!contentOrPreview) {
-    missing.push('contentOrPreview')
+  if (!title) {
+    missing.push('title')
   }
 
   return {
     appId,
     publishedFileId,
+    title,
     contentOrPreview,
     updatePath,
     valid: missing.length === 0,

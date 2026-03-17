@@ -25,7 +25,7 @@ describe('validateDraft', () => {
           publishedFileId: '123',
           contentFolder: '',
           previewFile: '/mods/preview.png',
-          title: '',
+          title: 'Updated Title',
           tags: []
         },
         'update'
@@ -41,7 +41,7 @@ describe('validateDraft', () => {
           publishedFileId: '123',
           contentFolder: '/mods/content',
           previewFile: '',
-          title: '',
+          title: 'Updated Title',
           tags: []
         },
         'update'
@@ -49,7 +49,23 @@ describe('validateDraft', () => {
     ).not.toThrow()
   })
 
-  it('rejects update when contentFolder and previewFile are both empty', () => {
+  it('allows title-only update when contentFolder and previewFile are empty', () => {
+    expect(() =>
+      validateDraft(
+        {
+          appId: '480',
+          publishedFileId: '123',
+          contentFolder: '',
+          previewFile: '',
+          title: 'Updated Title',
+          tags: []
+        },
+        'update'
+      )
+    ).not.toThrow()
+  })
+
+  it('rejects update when title is empty', () => {
     expect(() =>
       validateDraft(
         {
@@ -62,7 +78,7 @@ describe('validateDraft', () => {
         },
         'update'
       )
-    ).toThrowError(/contentFolder or previewFile is required/i)
+    ).toThrowError(/title is required for updates/i)
   })
 
   it('requires visibility fields in visibility mode', () => {

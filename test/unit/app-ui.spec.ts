@@ -78,7 +78,7 @@ describe('App UI validation gates', () => {
     ;(window as unknown as { workshop: typeof workshop }).workshop = workshop
   })
 
-  it('disables update/create actions until required fields are present', async () => {
+  it('keeps update disabled with selected item defaults and keeps create disabled until required fields are present', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
@@ -565,6 +565,81 @@ describe('App UI validation gates', () => {
     await flushPromises()
 
     expect(updateButton?.attributes('disabled')).toBeUndefined()
+  })
+
+  it('keeps title-only update disabled when title changes only by case/spacing', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
+    expect(modButton).toBeDefined()
+    await modButton?.trigger('click')
+    await flushPromises()
+
+    const titleInput = wrapper
+      .findAll('input')
+      .find((input) => (input.element as HTMLInputElement).value === 'Test Item')
+    expect(titleInput).toBeDefined()
+    await titleInput?.setValue('   test    item   ')
+    await flushPromises()
+
+    const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
+    expect(updateButton).toBeDefined()
+    expect(updateButton?.attributes('disabled')).toBeDefined()
+  })
+
+  it('allows title-only update with no content folder or preview image', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
+    expect(modButton).toBeDefined()
+    await modButton?.trigger('click')
+    await flushPromises()
+
+    const titleInput = wrapper
+      .findAll('input')
+      .find((input) => (input.element as HTMLInputElement).value === 'Test Item')
+    expect(titleInput).toBeDefined()
+    await titleInput?.setValue('Renamed Test Item')
+    await flushPromises()
+
+    const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
+    expect(updateButton).toBeDefined()
+    expect(updateButton?.attributes('disabled')).toBeUndefined()
+    await updateButton?.trigger('click')
+    await flushPromises()
+
+    const confirmUpdateButton = findConfirmUpdateButton(wrapper)
+    expect(confirmUpdateButton).toBeDefined()
+    await confirmUpdateButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.updateMod).toHaveBeenCalledTimes(1)
+    expect(workshop.updateMod).toHaveBeenCalledWith({
+      profileId: '123',
+      draft: expect.objectContaining({
+        appId: '480',
+        publishedFileId: '123',
+        contentFolder: '',
+        previewFile: '',
+        title: 'Renamed Test Item'
+      })
+    })
   })
 
   it('shows concise update popup when selected content folder is empty', async () => {
