@@ -196,7 +196,7 @@ watch(
   <section class="fade-in login-shell">
     <div class="login-panel">
       <header>
-        <p class="login-kicker text-[16px] font-extrabold tracking-[0.18em] text-sky-500">STEAM WORKSHOP MANAGER</p>
+        <p class="login-kicker text-[16px] font-extrabold tracking-[0.18em] text-sky-500">WORKSHOP MANAGER</p>
         <h1 class="text-4xl font-extrabold tracking-tight text-slate-900">Sign in</h1>
         <p class="mt-2 text-sm text-slate-600">Use your Steam account to unlock mod management.</p>
         <p v-if="statusMessage" class="login-status">{{ statusMessage }}</p>
@@ -347,7 +347,7 @@ watch(
         </button>
         <button
           type="button"
-          class="login-quit mt-2 w-full rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
+          class="login-quit mt-2 mx-auto block min-w-[148px] rounded border border-slate-300 px-4 py-2 text-xs font-semibold"
           @click="emit('quit-app')"
         >
           Quit

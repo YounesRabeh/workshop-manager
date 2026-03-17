@@ -1,4 +1,4 @@
-# Steam Workshop Manager
+# Workshop Manager
 
 Cross-platform desktop app for Steam Workshop publish/update workflows, built with Electron, Vue 3, TypeScript, and Tailwind.
 
@@ -6,7 +6,7 @@ Cross-platform desktop app for Steam Workshop publish/update workflows, built wi
 
 | Screenshot 1 | Screenshot 2 |
 | --- | --- |
-| ![Steam Workshop Manager Screenshot 1](github/photo01.png) | ![Steam Workshop Manager Screenshot 2](github/photo02.png) |
+| ![Workshop Manager Screenshot 1](github/photo01.png) | ![Workshop Manager Screenshot 2](github/photo02.png) |
 
 ## Included in V1
 
@@ -35,8 +35,15 @@ Cross-platform desktop app for Steam Workshop publish/update workflows, built wi
    - `pnpm test`
 4. Type-check:
    - `pnpm typecheck`
-5. Build:
+5. Build bundles only (no installer):
    - `pnpm build`
+6. Build platform executable package:
+   - `pnpm build:exe`
+   - Output artifacts are written to `dist/`
+   - Host platform targets:
+     - Windows: `*.exe` (NSIS)
+     - macOS: `*.dmg`
+     - Linux: `*.AppImage`
 
 ## Notes
 

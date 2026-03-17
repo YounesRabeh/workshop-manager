@@ -1725,7 +1725,7 @@ onUnmounted(() => {
   <main class="steam-theme">
     <section v-if="isBootstrapping" class="fade-in splash-screen">
       <div class="splash-panel">
-        <p class="splash-kicker">STEAM WORKSHOP MANAGER</p>
+        <p class="splash-kicker">WORKSHOP MANAGER</p>
         <h1 class="splash-title">Initializing</h1>
         <p class="splash-subtitle">Preparing SteamCMD and saved session data...</p>
         <div class="splash-loader" role="status" aria-label="Loading">
@@ -1883,7 +1883,7 @@ onUnmounted(() => {
         >
           <article class="w-full max-w-md rounded-xl border border-[#2a475e] bg-[#162534] p-5 shadow-2xl">
             <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">About</p>
-            <h2 class="mt-1 text-xl font-bold text-slate-100">Steam Workshop Manager</h2>
+            <h2 class="mt-1 text-xl font-bold text-slate-100">Workshop Manager</h2>
             <p class="mt-2 text-sm text-slate-300">
               Developer utility for Steam Workshop uploads and updates.
             </p>

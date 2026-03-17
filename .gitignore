@@ -1,7 +1,27 @@
 node_modules/
 out/
 dist/
+squashfs-root/
 .vite/
 *.log
 .DS_Store
 coverage/
+
+# Packaged executable artifacts
+*.AppImage
+*.dmg
+*.exe
+*.msi
+*.deb
+*.rpm
+*.blockmap
+latest*.yml
+builder-debug.yml
+builder-effective-config.yaml
+
+# Generated icon artifacts (source is resources/app-icon.png)
+resources/app-icon.normalized.png
+resources/app-icon.ico
+resources/app-icon.icns
+resources/.icon-source
+**/public/app-icon.png

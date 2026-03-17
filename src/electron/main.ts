@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron'
 import { extname, join } from 'node:path'
 import { mkdir, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -29,8 +29,12 @@ if (process.env['ELECTRON_VERBOSE_LOGS'] !== '1') {
 }
 
 if (process.platform === 'linux') {
+  process.env['CHROME_DESKTOP'] ??= 'workshop-manager.desktop'
   // Avoid noisy GPU/VSync errors on some Linux desktop stacks.
   app.disableHardwareAcceleration()
+  // Helps Linux shells match the running window to this app identity instead of generic Electron.
+  app.commandLine.appendSwitch('class', 'workshop-manager')
+  app.commandLine.appendSwitch('name', 'workshop-manager')
 }
 
 function resolvePreloadPath(): string {
@@ -39,6 +43,32 @@ function resolvePreloadPath(): string {
     return jsPath
   }
   return join(__dirname, '../preload/index.mjs')
+}
+
+function resolveWindowIconPath(): string | undefined {
+  const iconCandidates =
+    process.platform === 'win32'
+      ? ['app-icon.ico', 'app-icon.normalized.png', 'app-icon.png']
+      : ['app-icon.normalized.png', 'app-icon.png', 'app-icon.icns']
+  const candidateDirs = new Set<string>()
+  candidateDirs.add(join(process.cwd(), 'resources'))
+  candidateDirs.add(join(app.getAppPath(), 'resources'))
+  candidateDirs.add(join(__dirname, '../resources'))
+  candidateDirs.add(join(__dirname, '../../resources'))
+  const publicDir = process.env['VITE_PUBLIC']
+  if (publicDir) {
+    candidateDirs.add(publicDir)
+  }
+
+  for (const dir of candidateDirs) {
+    for (const iconName of iconCandidates) {
+      const iconPath = join(dir, iconName)
+      if (existsSync(iconPath)) {
+        return iconPath
+      }
+    }
+  }
+  return undefined
 }
 
 function toImageMimeType(path: string): string {
@@ -103,12 +133,14 @@ function decryptSecret(value: string): string {
 }
 
 async function createWindow(): Promise<void> {
+  const iconPath = resolveWindowIconPath()
   mainWindow = new BrowserWindow({
     width: 1050,
     height: 750,
     minWidth: 780,
     minHeight: 560,
     autoHideMenuBar: true,
+    icon: iconPath,
     // Prevent white flashes during resize before renderer repaint completes.
     backgroundColor: '#171a21',
     webPreferences: {
@@ -119,6 +151,13 @@ async function createWindow(): Promise<void> {
     }
   })
 
+  if (iconPath) {
+    mainWindow.setIcon(iconPath)
+    if (process.platform === 'darwin' && app.dock) {
+      app.dock.setIcon(nativeImage.createFromPath(iconPath))
+    }
+  }
+
   if (process.env['ELECTRON_RENDERER_URL']) {
     await mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -127,6 +166,11 @@ async function createWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === 'linux') {
+    app.setName('Workshop Manager')
+    app.setDesktopName('workshop-manager.desktop')
+  }
+
   Menu.setApplicationMenu(null)
 
   const paths = getAppPaths()
