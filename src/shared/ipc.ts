@@ -1,6 +1,8 @@
 export const IPC_CHANNELS = {
   ensureSteamCmdInstalled: 'workshop:ensureSteamCmdInstalled',
+  getAppVersion: 'workshop:getAppVersion',
   login: 'workshop:login',
+  quitApp: 'workshop:quitApp',
   logout: 'workshop:logout',
   clearStoredSession: 'workshop:clearStoredSession',
   submitSteamGuardCode: 'workshop:submitSteamGuardCode',

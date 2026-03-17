@@ -212,6 +212,10 @@ app.whenReady().then(async () => {
     }
   })
 
+  ipcMain.handle(IPC_CHANNELS.getAppVersion, async () => {
+    return { version: app.getVersion() }
+  })
+
   ipcMain.handle(IPC_CHANNELS.login, async (_event, payload: LoginInput) => {
     try {
       const useStoredAuth = payload.useStoredAuth === true
@@ -228,6 +232,11 @@ app.whenReady().then(async () => {
     } catch (error) {
       throw toIpcError(error)
     }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.quitApp, async () => {
+    app.quit()
+    return { ok: true }
   })
 
   ipcMain.handle(IPC_CHANNELS.logout, async () => {

@@ -15,7 +15,9 @@ import { IPC_CHANNELS } from '@shared/ipc'
 
 export interface WorkshopApi {
   ensureSteamCmdInstalled: () => Promise<unknown>
+  getAppVersion: () => Promise<{ version: string }>
   login: (input: LoginInput) => Promise<{ sessionId: string; rememberedUsername?: string }>
+  quitApp: () => Promise<{ ok: true }>
   logout: () => Promise<{ ok: true }>
   clearStoredSession: () => Promise<{ ok: true }>
   submitSteamGuardCode: (payload: { sessionId: string; code: string }) => Promise<{ ok: true }>
@@ -48,7 +50,9 @@ export interface WorkshopApi {
 
 const api: WorkshopApi = {
   ensureSteamCmdInstalled: () => ipcRenderer.invoke(IPC_CHANNELS.ensureSteamCmdInstalled),
+  getAppVersion: () => ipcRenderer.invoke(IPC_CHANNELS.getAppVersion),
   login: (input) => ipcRenderer.invoke(IPC_CHANNELS.login, input),
+  quitApp: () => ipcRenderer.invoke(IPC_CHANNELS.quitApp),
   logout: () => ipcRenderer.invoke(IPC_CHANNELS.logout),
   clearStoredSession: () => ipcRenderer.invoke(IPC_CHANNELS.clearStoredSession),
   submitSteamGuardCode: (payload) => ipcRenderer.invoke(IPC_CHANNELS.submitSteamGuardCode, payload),

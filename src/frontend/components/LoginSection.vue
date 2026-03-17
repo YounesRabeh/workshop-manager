@@ -11,6 +11,7 @@ import { moveFocusWithVerticalArrows } from '../events/keyboard-events'
 
 const props = defineProps<{
   statusMessage: string
+  appVersion: string
   isLoginSubmitting: boolean
   loginForm: LoginFormState
   isPasswordPeek: boolean
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   (e: 'save-advanced-settings'): void
   (e: 'clear-web-api-key'): void
   (e: 'clear-stored-session'): void
+  (e: 'quit-app'): void
 }>()
 
 function authIssueClasses(tone: AuthIssueTone): string {
@@ -343,6 +345,13 @@ watch(
         >
           {{ submitLabel }}
         </button>
+        <button
+          type="button"
+          class="login-quit mt-2 w-full rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
+          @click="emit('quit-app')"
+        >
+          Quit
+        </button>
       </form>
 
       <div
@@ -386,6 +395,6 @@ watch(
       </div>
     </div>
 
-    <p class="login-disclaimer">* Not an official Steam product</p>
+    <p class="login-disclaimer">* Not an official Steam product • v{{ appVersion || 'dev' }}</p>
   </section>
 </template>
