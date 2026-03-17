@@ -192,18 +192,40 @@ const hasMeaningfulUpdateTitleChange = computed(() => {
   return selectedTitle !== draftTitle
 })
 
+const hasPendingUpdateChanges = computed(() => {
+  const selectedItem = selectedWorkshopItem.value
+  if (!selectedItem) {
+    return false
+  }
+
+  const contentFolderChanged = updateDraft.contentFolder.trim().length > 0
+  const previewChanged = updateDraft.previewFile.trim().length > 0
+  const releaseNotesChanged = updateDraft.releaseNotes.trim().length > 0
+  const tagsChanged = updateTagsTouched.value
+  const titleChanged = hasMeaningfulUpdateTitleChange.value
+
+  const appIdChanged =
+    updateDraft.appId.trim() !== (selectedItem.appId?.trim() ?? '')
+  const publishedFileIdChanged =
+    updateDraft.publishedFileId.trim() !== selectedItem.publishedFileId.trim()
+
+  return (
+    contentFolderChanged ||
+    previewChanged ||
+    releaseNotesChanged ||
+    tagsChanged ||
+    titleChanged ||
+    appIdChanged ||
+    publishedFileIdChanged
+  )
+})
+
 const updateChecklist = computed<PublishChecklistItem[]>(() => {
-  const requiresMeaningfulTitleChange = !updateRequirements.value.contentOrPreview
   return [
     { label: 'App ID', ok: updateRequirements.value.appId },
     { label: 'Published File ID', ok: updateRequirements.value.publishedFileId },
-    { label: 'Title', ok: updateDraft.title.trim().length > 0 },
+    { label: 'Title', ok: hasMeaningfulUpdateTitleChange.value, optional: true },
     { label: 'Content folder or Thumbnail', ok: updateRequirements.value.contentOrPreview, optional: true },
-    {
-      label: 'Meaningful title change',
-      ok: hasMeaningfulUpdateTitleChange.value,
-      optional: !requiresMeaningfulTitleChange
-    },
     { label: 'Release notes', ok: updateDraft.releaseNotes.trim().length > 0, optional: true }
   ]
 })
@@ -1341,27 +1363,19 @@ function resolveUpdateBlockedMessage(): string {
   if (!updateRequirements.value.appId || !updateRequirements.value.publishedFileId || !updateRequirements.value.title) {
     return 'Update blocked: title, app ID, and published file ID are required.'
   }
-  if (!updateRequirements.value.contentOrPreview && !hasMeaningfulUpdateTitleChange.value) {
-    return "Update blocked: for title-only updates, use a different title (case/spacing-only edits don't count)."
+  if (!hasPendingUpdateChanges.value) {
+    return 'Update blocked: no changes detected. Modify title/content/preview/tags/release notes first.'
   }
   return 'Update blocked: requirements not met.'
 }
 
 function canUpdate(): boolean {
-  const hasBaseRequirements =
+  return (
     loginState.value === 'signed_in' &&
     selectedWorkshopItemId.value.trim().length > 0 &&
-    updateRequirements.value.valid
-
-  if (!hasBaseRequirements) {
-    return false
-  }
-
-  if (updateRequirements.value.contentOrPreview) {
-    return true
-  }
-
-  return hasMeaningfulUpdateTitleChange.value
+    updateRequirements.value.valid &&
+    hasPendingUpdateChanges.value
+  )
 }
 
 async function upload(): Promise<void> {

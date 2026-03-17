@@ -171,6 +171,7 @@ const selectedItemDisplay = computed(() => props.selectedWorkshopItem?.title || 
 const selectedItemPreviewUrl = computed(() => props.selectedWorkshopItem?.previewUrl || '')
 const previewFileValue = computed(() => props.draft.previewFile.trim())
 const previewImageLoadFailed = ref(false)
+const previewImageIsSquare = ref<boolean | null>(null)
 const uploadPreviewImageSrc = ref('')
 
 function toLocalFileUrl(path: string): string {
@@ -222,6 +223,7 @@ watch(previewFileValue, async (path) => {
   const requestId = previewLoadRequestId
 
   previewImageLoadFailed.value = false
+  previewImageIsSquare.value = null
   uploadPreviewImageSrc.value = ''
 
   if (!path) {
@@ -331,8 +333,19 @@ function toggleAllFolders(): void {
 }
 
 function readinessItemClass(item: PublishChecklistItem): string {
+  if (
+    isUpdateMode.value &&
+    item.label === 'Title' &&
+    !item.ok &&
+    props.draft.title.trim().length === 0
+  ) {
+    return 'border-rose-400/45 bg-rose-500/18'
+  }
   if (item.label === 'Release notes' && !hasContentFolder.value) {
     return 'border-[#2a3542] bg-[#0a111a] opacity-60'
+  }
+  if (item.label === 'Release notes' && hasContentFolder.value && !item.ok) {
+    return 'border-[#e0b26f]/60 bg-[#7a4f21]/30'
   }
   if (item.ok) {
     return 'border-emerald-400/45 bg-emerald-500/18'
@@ -344,8 +357,19 @@ function readinessItemClass(item: PublishChecklistItem): string {
 }
 
 function readinessStatusClass(item: PublishChecklistItem): string {
+  if (
+    isUpdateMode.value &&
+    item.label === 'Title' &&
+    !item.ok &&
+    props.draft.title.trim().length === 0
+  ) {
+    return 'text-rose-200'
+  }
   if (item.label === 'Release notes' && !hasContentFolder.value) {
     return 'text-slate-600'
+  }
+  if (item.label === 'Release notes' && hasContentFolder.value && !item.ok) {
+    return 'text-amber-200'
   }
   if (item.ok) {
     return 'text-emerald-200'
@@ -357,6 +381,20 @@ function readinessStatusClass(item: PublishChecklistItem): string {
 }
 
 function readinessStatusLabel(item: PublishChecklistItem): string {
+  if (
+    isUpdateMode.value &&
+    item.label === 'Title' &&
+    !item.ok &&
+    props.draft.title.trim().length === 0
+  ) {
+    return 'Missing'
+  }
+  if (item.label === 'Release notes' && !hasContentFolder.value) {
+    return 'Not needed'
+  }
+  if (item.label === 'Release notes' && hasContentFolder.value && !item.ok) {
+    return 'Better if present'
+  }
   if (item.ok) {
     return 'OK'
   }
@@ -373,6 +411,24 @@ function submitPrimaryAction(): void {
 
 function onUploadPreviewError(): void {
   previewImageLoadFailed.value = true
+  previewImageIsSquare.value = null
+}
+
+function onUploadPreviewLoad(event: Event): void {
+  const image = event.target as HTMLImageElement | null
+  if (!image) {
+    previewImageIsSquare.value = null
+    return
+  }
+
+  const width = image.naturalWidth
+  const height = image.naturalHeight
+  if (!width || !height) {
+    previewImageIsSquare.value = null
+    return
+  }
+
+  previewImageIsSquare.value = Math.abs(width - height) <= 1
 }
 </script>
 
@@ -583,6 +639,7 @@ function onUploadPreviewError(): void {
                 :src="uploadPreviewImageSrc"
                 alt="Workshop preview thumbnail"
                 class="h-full w-full object-cover"
+                @load="onUploadPreviewLoad"
                 @error="onUploadPreviewError"
               />
               <div v-else class="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-xs text-slate-300">
@@ -610,6 +667,12 @@ function onUploadPreviewError(): void {
               Clear
             </button>
           </div>
+          <p
+            v-if="previewFileValue && previewImageIsSquare === false && !previewImageLoadFailed"
+            class="mt-1 text-[11px] text-amber-300"
+          >
+            Warning: preview image is not square (1:1). Steam thumbnails look best when square.
+          </p>
        </div>
 
         <div>

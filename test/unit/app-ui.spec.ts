@@ -595,6 +595,44 @@ describe('App UI validation gates', () => {
     expect(updateButton?.attributes('disabled')).toBeDefined()
   })
 
+  it('disables update again after selecting and then resetting content folder', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
+    expect(modButton).toBeDefined()
+    await modButton?.trigger('click')
+    await flushPromises()
+
+    const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
+    expect(updateButton).toBeDefined()
+    expect(updateButton?.attributes('disabled')).toBeDefined()
+
+    const pickContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Choose Content Folder'))
+    expect(pickContentFolderButton).toBeDefined()
+    await pickContentFolderButton?.trigger('click')
+    await flushPromises()
+    expect(updateButton?.attributes('disabled')).toBeUndefined()
+
+    const resetFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Reset Folder'))
+    expect(resetFolderButton).toBeDefined()
+    await resetFolderButton?.trigger('click')
+    await flushPromises()
+
+    expect(updateButton?.attributes('disabled')).toBeDefined()
+  })
+
   it('allows title-only update with no content folder or preview image', async () => {
     const wrapper = mount(App)
     await flushPromises()
