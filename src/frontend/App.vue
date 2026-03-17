@@ -176,12 +176,34 @@ const loginHeaderStatusMessage = computed(() => (isSteamCmdDetected.value ? 'Ste
 const createRequirements = computed(() => evaluateCreateRequirements(createDraft))
 const updateRequirements = computed(() => evaluateUpdateRequirements(updateDraft))
 
+function normalizeComparableTitle(value: string | undefined): string {
+  if (typeof value !== 'string') {
+    return ''
+  }
+  return value.replace(/\s+/g, ' ').trim().toLocaleLowerCase()
+}
+
+const hasMeaningfulUpdateTitleChange = computed(() => {
+  const selectedTitle = normalizeComparableTitle(selectedWorkshopItem.value?.title)
+  const draftTitle = normalizeComparableTitle(updateDraft.title)
+  if (!selectedTitle || !draftTitle) {
+    return false
+  }
+  return selectedTitle !== draftTitle
+})
+
 const updateChecklist = computed<PublishChecklistItem[]>(() => {
+  const requiresMeaningfulTitleChange = !updateRequirements.value.contentOrPreview
   return [
     { label: 'App ID', ok: updateRequirements.value.appId },
     { label: 'Published File ID', ok: updateRequirements.value.publishedFileId },
     { label: 'Title', ok: updateDraft.title.trim().length > 0 },
-    { label: 'Content folder or Thumbnail', ok: updateRequirements.value.contentOrPreview },
+    { label: 'Content folder or Thumbnail', ok: updateRequirements.value.contentOrPreview, optional: true },
+    {
+      label: 'Meaningful title change',
+      ok: hasMeaningfulUpdateTitleChange.value,
+      optional: !requiresMeaningfulTitleChange
+    },
     { label: 'Release notes', ok: updateDraft.releaseNotes.trim().length > 0, optional: true }
   ]
 })
@@ -1315,12 +1337,31 @@ function canCreate(): boolean {
   return loginState.value === 'signed_in' && createRequirements.value.valid
 }
 
+function resolveUpdateBlockedMessage(): string {
+  if (!updateRequirements.value.appId || !updateRequirements.value.publishedFileId || !updateRequirements.value.title) {
+    return 'Update blocked: title, app ID, and published file ID are required.'
+  }
+  if (!updateRequirements.value.contentOrPreview && !hasMeaningfulUpdateTitleChange.value) {
+    return "Update blocked: for title-only updates, use a different title (case/spacing-only edits don't count)."
+  }
+  return 'Update blocked: requirements not met.'
+}
+
 function canUpdate(): boolean {
-  return (
+  const hasBaseRequirements =
     loginState.value === 'signed_in' &&
     selectedWorkshopItemId.value.trim().length > 0 &&
     updateRequirements.value.valid
-  )
+
+  if (!hasBaseRequirements) {
+    return false
+  }
+
+  if (updateRequirements.value.contentOrPreview) {
+    return true
+  }
+
+  return hasMeaningfulUpdateTitleChange.value
 }
 
 async function upload(): Promise<void> {
@@ -1350,7 +1391,7 @@ async function upload(): Promise<void> {
 
 async function updateItem(): Promise<void> {
   if (!canUpdate()) {
-    statusMessage.value = 'Update blocked: add content folder or preview image first.'
+    statusMessage.value = resolveUpdateBlockedMessage()
     return
   }
 
@@ -1401,7 +1442,7 @@ async function updateItem(): Promise<void> {
 
 function openUpdateConfirmation(): void {
   if (!canUpdate()) {
-    statusMessage.value = 'Update blocked: add content folder or preview image first.'
+    statusMessage.value = resolveUpdateBlockedMessage()
     return
   }
   isUpdateConfirmOpen.value = true

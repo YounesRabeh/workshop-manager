@@ -38,8 +38,8 @@ export function validateDraft(draft: UploadDraft, mode: 'upload' | 'update' | 'v
     if (!requirements.publishedFileId) {
       throw new AppError('validation', 'publishedFileId is required for updates')
     }
-    if (!requirements.contentOrPreview) {
-      throw new AppError('validation', 'Either contentFolder or previewFile is required for updates')
+    if (!requirements.title) {
+      throw new AppError('validation', 'title is required for updates')
     }
   }
 

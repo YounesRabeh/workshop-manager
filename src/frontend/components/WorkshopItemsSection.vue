@@ -101,15 +101,15 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
         No workshop items found for the current filters.
       </div>
 
-      <div v-else class="mt-4 flex flex-wrap gap-4">
+      <div v-else class="workshop-grid mt-4">
         <button
           v-for="item in workshopItems"
           :key="item.publishedFileId"
-          class="workshop-card w-full min-[700px]:w-[320px] overflow-hidden rounded-xl border text-left transition"
+          class="workshop-card w-full overflow-hidden rounded-xl border text-left transition"
           :class="selectedWorkshopItemId === item.publishedFileId ? 'workshop-card-selected' : 'border-slate-200 bg-white hover:bg-slate-50'"
           @click="emit('select-item', item)"
         >
-          <div class="workshop-preview aspect-square w-full bg-slate-100">
+          <div class="workshop-preview w-full bg-slate-100">
             <img v-if="item.previewUrl" :src="item.previewUrl" :alt="item.title" class="h-full w-full object-cover" />
             <div v-else class="flex h-full w-full items-center justify-center text-xs font-semibold uppercase tracking-wide text-slate-500">No preview</div>
           </div>

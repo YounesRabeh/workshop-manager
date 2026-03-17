@@ -328,7 +328,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
           publishedFileId: '123',
           contentFolder: emptyContentFolder,
           previewFile: '',
-          title: '',
+          title: 'My Mod',
           tags: []
         },
         'update'
