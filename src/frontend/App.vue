@@ -4,6 +4,7 @@ import type { ContentFolderFileEntry, RunEvent, UploadDraft, WorkshopItemSummary
 import { evaluateCreateRequirements, evaluateUpdateRequirements } from '@shared/workshop-requirements'
 import AppTopBar from './components/AppTopBar.vue'
 import LoginSection from './components/LoginSection.vue'
+import LogsSection from './components/LogsSection.vue'
 import PublishSection from './components/PublishSection.vue'
 import WorkshopItemsSection from './components/WorkshopItemsSection.vue'
 import { createAppGlobalKeyDownHandler, createAppGlobalMouseDownHandler } from './events/keyboard-events'
@@ -15,6 +16,7 @@ import type {
   ContentTreeNode,
   FlowStep,
   LoginFormState,
+  PersistedRunLog,
   PublishChecklistItem,
   StagedContentFile,
   SteamGuardPromptType,
@@ -121,6 +123,11 @@ const isAboutOpen = ref(false)
 const isUpdateConfirmOpen = ref(false)
 const isBootstrapping = ref(true)
 const activeToast = ref<UiToast | null>(null)
+const appVersion = ref('dev')
+const recentRuns = ref<PersistedRunLog[]>([])
+const selectedRunId = ref('')
+const selectedRun = ref<PersistedRunLog | null>(null)
+const showLoginLogs = ref(false)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 const selectedWorkshopItem = computed(() => workshopItems.value.find((item) => item.publishedFileId === selectedWorkshopItemId.value))
@@ -296,6 +303,68 @@ function normalizeError(error: unknown): ApiFailure {
     message: maybe.message ?? fallback.message,
     code: maybe.code ?? fallback.code
   }
+}
+
+function statusBadgeClass(status: PersistedRunLog['status']): string {
+  if (status === 'success') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+  if (status === 'failed') {
+    return 'border-rose-200 bg-rose-50 text-rose-700'
+  }
+  if (status === 'cancelled') {
+    return 'border-slate-300 bg-slate-100 text-slate-700'
+  }
+  return 'border-amber-200 bg-amber-50 text-amber-700'
+}
+
+function formatRunTimestamp(runId: string): string {
+  const timestamp = Number(runId.split('-')[0] ?? '')
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return runId
+  }
+  return new Date(timestamp).toLocaleString()
+}
+
+async function selectRun(runId: string): Promise<void> {
+  selectedRunId.value = runId
+  try {
+    const payload = (await window.workshop.getRunLog(runId)) as PersistedRunLog | null
+    if (payload) {
+      selectedRun.value = payload
+      return
+    }
+  } catch {
+    // Fall through to local list fallback.
+  }
+
+  selectedRun.value = recentRuns.value.find((run) => run.runId === runId) ?? null
+}
+
+async function refreshRunLogs(): Promise<void> {
+  try {
+    const payload = (await window.workshop.getRunLogs()) as PersistedRunLog[] | null | undefined
+    const runs = Array.isArray(payload) ? payload : []
+    recentRuns.value = runs
+
+    const nextRunId = selectedRunId.value || runs[0]?.runId || ''
+    if (!nextRunId) {
+      selectedRunId.value = ''
+      selectedRun.value = null
+      return
+    }
+
+    await selectRun(nextRunId)
+  } catch {
+    recentRuns.value = []
+    selectedRunId.value = ''
+    selectedRun.value = null
+  }
+}
+
+async function showTimeoutLogs(): Promise<void> {
+  showLoginLogs.value = true
+  await refreshRunLogs()
 }
 
 function toAuthIssue(error: ApiFailure): AuthIssue {
@@ -1049,6 +1118,7 @@ async function clearStoredSession(): Promise<void> {
 
 async function finalizeSuccessfulLogin(successMessage: string): Promise<void> {
   loginState.value = 'signed_in'
+  showLoginLogs.value = false
   steamGuardSessionId.value = null
   steamGuardPromptType.value = 'none'
   authIssue.value = null
@@ -1086,6 +1156,9 @@ async function tryAutoLoginWithStoredSession(): Promise<void> {
     await finalizeSuccessfulLogin('Signed in with saved Steam session. Loading workshop items...')
   } catch (error) {
     const parsed = normalizeError(error)
+    if (parsed.code === 'timeout') {
+      await showTimeoutLogs()
+    }
     if (isSavedSessionFallbackError(parsed)) {
       steamGuardPromptType.value = 'none'
       steamGuardSessionId.value = null
@@ -1108,6 +1181,18 @@ async function refreshCurrentProfile(): Promise<void> {
   } catch {
     accountPersonaName.value = ''
     accountProfileImageUrl.value = null
+  }
+}
+
+async function loadAppVersion(): Promise<void> {
+  try {
+    const payload = await window.workshop.getAppVersion()
+    const version = payload?.version?.trim()
+    if (version) {
+      appVersion.value = version
+    }
+  } catch {
+    appVersion.value = 'dev'
   }
 }
 
@@ -1191,6 +1276,9 @@ async function login(): Promise<void> {
     )
   } catch (error) {
     const parsed = normalizeError(error)
+    if (parsed.code === 'timeout') {
+      await showTimeoutLogs()
+    }
     steamGuardPromptType.value = 'none'
     steamGuardSessionId.value = null
     if (isSavedSessionFallbackError(parsed) && usingSavedSession) {
@@ -1230,9 +1318,18 @@ async function signOut(): Promise<void> {
   createTagInput.value = ''
   updateTagInput.value = ''
   flowStep.value = 'mods'
+  showLoginLogs.value = false
   statusMessage.value = 'Signed out.'
   accountPersonaName.value = ''
   accountProfileImageUrl.value = null
+}
+
+async function quitApp(): Promise<void> {
+  try {
+    await window.workshop.quitApp()
+  } catch {
+    // no-op; app may already be closing
+  }
 }
 
 async function submitSteamGuardCode(): Promise<void> {
@@ -1606,7 +1703,7 @@ onMounted(async () => {
   })
 
   try {
-    await Promise.all([ensureSteamCmdInstalled(), refreshRememberedLoginState(), loadAdvancedSettings()])
+    await Promise.all([ensureSteamCmdInstalled(), refreshRememberedLoginState(), loadAdvancedSettings(), loadAppVersion()])
   } finally {
     isBootstrapping.value = false
   }
@@ -1640,31 +1737,45 @@ onUnmounted(() => {
       <p class="splash-disclaimer">* Not an official Steam product</p>
     </section>
 
-    <LoginSection
-      v-else-if="!isAuthenticated"
-      :status-message="loginHeaderStatusMessage"
-      :is-login-submitting="isLoginSubmitting"
-      :login-form="loginForm"
-      :is-password-peek="isPasswordPeek"
-      :auth-issue="authIssue"
-      :steam-guard-prompt-type="steamGuardPromptType"
-      :steam-guard-code="steamGuardCode"
-      :is-stored-session-login-attempt="isStoredSessionLoginAttempt"
-      :can-clear-stored-session="hasPersistedStoredSession"
-      :is-advanced-options-open="isAdvancedOptionsOpen"
-      :advanced-settings="advancedSettings"
-      :is-web-api-key-peek="isWebApiKeyPeek"
-      @submit-login="login"
-      @set-password-peek="setPasswordPeek"
-      @submit-guard-code="submitSteamGuardCode"
-      @update-steam-guard-code="setSteamGuardCode"
-      @toggle-advanced-options="toggleAdvancedOptions"
-      @update-web-api-key="setWebApiKey"
-      @set-web-api-key-peek="setWebApiKeyPeek"
-      @save-advanced-settings="saveAdvancedSettings"
-      @clear-web-api-key="clearSavedWebApiKey"
-      @clear-stored-session="clearStoredSession"
-    />
+    <template v-else-if="!isAuthenticated">
+      <LoginSection
+        :status-message="loginHeaderStatusMessage"
+        :app-version="appVersion"
+        :is-login-submitting="isLoginSubmitting"
+        :login-form="loginForm"
+        :is-password-peek="isPasswordPeek"
+        :auth-issue="authIssue"
+        :steam-guard-prompt-type="steamGuardPromptType"
+        :steam-guard-code="steamGuardCode"
+        :is-stored-session-login-attempt="isStoredSessionLoginAttempt"
+        :can-clear-stored-session="hasPersistedStoredSession"
+        :is-advanced-options-open="isAdvancedOptionsOpen"
+        :advanced-settings="advancedSettings"
+        :is-web-api-key-peek="isWebApiKeyPeek"
+        @submit-login="login"
+        @set-password-peek="setPasswordPeek"
+        @submit-guard-code="submitSteamGuardCode"
+        @update-steam-guard-code="setSteamGuardCode"
+        @toggle-advanced-options="toggleAdvancedOptions"
+        @update-web-api-key="setWebApiKey"
+        @set-web-api-key-peek="setWebApiKeyPeek"
+        @save-advanced-settings="saveAdvancedSettings"
+        @clear-web-api-key="clearSavedWebApiKey"
+        @clear-stored-session="clearStoredSession"
+        @quit-app="quitApp"
+      />
+      <div v-if="showLoginLogs" class="app-shell pb-6">
+        <LogsSection
+          :recent-runs="recentRuns"
+          :selected-run-id="selectedRunId"
+          :selected-run="selectedRun"
+          :format-run-timestamp="formatRunTimestamp"
+          :status-badge-class="statusBadgeClass"
+          @refresh="refreshRunLogs"
+          @select-run="selectRun"
+        />
+      </div>
+    </template>
 
     <template v-else>
       <div class="app-shell">
@@ -1682,6 +1793,7 @@ onUnmounted(() => {
           :can-access-update="canAccessUpdate"
           :account-display-name="accountDisplayName"
           :workshop-items-count="workshopItems.length"
+          :app-version="appVersion"
           :is-fullscreen="isFullscreen"
           :is-dev-mode="advancedSettings.hasWebApiKey"
           :profile-image-url="accountProfileImageUrl"

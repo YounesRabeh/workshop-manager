@@ -6,7 +6,9 @@ import App from '../../src/frontend/App.vue'
 
 const workshop = {
   ensureSteamCmdInstalled: vi.fn(async () => ({ installed: true })),
+  getAppVersion: vi.fn(async () => ({ version: '0.1.0' })),
   login: vi.fn(async () => ({ sessionId: 's1' })),
+  quitApp: vi.fn(async () => ({ ok: true })),
   logout: vi.fn(async () => ({ ok: true })),
   clearStoredSession: vi.fn(async () => ({ ok: true })),
   submitSteamGuardCode: vi.fn(async () => ({ ok: true })),
@@ -138,6 +140,20 @@ describe('App UI validation gates', () => {
     expect(workshop.clearStoredSession).toHaveBeenCalledTimes(1)
   })
 
+  it('quits app from login section', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const quitButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Quit')
+    expect(quitButton).toBeDefined()
+    await quitButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.quitApp).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps clear saved session disabled when only checkbox is ticked locally', async () => {
     const wrapper = mount(App)
     await flushPromises()
@@ -236,6 +252,35 @@ describe('App UI validation gates', () => {
         useStoredAuth: true
       })
     )
+  })
+
+  it('shows dedicated logs section when login times out', async () => {
+    const timeoutRun = {
+      runId: '1700000000000-timeout',
+      success: false,
+      steamOutputSummary: 'SteamCMD run exceeded timeout (10000ms)',
+      logPath: '/tmp/steamcmd-output.log',
+      lines: ['[RUN_META] timeout reached after 10000ms, restarting SteamCMD process'],
+      status: 'failed' as const
+    }
+
+    workshop.login.mockRejectedValueOnce(new Error('[timeout] SteamCMD run exceeded timeout (10000ms)'))
+    workshop.getRunLogs.mockResolvedValueOnce([timeoutRun])
+    workshop.getRunLog.mockResolvedValueOnce(timeoutRun)
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(workshop.getRunLogs).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Dedicated Logs')
+    expect(wrapper.text()).toContain('SteamCMD run exceeded timeout (10000ms)')
   })
 
   it('forces rememberUsername when keep-signed-in is enabled', async () => {

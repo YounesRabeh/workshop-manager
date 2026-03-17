@@ -823,7 +823,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
     const runId = createRunId()
     const args = buildLoginArgs(normalizedUsername, password, useStoredAuth)
-    const timeoutMs = useStoredAuth ? 20_000 : 30_000
+    const timeoutMs = useStoredAuth ? 10_000 : 15_000
 
     if (
       useStoredAuth &&
