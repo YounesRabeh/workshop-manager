@@ -50,7 +50,6 @@ const avatarSrc = computed(() => props.profileImageUrl?.trim() || profilePlaceho
           <p class="session-name truncate text-[2rem] font-extrabold leading-tight text-slate-900">{{ accountDisplayName }}</p>
           <p class="session-meta mt-1 text-base text-slate-600">
             Workshop items loaded: {{ workshopItemsCount }}
-            <span class="ml-2 text-xs text-slate-500">v{{ appVersion || 'dev' }}</span>
           </p>
         </div>
       </div>

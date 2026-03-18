@@ -1887,6 +1887,9 @@ onUnmounted(() => {
             <p class="mt-2 text-sm text-slate-300">
               Developer utility for Steam Workshop uploads and updates.
             </p>
+            <p class="mt-2 text-xs text-slate-400">
+              Version: <span class="font-semibold text-slate-200">v{{ appVersion || 'dev' }}</span>
+            </p>
             <p class="mt-3 text-xs text-slate-400">* Not an official Steam product.</p>
             <div class="mt-4 flex justify-end">
               <button class="steam-btn-muted rounded px-3 py-1.5 text-xs font-semibold" @click="closeAboutModal">Close</button>
