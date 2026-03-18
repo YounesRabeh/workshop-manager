@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron'
-import { extname, join } from 'node:path'
+import { dirname, extname, join } from 'node:path'
 import { access, copyFile, mkdir, readFile, readdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { IPC_CHANNELS } from '@shared/ipc'
@@ -69,7 +69,7 @@ async function copyMissingTree(sourceDir: string, targetDir: string): Promise<vo
     if (await pathExists(targetPath)) {
       continue
     }
-    await mkdir(join(targetPath, '..'), { recursive: true })
+    await mkdir(dirname(targetPath), { recursive: true })
     await copyFile(sourcePath, targetPath)
   }
 }
@@ -82,23 +82,20 @@ async function migrateLegacyUserData(stableUserDataPath: string): Promise<void> 
     join(appDataPath, 'Workshop Manager'),
     join(appDataPath, 'steam-workshop-mod-manager')
   ].filter((candidate) => candidate !== stableUserDataPath)
-
-  const targetHasProfiles = await pathExists(join(stableUserDataPath, 'profiles.json'))
-  if (targetHasProfiles) {
-    return
-  }
-
+  let migratedAny = false
   for (const legacyPath of legacyCandidates) {
     if (!(await pathExists(legacyPath))) {
       continue
     }
     await copyMissingTree(legacyPath, stableUserDataPath)
-    if (await pathExists(join(stableUserDataPath, 'profiles.json'))) {
-      console.log(`[startup] Migrated profile data from: ${legacyPath}`)
-      return
-    }
+    migratedAny = true
+  }
+  if (migratedAny) {
+    console.log('[startup] Checked and merged legacy app data into stable userData path')
   }
 }
+
+const stableUserDataPath = configureStableUserDataPath()
 
 function resolvePreloadPath(): string {
   const jsPath = join(__dirname, '../preload/index.js')
@@ -229,7 +226,6 @@ async function createWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  const stableUserDataPath = configureStableUserDataPath()
   await migrateLegacyUserData(stableUserDataPath)
 
   if (process.platform === 'linux') {
