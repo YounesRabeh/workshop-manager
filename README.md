@@ -39,6 +39,8 @@ Cross-platform desktop app for Steam Workshop publish/update workflows, built wi
    - `pnpm build`
 6. Build platform executable package:
    - `pnpm build:exe`
+   - By default, this skips icon regeneration.
+   - To regenerate icon assets before packaging, run `pnpm build:exe:icon` (or `pnpm build:exe -- --generate-icon`).
    - Output artifacts are written to `dist/`
    - Host platform targets:
      - Windows: `*.exe` (NSIS)
