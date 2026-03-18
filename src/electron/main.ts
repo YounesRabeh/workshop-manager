@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron'
 import { extname, join } from 'node:path'
-import { mkdir, readFile } from 'node:fs/promises'
+import { access, copyFile, mkdir, readFile, readdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { IPC_CHANNELS } from '@shared/ipc'
 import type {
@@ -21,6 +21,7 @@ import { getAppPaths } from '@backend/services/path-provider'
 import { listContentFolderFiles } from '@backend/services/content-folder-scanner'
 
 let mainWindow: BrowserWindow | null = null
+const STABLE_USER_DATA_DIR_NAME = 'workshop-manager'
 
 if (process.env['ELECTRON_VERBOSE_LOGS'] !== '1') {
   // Hide noisy Chromium internal stderr lines (for example atom_cache copy/paste warnings).
@@ -35,6 +36,68 @@ if (process.platform === 'linux') {
   // Helps Linux shells match the running window to this app identity instead of generic Electron.
   app.commandLine.appendSwitch('class', 'workshop-manager')
   app.commandLine.appendSwitch('name', 'workshop-manager')
+}
+
+function configureStableUserDataPath(): string {
+  const stablePath = join(app.getPath('appData'), STABLE_USER_DATA_DIR_NAME)
+  app.setPath('userData', stablePath)
+  return stablePath
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function copyMissingTree(sourceDir: string, targetDir: string): Promise<void> {
+  await mkdir(targetDir, { recursive: true })
+  const entries = await readdir(sourceDir, { withFileTypes: true })
+  for (const entry of entries) {
+    const sourcePath = join(sourceDir, entry.name)
+    const targetPath = join(targetDir, entry.name)
+    if (entry.isDirectory()) {
+      await copyMissingTree(sourcePath, targetPath)
+      continue
+    }
+    if (!entry.isFile()) {
+      continue
+    }
+    if (await pathExists(targetPath)) {
+      continue
+    }
+    await mkdir(join(targetPath, '..'), { recursive: true })
+    await copyFile(sourcePath, targetPath)
+  }
+}
+
+async function migrateLegacyUserData(stableUserDataPath: string): Promise<void> {
+  const appDataPath = app.getPath('appData')
+  const legacyCandidates = [
+    join(appDataPath, 'Workshop Manager', 'workshop-manager'),
+    join(appDataPath, 'steam-workshop-mod-manager', 'workshop-manager'),
+    join(appDataPath, 'Workshop Manager'),
+    join(appDataPath, 'steam-workshop-mod-manager')
+  ].filter((candidate) => candidate !== stableUserDataPath)
+
+  const targetHasProfiles = await pathExists(join(stableUserDataPath, 'profiles.json'))
+  if (targetHasProfiles) {
+    return
+  }
+
+  for (const legacyPath of legacyCandidates) {
+    if (!(await pathExists(legacyPath))) {
+      continue
+    }
+    await copyMissingTree(legacyPath, stableUserDataPath)
+    if (await pathExists(join(stableUserDataPath, 'profiles.json'))) {
+      console.log(`[startup] Migrated profile data from: ${legacyPath}`)
+      return
+    }
+  }
 }
 
 function resolvePreloadPath(): string {
@@ -166,6 +229,9 @@ async function createWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  const stableUserDataPath = configureStableUserDataPath()
+  await migrateLegacyUserData(stableUserDataPath)
+
   if (process.platform === 'linux') {
     app.setName('Workshop Manager')
     app.setDesktopName('workshop-manager.desktop')
