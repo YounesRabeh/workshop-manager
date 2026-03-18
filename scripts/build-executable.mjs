@@ -24,18 +24,20 @@ export function getElectronBuilderArgsForPlatform(platform) {
   return ['exec', 'electron-builder', mapping.platformArg, mapping.target, '--publish', 'never']
 }
 
-export function buildStepsForPlatform(platform) {
+export function parseBuildExecutableOptions(argv = []) {
+  const normalized = Array.isArray(argv) ? argv : []
+  return {
+    generateIcon: normalized.includes('--generate-icon')
+  }
+}
+
+export function buildStepsForPlatform(platform, options = {}) {
   const pnpmCommand = resolvePnpmCommand(platform)
-  return [
+  const steps = [
     {
       label: 'Kill old app instance',
       command: pnpmCommand,
       args: ['kill:instance']
-    },
-    {
-      label: 'Sync icon assets',
-      command: pnpmCommand,
-      args: ['sync:icon']
     },
     {
       label: 'Build app bundles',
@@ -48,6 +50,16 @@ export function buildStepsForPlatform(platform) {
       args: getElectronBuilderArgsForPlatform(platform)
     }
   ]
+
+  if (options.generateIcon) {
+    steps.splice(1, 0, {
+      label: 'Sync icon assets',
+      command: pnpmCommand,
+      args: ['sync:icon']
+    })
+  }
+
+  return steps
 }
 
 function runStep(step) {
@@ -59,7 +71,8 @@ function runStep(step) {
 }
 
 async function main() {
-  const steps = buildStepsForPlatform(process.platform)
+  const options = parseBuildExecutableOptions(process.argv.slice(2))
+  const steps = buildStepsForPlatform(process.platform, options)
   for (const step of steps) {
     runStep(step)
   }

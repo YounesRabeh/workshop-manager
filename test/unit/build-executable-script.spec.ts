@@ -3,6 +3,7 @@ import {
   buildStepsForPlatform,
   getElectronBuilderArgsForPlatform,
   getPackagingTargetForPlatform,
+  parseBuildExecutableOptions,
   resolvePnpmCommand
 } from '../../scripts/build-executable.mjs'
 
@@ -39,20 +40,34 @@ describe('build-executable script helpers', () => {
     expect(resolvePnpmCommand('darwin')).toBe('pnpm')
   })
 
-  it('builds steps in required order for linux', () => {
+  it('builds steps in required default order for linux', () => {
     const steps = buildStepsForPlatform('linux')
+    expect(steps.map((s) => s.label)).toEqual([
+      'Kill old app instance',
+      'Build app bundles',
+      'Package executable artifacts'
+    ])
+    expect(steps[0]).toMatchObject({ command: 'pnpm', args: ['kill:instance'] })
+    expect(steps[1]).toMatchObject({ command: 'pnpm', args: ['build:bundle'] })
+    expect(steps[2]).toMatchObject({
+      command: 'pnpm',
+      args: ['exec', 'electron-builder', '--linux', 'AppImage', '--publish', 'never']
+    })
+  })
+
+  it('includes icon sync step only when generateIcon is enabled', () => {
+    const steps = buildStepsForPlatform('linux', { generateIcon: true })
     expect(steps.map((s) => s.label)).toEqual([
       'Kill old app instance',
       'Sync icon assets',
       'Build app bundles',
       'Package executable artifacts'
     ])
-    expect(steps[0]).toMatchObject({ command: 'pnpm', args: ['kill:instance'] })
     expect(steps[1]).toMatchObject({ command: 'pnpm', args: ['sync:icon'] })
-    expect(steps[2]).toMatchObject({ command: 'pnpm', args: ['build:bundle'] })
-    expect(steps[3]).toMatchObject({
-      command: 'pnpm',
-      args: ['exec', 'electron-builder', '--linux', 'AppImage', '--publish', 'never']
-    })
+  })
+
+  it('parses generate icon flag from argv', () => {
+    expect(parseBuildExecutableOptions([])).toEqual({ generateIcon: false })
+    expect(parseBuildExecutableOptions(['--generate-icon'])).toEqual({ generateIcon: true })
   })
 })
