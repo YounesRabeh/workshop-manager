@@ -9,7 +9,7 @@ export interface AppPaths {
 }
 
 export function getAppPaths(): AppPaths {
-  const dataDir = join(app.getPath('userData'), 'workshop-manager')
+  const dataDir = app.getPath('userData')
   return {
     dataDir,
     profilesPath: join(dataDir, 'profiles.json'),
