@@ -329,6 +329,29 @@ describe('App UI validation gates', () => {
     expect(avatar.attributes('src')).toContain('https://example.invalid/avatar.png')
   })
 
+  it('shows app version in About modal and not in top bar session meta', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('v0.1.0')
+
+    const aboutButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'About')
+    expect(aboutButton).toBeDefined()
+    await aboutButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Version: v0.1.0')
+  })
+
   it('saves advanced web api settings from login panel', async () => {
     const wrapper = mount(App)
     await flushPromises()
