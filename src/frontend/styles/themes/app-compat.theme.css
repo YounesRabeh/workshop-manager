@@ -1,0 +1,139 @@
+.steam-theme .bg-white,
+.steam-theme .bg-white\/85,
+.steam-theme .bg-white\/70 {
+  background-color: rgba(27, 40, 56, 0.92) !important;
+}
+
+.steam-theme .bg-slate-50,
+.steam-theme .bg-slate-100,
+.steam-theme .bg-orange-100 {
+  background-color: #16202d !important;
+}
+
+.steam-theme .border-slate-200,
+.steam-theme .border-sky-200,
+.steam-theme .border-sky-200\/80,
+.steam-theme .border-orange-200,
+.steam-theme .border-orange-100,
+.steam-theme .border-amber-300,
+.steam-theme .border-amber-200,
+.steam-theme .ring-slate-200 {
+  border-color: #284963 !important;
+}
+
+.steam-theme .text-slate-900,
+.steam-theme .text-slate-800 {
+  color: #e5eef7 !important;
+}
+
+.steam-theme .text-slate-700,
+.steam-theme .text-slate-600 {
+  color: #c7d5e0 !important;
+}
+
+.steam-theme .text-slate-500 {
+  color: #9fb1bf !important;
+}
+
+.steam-theme .bg-emerald-50 {
+  background-color: rgba(34, 84, 64, 0.58) !important;
+}
+
+.steam-theme .border-emerald-200 {
+  border-color: #3f8f70 !important;
+}
+
+.steam-theme .text-emerald-700 {
+  color: #bfe7d1 !important;
+}
+
+.steam-theme .bg-orange-50\/70 {
+  background-color: rgba(87, 52, 20, 0.6) !important;
+}
+
+.steam-theme .border-orange-100,
+.steam-theme .border-orange-200,
+.steam-theme .border-orange-300,
+.steam-theme .border-orange-500 {
+  border-color: #b77533 !important;
+}
+
+.steam-theme .text-orange-900,
+.steam-theme .text-orange-700 {
+  color: #ffc07a !important;
+}
+
+.steam-theme .text-amber-800,
+.steam-theme .text-amber-900 {
+  color: #ffd59d !important;
+}
+
+.steam-theme .bg-cyan-50 {
+  background-color: rgba(45, 82, 108, 0.62) !important;
+}
+
+.steam-theme .border-cyan-300 {
+  border-color: #66c0f4 !important;
+}
+
+.steam-theme .text-sky-800 {
+  color: #cce9ff !important;
+}
+
+.steam-theme input,
+.steam-theme textarea {
+  background-color: #0f1a25 !important;
+  border-color: #2a475e !important;
+  color: #e5eef7 !important;
+}
+
+.steam-theme .workshop-visibility-filter-select {
+  background-color: #0f1a25 !important;
+  border-color: #2a475e !important;
+  color: #e5eef7 !important;
+}
+
+.steam-theme .workshop-visibility-filter-select:focus {
+  border-color: #66c0f4 !important;
+  box-shadow: 0 0 0 1px rgba(102, 192, 244, 0.45);
+}
+
+.steam-theme .workshop-visibility-filter-select option {
+  background-color: #1b2838;
+  color: #e5eef7;
+}
+
+.steam-theme .workshop-visibility-filter-select option:checked {
+  background-color: #66c0f4;
+  color: #0b141e;
+  font-weight: 700;
+}
+
+.steam-theme input::placeholder,
+.steam-theme textarea::placeholder {
+  color: #7f8a93 !important;
+}
+
+.steam-theme .bg-orange-600,
+.steam-theme .bg-cyan-600,
+.steam-theme .bg-cyan-700,
+.steam-theme .bg-sky-700,
+.steam-theme .bg-slate-900 {
+  background-color: #66c0f4 !important;
+  color: #0b141e !important;
+}
+
+.steam-theme .bg-sky-100 {
+  background-color: #2a475e !important;
+  color: #c7d5e0 !important;
+}
+
+.steam-theme .bg-emerald-100 {
+  background-color: #26513f !important;
+  color: #c6ead8 !important;
+}
+
+.steam-theme .shadow-md,
+.steam-theme .shadow-lg {
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45) !important;
+}
