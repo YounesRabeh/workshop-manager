@@ -105,7 +105,7 @@ export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update
     lines.push(`\t\"title\"\t\"${escapeVdf(title)}\"`)
   }
 
-  if (mode === 'update' && changeNote) {
+  if (changeNote) {
     lines.push(`\t\"changenote\"\t\"${escapeVdf(changeNote, true)}\"`)
   }
 

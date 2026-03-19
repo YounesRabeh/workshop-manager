@@ -108,6 +108,71 @@ describe('App UI validation gates', () => {
     expect(createButton?.attributes('disabled')).toBeDefined()
   })
 
+  it('keeps readiness layout tweaks: top row App ID + Title, separator visible, and no Published File ID in update', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
+    expect(modButton).toBeDefined()
+    await modButton?.trigger('click')
+    await flushPromises()
+
+    const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
+    expect(updateButton).toBeDefined()
+    const updatePublishArticle = updateButton!.element.closest('article')
+    expect(updatePublishArticle).toBeTruthy()
+
+    const updateReadinessLists = updatePublishArticle!.querySelectorAll('div.rounded-xl ul')
+    expect(updateReadinessLists.length).toBeGreaterThanOrEqual(2)
+    const updateTopLabels = [...updateReadinessLists[0].querySelectorAll('li > span:first-child')].map((node) =>
+      (node.textContent ?? '').trim()
+    )
+    expect(updateTopLabels).toEqual(['App ID', 'Title'])
+
+    const updateAllReadinessLabels = [...updatePublishArticle!.querySelectorAll('div.rounded-xl li > span:first-child')].map((node) =>
+      (node.textContent ?? '').trim()
+    )
+    expect(updateAllReadinessLabels).not.toContain('Published File ID')
+
+    const updateSeparator = [...updatePublishArticle!.querySelectorAll('div')].find(
+      (node) =>
+        node.className.includes('border-t') &&
+        node.className.includes('border-[#365572]/70')
+    )
+    expect(updateSeparator).toBeTruthy()
+
+    const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
+    expect(createTab).toBeDefined()
+    await createTab?.trigger('click')
+    await flushPromises()
+
+    const createButton = wrapper.findAll('button').find((button) => button.text().includes('Create New Item'))
+    expect(createButton).toBeDefined()
+    const createPublishArticle = createButton!.element.closest('article')
+    expect(createPublishArticle).toBeTruthy()
+
+    const createReadinessLists = createPublishArticle!.querySelectorAll('div.rounded-xl ul')
+    expect(createReadinessLists.length).toBeGreaterThanOrEqual(2)
+    const createTopLabels = [...createReadinessLists[0].querySelectorAll('li > span:first-child')].map((node) =>
+      (node.textContent ?? '').trim()
+    )
+    expect(createTopLabels).toEqual(['App ID', 'Title', 'Content folder'])
+
+    const createSeparator = [...createPublishArticle!.querySelectorAll('div')].find(
+      (node) =>
+        node.className.includes('border-t') &&
+        node.className.includes('border-[#365572]/70')
+    )
+    expect(createSeparator).toBeTruthy()
+  })
+
   it('hydrates remembered username without persisting password', async () => {
     const wrapper = mount(App)
     await flushPromises()
@@ -528,10 +593,158 @@ describe('App UI validation gates', () => {
     await createButton?.trigger('click')
     await flushPromises()
 
+    const confirmCreateButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Create Item')
+    expect(confirmCreateButton).toBeDefined()
+    await confirmCreateButton?.trigger('click')
+    await flushPromises()
+
     expect(workshop.uploadMod).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Upload Failed')
     expect(wrapper.text()).toContain('ERROR (No Connection)')
     expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Upload failed. See popup.')
+  })
+
+  it('keeps create release notes disabled until content folder is selected', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
+    expect(createTab).toBeDefined()
+    await createTab?.trigger('click')
+    await flushPromises()
+
+    const releaseNotesField = wrapper.find('textarea')
+    expect(releaseNotesField.exists()).toBe(true)
+    expect(releaseNotesField.attributes('disabled')).toBeDefined()
+
+    const pickContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Choose Content Folder'))
+    expect(pickContentFolderButton).toBeDefined()
+    await pickContentFolderButton?.trigger('click')
+    await flushPromises()
+
+    expect(releaseNotesField.attributes('disabled')).toBeUndefined()
+  })
+
+  it('includes selected create visibility in upload payload', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
+    expect(createTab).toBeDefined()
+    await createTab?.trigger('click')
+    await flushPromises()
+
+    const pickContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Choose Content Folder'))
+    expect(pickContentFolderButton).toBeDefined()
+    await pickContentFolderButton?.trigger('click')
+    await flushPromises()
+
+    const createButton = wrapper.findAll('button').find((button) => button.text().includes('Create New Item'))
+    expect(createButton).toBeDefined()
+    const publishArticle = createButton!.element.closest('article')
+    expect(publishArticle).toBeTruthy()
+    const publishInputs = publishArticle!.querySelectorAll('input')
+    expect(publishInputs.length).toBeGreaterThanOrEqual(2)
+    ;(publishInputs[0] as HTMLInputElement).value = '480'
+    publishInputs[0].dispatchEvent(new Event('input', { bubbles: true }))
+    ;(publishInputs[1] as HTMLInputElement).value = 'Created With Hidden Visibility'
+    publishInputs[1].dispatchEvent(new Event('input', { bubbles: true }))
+
+    const visibilitySelect = publishArticle!.querySelector('select')
+    expect(visibilitySelect).toBeTruthy()
+    ;(visibilitySelect as HTMLSelectElement).value = '2'
+    visibilitySelect!.dispatchEvent(new Event('change', { bubbles: true }))
+    await flushPromises()
+
+    await createButton?.trigger('click')
+    await flushPromises()
+
+    const confirmCreateButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Create Item')
+    expect(confirmCreateButton).toBeDefined()
+    await confirmCreateButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.uploadMod).toHaveBeenCalledTimes(1)
+    expect(workshop.uploadMod).toHaveBeenCalledWith({
+      profileId: 'new-item',
+      draft: expect.objectContaining({
+        appId: '480',
+        title: 'Created With Hidden Visibility',
+        visibility: 2
+      })
+    })
+  })
+
+  it('opens create confirmation modal and cancel does not upload', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
+    expect(createTab).toBeDefined()
+    await createTab?.trigger('click')
+    await flushPromises()
+
+    const pickContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Choose Content Folder'))
+    expect(pickContentFolderButton).toBeDefined()
+    await pickContentFolderButton?.trigger('click')
+    await flushPromises()
+
+    const createButton = wrapper.findAll('button').find((button) => button.text().includes('Create New Item'))
+    expect(createButton).toBeDefined()
+    const publishArticle = createButton!.element.closest('article')
+    expect(publishArticle).toBeTruthy()
+    const publishInputs = publishArticle!.querySelectorAll('input')
+    expect(publishInputs.length).toBeGreaterThanOrEqual(2)
+    ;(publishInputs[0] as HTMLInputElement).value = '480'
+    publishInputs[0].dispatchEvent(new Event('input', { bubbles: true }))
+    ;(publishInputs[1] as HTMLInputElement).value = 'Created But Cancelled'
+    publishInputs[1].dispatchEvent(new Event('input', { bubbles: true }))
+    await flushPromises()
+
+    await createButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Create Workshop Item?')
+
+    const cancelCreateButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Cancel')
+    expect(cancelCreateButton).toBeDefined()
+    await cancelCreateButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.uploadMod).not.toHaveBeenCalled()
   })
 
   it('shows update failed popup and uses short status text', async () => {
