@@ -197,6 +197,23 @@ describe('App UI validation gates', () => {
     expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Enter your password to sign in.')
   })
 
+  it('toggles remember checkboxes on Enter without submitting login', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    expect(checkboxes.length).toBeGreaterThanOrEqual(2)
+
+    const rememberUsername = checkboxes[0]
+    expect((rememberUsername.element as HTMLInputElement).checked).toBe(true)
+
+    await rememberUsername.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+
+    expect((rememberUsername.element as HTMLInputElement).checked).toBe(false)
+    expect(workshop.login).not.toHaveBeenCalled()
+  })
+
   it('does not auto-focus sign in while typing credentials without stored session', async () => {
     const wrapper = mount(App, { attachTo: document.body })
     try {
@@ -502,6 +519,10 @@ describe('App UI validation gates', () => {
     publishInputs[0].dispatchEvent(new Event('input', { bubbles: true }))
     ;(publishInputs[1] as HTMLInputElement).value = 'Created Mod'
     publishInputs[1].dispatchEvent(new Event('input', { bubbles: true }))
+    const releaseNotesField = publishArticle!.querySelector('textarea')
+    expect(releaseNotesField).toBeTruthy()
+    ;(releaseNotesField as HTMLTextAreaElement).value = 'Initial release notes'
+    releaseNotesField!.dispatchEvent(new Event('input', { bubbles: true }))
     await flushPromises()
 
     await createButton?.trigger('click')

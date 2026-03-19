@@ -117,7 +117,8 @@ const selectedWorkshopItemId = ref<string>('')
 const committedVisibility = ref<0 | 1 | 2 | 3>(0)
 const pendingVisibility = ref<0 | 1 | 2 | 3>(0)
 
-const stagedContentFiles = ref<StagedContentFile[]>([])
+const createStagedContentFiles = ref<StagedContentFile[]>([])
+const updateStagedContentFiles = ref<StagedContentFile[]>([])
 const isFullscreen = ref(false)
 const isAboutOpen = ref(false)
 const isUpdateConfirmOpen = ref(false)
@@ -131,8 +132,11 @@ const showLoginLogs = ref(false)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 const selectedWorkshopItem = computed(() => workshopItems.value.find((item) => item.publishedFileId === selectedWorkshopItemId.value))
-const totalStagedContentSizeBytes = computed(() =>
-  stagedContentFiles.value.reduce((sum, file) => sum + file.sizeBytes, 0)
+const createTotalStagedContentSizeBytes = computed(() =>
+  createStagedContentFiles.value.reduce((sum, file) => sum + file.sizeBytes, 0)
+)
+const updateTotalStagedContentSizeBytes = computed(() =>
+  updateStagedContentFiles.value.reduce((sum, file) => sum + file.sizeBytes, 0)
 )
 const filteredWorkshopItems = computed(() => {
   if (workshopVisibilityFilter.value === 'all') {
@@ -173,9 +177,6 @@ const canChangeVisibility = computed(() => {
     pendingVisibility.value !== committedVisibility.value
   )
 })
-const activePublishMode = computed<'update' | 'create'>(() => (flowStep.value === 'create' ? 'create' : 'update'))
-const activeDraft = computed<UploadDraftState>(() => (activePublishMode.value === 'create' ? createDraft : updateDraft))
-const activeTagInput = computed<string>(() => (activePublishMode.value === 'create' ? createTagInput.value : updateTagInput.value))
 const accountPersonaName = ref<string>('')
 const accountDisplayName = computed(() => accountPersonaName.value || loginForm.username.trim() || 'Steam account')
 const accountProfileImageUrl = ref<string | null>(null)
@@ -239,19 +240,16 @@ const updateChecklist = computed<PublishChecklistItem[]>(() => {
 
 const createChecklist = computed<PublishChecklistItem[]>(() => {
   return [
-    { label: 'App ID', ok: createRequirements.value.appId },
-    { label: 'Content folder', ok: createRequirements.value.contentFolder },
+    { label: 'App ID (numeric)', ok: createRequirements.value.appId },
     { label: 'Title', ok: createRequirements.value.title },
+    { label: 'Release notes', ok: createRequirements.value.releaseNotes },
+    { label: 'Content folder', ok: createDraft.contentFolder.trim().length > 0, optional: true },
     { label: 'Preview image', ok: createDraft.previewFile.trim().length > 0, optional: true },
-    { label: 'Release notes', ok: createDraft.releaseNotes.trim().length > 0, optional: true }
   ]
 })
 
-const activePublishChecklist = computed<PublishChecklistItem[]>(() =>
-  activePublishMode.value === 'create' ? createChecklist.value : updateChecklist.value
-)
-
-const stagedContentTree = computed<ContentTreeNode[]>(() => buildContentTree(stagedContentFiles.value))
+const createStagedContentTree = computed<ContentTreeNode[]>(() => buildContentTree(createStagedContentFiles.value))
+const updateStagedContentTree = computed<ContentTreeNode[]>(() => buildContentTree(updateStagedContentFiles.value))
 
 function normalizeError(error: unknown): ApiFailure {
   const fallback: ApiFailure = {
@@ -628,8 +626,25 @@ function buildContentTree(files: StagedContentFile[]): ContentTreeNode[] {
   return tree.children ?? []
 }
 
-async function stageSelectedContentFiles(paths: string[]): Promise<void> {
-  const contentFolder = activeDraft.value.contentFolder.trim()
+function getDraftForMode(mode: 'create' | 'update'): UploadDraftState {
+  return mode === 'create' ? createDraft : updateDraft
+}
+
+function getStagedFilesForMode(mode: 'create' | 'update'): StagedContentFile[] {
+  return mode === 'create' ? createStagedContentFiles.value : updateStagedContentFiles.value
+}
+
+function setStagedFilesForMode(mode: 'create' | 'update', files: StagedContentFile[]): void {
+  if (mode === 'create') {
+    createStagedContentFiles.value = files
+    return
+  }
+  updateStagedContentFiles.value = files
+}
+
+async function stageSelectedContentFiles(mode: 'create' | 'update', paths: string[]): Promise<void> {
+  const draft = getDraftForMode(mode)
+  const contentFolder = draft.contentFolder.trim()
   if (contentFolder.length === 0) {
     statusMessage.value = 'Select content folder first.'
     return
@@ -664,9 +679,11 @@ async function stageSelectedContentFiles(paths: string[]): Promise<void> {
     return
   }
 
-  const beforeCount = stagedContentFiles.value.length
-  stagedContentFiles.value = mergeContentFiles(stagedContentFiles.value, selectedMatches)
-  const addedCount = stagedContentFiles.value.length - beforeCount
+  const stagedBefore = getStagedFilesForMode(mode)
+  const beforeCount = stagedBefore.length
+  const merged = mergeContentFiles(stagedBefore, selectedMatches)
+  setStagedFilesForMode(mode, merged)
+  const addedCount = merged.length - beforeCount
   const addedSize = selectedMatches.reduce((sum, file) => sum + file.sizeBytes, 0)
 
   if (outsideCount > 0) {
@@ -679,13 +696,13 @@ async function stageSelectedContentFiles(paths: string[]): Promise<void> {
 
 function removeStagedFile(absolutePath: string): void {
   const pathKey = normalizeFsPath(absolutePath)
-  stagedContentFiles.value = stagedContentFiles.value.filter((item) => normalizeFsPath(item.absolutePath) !== pathKey)
+  updateStagedContentFiles.value = updateStagedContentFiles.value.filter((item) => normalizeFsPath(item.absolutePath) !== pathKey)
   const removedName = fileNameFromPath(absolutePath)
   statusMessage.value = `Removed staged file: ${removedName}`
 }
 
 async function pickUploadFiles(): Promise<void> {
-  if (activeDraft.value.contentFolder.trim().length === 0) {
+  if (updateDraft.contentFolder.trim().length === 0) {
     statusMessage.value = 'Select content folder first.'
     return
   }
@@ -695,7 +712,7 @@ async function pickUploadFiles(): Promise<void> {
     return
   }
   try {
-    await stageSelectedContentFiles(paths)
+    await stageSelectedContentFiles('update', paths)
   } catch (error) {
     const parsed = normalizeError(error)
     statusMessage.value = `Failed to add files (${parsed.code}): ${parsed.message}`
@@ -708,17 +725,18 @@ async function pickUploadFiles(): Promise<void> {
 }
 
 function clearUploadFiles(): void {
-  stagedContentFiles.value = []
+  updateStagedContentFiles.value = []
 }
 
-function clearWorkspace(): void {
-  activeDraft.value.contentFolder = ''
-  stagedContentFiles.value = []
+function clearWorkspaceForMode(mode: 'create' | 'update'): void {
+  const draft = getDraftForMode(mode)
+  draft.contentFolder = ''
+  setStagedFilesForMode(mode, [])
   statusMessage.value = 'Mod content cleared.'
 }
 
-function setStagedContentFilesFromFolder(contentFolder: string, files: StagedContentFile[]): void {
-  stagedContentFiles.value = files
+function setStagedContentFilesFromFolder(mode: 'create' | 'update', contentFolder: string, files: StagedContentFile[]): void {
+  setStagedFilesForMode(mode, files)
   if (files.length === 0) {
     statusMessage.value = `Content folder selected: ${contentFolder}. No files found.`
     return
@@ -727,8 +745,8 @@ function setStagedContentFilesFromFolder(contentFolder: string, files: StagedCon
   statusMessage.value = `Loaded ${files.length} content file(s), ${formatSizeLabel(totalSize)} total.`
 }
 
-function setContentFolderSelectionError(contentFolder: string, message: string): void {
-  stagedContentFiles.value = []
+function setContentFolderSelectionError(mode: 'create' | 'update', contentFolder: string, message: string): void {
+  setStagedFilesForMode(mode, [])
   statusMessage.value = `Content folder selected: ${contentFolder}. Scan failed: ${message}`
   showToast({
     tone: 'error',
@@ -737,8 +755,8 @@ function setContentFolderSelectionError(contentFolder: string, message: string):
   })
 }
 
-function addTag(): void {
-  const normalizedTags = activeTagInput.value
+function addCreateTag(): void {
+  const normalizedTags = createTagInput.value
     .split(/[;,]/g)
     .map((tag) => tag.trim())
     .filter(Boolean)
@@ -747,33 +765,54 @@ function addTag(): void {
     return
   }
 
-  const existing = new Set(activeDraft.value.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))
+  const existing = new Set(createDraft.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))
+  for (const tag of normalizedTags) {
+    const dedupeKey = tag.toLowerCase()
+    if (existing.has(dedupeKey)) {
+      continue
+    }
+    createDraft.tags.push(tag)
+    existing.add(dedupeKey)
+  }
+  createTagInput.value = ''
+}
+
+function addUpdateTag(): void {
+  const normalizedTags = updateTagInput.value
+    .split(/[;,]/g)
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+
+  if (normalizedTags.length === 0) {
+    return
+  }
+
+  const existing = new Set(updateDraft.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))
   let addedCount = 0
   for (const tag of normalizedTags) {
     const dedupeKey = tag.toLowerCase()
     if (existing.has(dedupeKey)) {
       continue
     }
-    activeDraft.value.tags.push(tag)
+    updateDraft.tags.push(tag)
     existing.add(dedupeKey)
     addedCount += 1
   }
 
-  if (activePublishMode.value === 'update' && addedCount > 0) {
+  if (addedCount > 0) {
     updateTagsTouched.value = true
-  }
-
-  if (activePublishMode.value === 'create') {
-    createTagInput.value = ''
-    return
   }
   updateTagInput.value = ''
 }
 
-function removeTag(tag: string): void {
-  const before = activeDraft.value.tags.length
-  activeDraft.value.tags = activeDraft.value.tags.filter((value) => value !== tag)
-  if (activePublishMode.value === 'update' && activeDraft.value.tags.length < before) {
+function removeCreateTag(tag: string): void {
+  createDraft.tags = createDraft.tags.filter((value) => value !== tag)
+}
+
+function removeUpdateTag(tag: string): void {
+  const before = updateDraft.tags.length
+  updateDraft.tags = updateDraft.tags.filter((value) => value !== tag)
+  if (updateDraft.tags.length < before) {
     updateTagsTouched.value = true
   }
 }
@@ -786,11 +825,11 @@ function onChangeWorkshopVisibilityFilter(value: WorkshopVisibilityFilter): void
   workshopVisibilityFilter.value = value
 }
 
-function onChangeTagInput(value: string): void {
-  if (activePublishMode.value === 'create') {
-    createTagInput.value = value
-    return
-  }
+function onChangeCreateTagInput(value: string): void {
+  createTagInput.value = value
+}
+
+function onChangeUpdateTagInput(value: string): void {
   updateTagInput.value = value
 }
 
@@ -1313,6 +1352,8 @@ async function signOut(): Promise<void> {
   workshopVisibilityFilter.value = 'all'
   applyDraft(createDraft, createEmptyDraft())
   applyDraft(updateDraft, createEmptyDraft())
+  createStagedContentFiles.value = []
+  updateStagedContentFiles.value = []
   updateDraftCache.value = {}
   updateTagsTouched.value = false
   createTagInput.value = ''
@@ -1356,22 +1397,23 @@ async function submitSteamGuardCode(): Promise<void> {
   }
 }
 
-async function pickContentFolder(): Promise<void> {
+async function pickContentFolderForMode(mode: 'create' | 'update'): Promise<void> {
   const path = await window.workshop.pickFolder()
   if (path) {
-    activeDraft.value.contentFolder = path
+    const draft = getDraftForMode(mode)
+    draft.contentFolder = path
     try {
       const files = await loadContentFolderFiles(path)
-      setStagedContentFilesFromFolder(path, files)
+      setStagedContentFilesFromFolder(mode, path, files)
     } catch (error) {
       const parsed = normalizeError(error)
-      setContentFolderSelectionError(path, parsed.message)
+      setContentFolderSelectionError(mode, path, parsed.message)
     }
   }
 }
 
 async function openCurrentContentFolder(): Promise<void> {
-  const folderPath = activeDraft.value.contentFolder.trim()
+  const folderPath = updateDraft.contentFolder.trim()
   if (!folderPath) {
     statusMessage.value = 'Select content folder first.'
     return
@@ -1441,15 +1483,42 @@ async function refreshSelectedWorkshopItem(): Promise<void> {
   }
 }
 
-async function pickPreviewFile(): Promise<void> {
+async function pickCreatePreviewFile(): Promise<void> {
   const path = await window.workshop.pickFile()
   if (path) {
-    activeDraft.value.previewFile = path
+    createDraft.previewFile = path
   }
 }
 
-function clearPreviewFile(): void {
-  activeDraft.value.previewFile = ''
+function clearCreatePreviewFile(): void {
+  createDraft.previewFile = ''
+}
+
+function clearUpdatePreviewFile(): void {
+  updateDraft.previewFile = ''
+}
+
+async function pickCreateContentFolder(): Promise<void> {
+  await pickContentFolderForMode('create')
+}
+
+async function pickUpdateContentFolder(): Promise<void> {
+  await pickContentFolderForMode('update')
+}
+
+function clearCreateWorkspace(): void {
+  clearWorkspaceForMode('create')
+}
+
+function clearUpdateWorkspace(): void {
+  clearWorkspaceForMode('update')
+}
+
+async function pickUpdatePreviewFile(): Promise<void> {
+  const path = await window.workshop.pickFile()
+  if (path) {
+    updateDraft.previewFile = path
+  }
 }
 
 function canCreate(): boolean {
@@ -1818,31 +1887,63 @@ onUnmounted(() => {
         />
 
         <PublishSection
-          v-show="flowStep === 'update' || flowStep === 'create'"
-          :mode="activePublishMode"
+          v-if="flowStep === 'update'"
+          mode="update"
           :selected-workshop-item="selectedWorkshopItem"
-          :publish-checklist="activePublishChecklist"
-          :draft="activeDraft"
-          :tag-input="activeTagInput"
+          :publish-checklist="updateChecklist"
+          :draft="updateDraft"
+          :tag-input="updateTagInput"
           :visibility-committed="committedVisibility"
           :visibility-pending="pendingVisibility"
           :can-change-visibility="canChangeVisibility"
-          :staged-content-files="stagedContentFiles"
-          :staged-content-tree="stagedContentTree"
-          :total-staged-content-size-bytes="totalStagedContentSizeBytes"
-          :can-upload="canCreate()"
+          :staged-content-files="updateStagedContentFiles"
+          :staged-content-tree="updateStagedContentTree"
+          :total-staged-content-size-bytes="updateTotalStagedContentSizeBytes"
+          :can-upload="false"
           :can-update="canUpdate()"
           @go-to-mods="goToStep('mods')"
           @refresh-workshop-item="refreshSelectedWorkshopItem"
           @open-workshop-item="openSelectedWorkshopItem"
-          @pick-content-folder="pickContentFolder"
-          @pick-workspace-root="pickContentFolder"
-          @clear-workspace="clearWorkspace"
-          @pick-preview-file="pickPreviewFile"
-          @clear-preview-file="clearPreviewFile"
-          @change-tag-input="onChangeTagInput"
-          @add-tag="addTag"
-          @remove-tag="removeTag"
+          @pick-content-folder="pickUpdateContentFolder"
+          @pick-workspace-root="pickUpdateContentFolder"
+          @clear-workspace="clearUpdateWorkspace"
+          @pick-preview-file="pickUpdatePreviewFile"
+          @clear-preview-file="clearUpdatePreviewFile"
+          @change-tag-input="onChangeUpdateTagInput"
+          @add-tag="addUpdateTag"
+          @remove-tag="removeUpdateTag"
+          @change-visibility-selection="setPendingVisibility"
+          @update-visibility-only="updateVisibilityOnly"
+          @upload="upload"
+          @update-item="openUpdateConfirmation"
+        />
+
+        <PublishSection
+          v-if="flowStep === 'create'"
+          mode="create"
+          :selected-workshop-item="selectedWorkshopItem"
+          :publish-checklist="createChecklist"
+          :draft="createDraft"
+          :tag-input="createTagInput"
+          :visibility-committed="committedVisibility"
+          :visibility-pending="pendingVisibility"
+          :can-change-visibility="false"
+          :staged-content-files="createStagedContentFiles"
+          :staged-content-tree="createStagedContentTree"
+          :total-staged-content-size-bytes="createTotalStagedContentSizeBytes"
+          :can-upload="canCreate()"
+          :can-update="false"
+          @go-to-mods="goToStep('mods')"
+          @refresh-workshop-item="refreshSelectedWorkshopItem"
+          @open-workshop-item="openSelectedWorkshopItem"
+          @pick-content-folder="pickCreateContentFolder"
+          @pick-workspace-root="pickCreateContentFolder"
+          @clear-workspace="clearCreateWorkspace"
+          @pick-preview-file="pickCreatePreviewFile"
+          @clear-preview-file="clearCreatePreviewFile"
+          @change-tag-input="onChangeCreateTagInput"
+          @add-tag="addCreateTag"
+          @remove-tag="removeCreateTag"
           @change-visibility-selection="setPendingVisibility"
           @update-visibility-only="updateVisibilityOnly"
           @upload="upload"

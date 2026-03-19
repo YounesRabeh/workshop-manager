@@ -184,3 +184,20 @@ export function moveFocusWithVerticalArrows(
     getControl(Math.max(index - 1, 0))?.focus()
   }
 }
+
+export function toggleCheckboxOrRadioOnEnter(event: KeyboardEvent): boolean {
+  if (event.key !== 'Enter') {
+    return false
+  }
+  const target = event.target
+  if (!(target instanceof HTMLInputElement)) {
+    return false
+  }
+  const type = (target.type || '').toLowerCase()
+  if (type !== 'checkbox' && type !== 'radio') {
+    return false
+  }
+  event.preventDefault()
+  target.click()
+  return true
+}

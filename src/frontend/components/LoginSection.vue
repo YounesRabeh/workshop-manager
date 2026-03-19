@@ -7,7 +7,7 @@ import type {
   LoginFormState,
   SteamGuardPromptType
 } from '../types/ui'
-import { moveFocusWithVerticalArrows } from '../events/keyboard-events'
+import { moveFocusWithVerticalArrows, toggleCheckboxOrRadioOnEnter } from '../events/keyboard-events'
 
 const props = defineProps<{
   statusMessage: string
@@ -119,6 +119,9 @@ function focusLoginControl(index: number): void {
 }
 
 function onLoginControlArrowKey(event: KeyboardEvent, index: number): void {
+  if (toggleCheckboxOrRadioOnEnter(event)) {
+    return
+  }
   moveFocusWithVerticalArrows(event, index, getLoginControl, 4)
 }
 
@@ -345,13 +348,15 @@ watch(
         >
           {{ submitLabel }}
         </button>
-        <button
-          type="button"
-          class="login-quit mt-2 mx-auto block min-w-[148px] rounded border border-slate-300 px-4 py-2 text-xs font-semibold"
-          @click="emit('quit-app')"
-        >
-          Quit
-        </button>
+        <div class="mt-3 flex justify-center">
+          <button
+            type="button"
+            class="login-quit w-[168px] rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
+            @click="emit('quit-app')"
+          >
+            Quit
+          </button>
+        </div>
       </form>
 
       <div

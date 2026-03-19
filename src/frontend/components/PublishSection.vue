@@ -608,6 +608,8 @@ function onUploadPreviewLoad(event: Event): void {
           App ID
           <input
             v-model="draft.appId"
+            inputmode="numeric"
+            pattern="[0-9]*"
             class="mt-1 w-full rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100"
           />
         </label>
@@ -620,17 +622,17 @@ function onUploadPreviewLoad(event: Event): void {
       <textarea
         v-model="draft.releaseNotes"
         rows="2"
-        :disabled="!hasContentFolder"
-        :placeholder="hasContentFolder ? '' : 'Select a content folder to enable release notes.'"
+        :disabled="isUpdateMode && !hasContentFolder"
+        :placeholder="isUpdateMode && !hasContentFolder ? 'Select a content folder to enable release notes.' : ''"
         class="mt-1 min-h-[3.5rem] w-full resize-y rounded border border-[#355874] bg-[#0f1f2e] px-2 py-1 text-slate-100 disabled:cursor-not-allowed disabled:border-[#33465a] disabled:bg-[#0c1623] disabled:text-slate-500"
       />
 
       <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
-        <div>
+        <div class="max-w-[22rem]">
           <label class="text-sm text-slate-300">Thumbnail (optional)</label>
           <button
             type="button"
-            class="mt-1 block w-full overflow-hidden rounded-lg border border-[#4b708e] bg-[#102233] text-left transition-colors hover:border-[#6ecbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6ecbff]"
+            class="mt-1 block w-full max-w-[22rem] overflow-hidden rounded-lg border border-[#4b708e] bg-[#102233] text-left transition-colors hover:border-[#6ecbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6ecbff]"
             @click="emit('pick-preview-file')"
           >
             <div class="aspect-square w-full">

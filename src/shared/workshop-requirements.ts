@@ -1,18 +1,26 @@
-import type { UploadDraft } from './contracts'
-
 export type UpdateDraftPath = 'none' | 'content' | 'preview' | 'content_and_preview'
 
-type RequirementFields = Pick<
-UploadDraft,
-'appId' | 'publishedFileId' | 'contentFolder' | 'previewFile' | 'title' | 'visibility'
->
+type RequirementFields = {
+  appId?: string
+  publishedFileId?: string
+  contentFolder?: string
+  previewFile?: string
+  title?: string
+  releaseNotes?: string
+  changenote?: string
+  visibility?: 0 | 1 | 2 | 3
+}
 
-type CreateMissingField = 'appId' | 'contentFolder' | 'title'
+type CreateMissingField = 'appId' | 'title' | 'releaseNotes'
 type UpdateMissingField = 'appId' | 'publishedFileId' | 'title'
 type VisibilityMissingField = 'appId' | 'publishedFileId' | 'visibility'
 
 function hasText(value: string | undefined): boolean {
   return typeof value === 'string' && value.trim().length > 0
+}
+
+function isNumericText(value: string | undefined): boolean {
+  return typeof value === 'string' && /^\d+$/.test(value.trim())
 }
 
 export function getUpdateDraftPath(fields: RequirementFields): UpdateDraftPath {
@@ -33,30 +41,30 @@ export function getUpdateDraftPath(fields: RequirementFields): UpdateDraftPath {
 
 export function evaluateCreateRequirements(fields: RequirementFields): {
   appId: boolean
-  contentFolder: boolean
   title: boolean
+  releaseNotes: boolean
   valid: boolean
   missing: CreateMissingField[]
 } {
-  const appId = hasText(fields.appId)
-  const contentFolder = hasText(fields.contentFolder)
+  const appId = isNumericText(fields.appId)
   const title = hasText(fields.title)
+  const releaseNotes = hasText(fields.releaseNotes ?? fields.changenote)
   const missing: CreateMissingField[] = []
 
   if (!appId) {
     missing.push('appId')
   }
-  if (!contentFolder) {
-    missing.push('contentFolder')
-  }
   if (!title) {
     missing.push('title')
+  }
+  if (!releaseNotes) {
+    missing.push('releaseNotes')
   }
 
   return {
     appId,
-    contentFolder,
     title,
+    releaseNotes,
     valid: missing.length === 0,
     missing
   }

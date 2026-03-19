@@ -138,6 +138,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
         contentFolder: '/mods',
         previewFile: '/mods/preview.png',
         title: 'My Mod',
+        changenote: 'Initial release notes',
         tags: ['tag-a']
       },
       'upload'
