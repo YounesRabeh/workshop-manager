@@ -70,6 +70,22 @@ describe('generateWorkshopVdf', () => {
     expect(output).toContain('"contentfolder"\t"/mods/base"')
   })
 
+  it('includes changenote for upload mode when provided', () => {
+    const output = generateWorkshopVdf(
+      {
+        appId: '480',
+        contentFolder: '/mods/base',
+        previewFile: '/mods/preview.png',
+        title: 'New Upload',
+        changenote: 'Initial release',
+        tags: []
+      },
+      'upload'
+    )
+
+    expect(output).toContain('"changenote"\t"Initial release"')
+  })
+
   it('preserves changenote line breaks for update mode', () => {
     const output = generateWorkshopVdf(
       {

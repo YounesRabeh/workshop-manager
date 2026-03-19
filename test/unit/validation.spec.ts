@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { validateDraft } from '../../src/backend/utils/validation'
 
 describe('validateDraft', () => {
-  it('rejects create when appId/title/releaseNotes are missing', () => {
+  it('rejects create when appId/contentFolder/title are missing', () => {
     expect(() =>
       validateDraft(
         {
@@ -15,7 +15,23 @@ describe('validateDraft', () => {
         },
         'upload'
       )
-    ).toThrowError(/Missing required fields: appId, title, releaseNotes/i)
+    ).toThrowError(/Missing required fields: appId, contentFolder, title/i)
+  })
+
+  it('allows create when content folder is present and release notes are empty', () => {
+    expect(() =>
+      validateDraft(
+        {
+          appId: '480',
+          contentFolder: '/mods/content',
+          previewFile: '',
+          title: 'Created Title',
+          releaseNotes: '',
+          tags: []
+        },
+        'upload'
+      )
+    ).not.toThrow()
   })
 
   it('allows update with previewFile only', () => {

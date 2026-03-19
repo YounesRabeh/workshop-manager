@@ -1,0 +1,128 @@
+.publish-layout {
+  margin-top: 1.25rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 1220px) {
+  .publish-layout {
+    grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+  }
+}
+
+.publish-main-panel {
+  border: 1px solid #305070;
+  border-radius: 1rem;
+  background: #1b2838;
+  padding: 1.25rem;
+  box-shadow: 0 16px 40px rgba(4, 10, 20, 0.45);
+}
+
+.publish-readiness-card {
+  margin-top: 1rem;
+  border: 1px solid #2f4f69;
+  border-radius: 0.75rem;
+  background: #1a2b3e;
+  padding: 1rem;
+}
+
+.publish-side-panel {
+  border-color: #ad6f2f;
+  background: linear-gradient(135deg, rgba(93, 56, 21, 0.7), rgba(40, 32, 24, 0.82));
+}
+
+.publish-field-input {
+  width: 100%;
+  border: 1px solid #355874;
+  border-radius: 0.25rem;
+  background: #0f1f2e;
+  color: #f1f5f9;
+  padding: 0.25rem 0.5rem;
+}
+
+.publish-field-textarea {
+  min-height: 3.5rem;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #355874;
+  border-radius: 0.25rem;
+  background: #0f1f2e;
+  color: #f1f5f9;
+  padding: 0.25rem 0.5rem;
+}
+
+.publish-field-textarea:disabled {
+  cursor: not-allowed;
+  border-color: #33465a;
+  background: #0c1623;
+  color: #64748b;
+}
+
+.publish-preview-picker {
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+  overflow: hidden;
+  border: 1px solid #4b708e;
+  border-radius: 0.5rem;
+  background: #102233;
+  text-align: left;
+  transition: border-color 120ms ease;
+}
+
+.publish-preview-picker:hover {
+  border-color: #6ecbff;
+}
+
+.publish-preview-picker:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #6ecbff;
+}
+
+.publish-preview-clear-button {
+  border: 1px solid #6e3f4a;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: #e9b6c2;
+  padding: 0.125rem 0.5rem;
+  font-size: 11px;
+  font-weight: 600;
+  transition: background 120ms ease;
+}
+
+.publish-preview-clear-button:hover {
+  background: #45212a;
+}
+
+.publish-tag-input {
+  width: 100%;
+  border: 1px solid #355874;
+  border-radius: 0.25rem;
+  background: #0f1f2e;
+  color: #f1f5f9;
+  padding: 0.25rem 0.5rem;
+}
+
+.publish-tag-add-button {
+  border: 1px solid #6ecbff;
+  border-radius: 0.25rem;
+  background: #59b9f8;
+  color: #05253a;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.publish-primary-action-button {
+  border: 1px solid #78c2f7;
+  border-radius: 0.25rem;
+  background: #2c7fb2;
+  color: #f1f5f9;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.publish-primary-action-button:disabled {
+  opacity: 0.4;
+}

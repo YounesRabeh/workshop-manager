@@ -3,9 +3,10 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { ContentFolderFileEntry, RunEvent, UploadDraft, WorkshopItemSummary } from '@shared/contracts'
 import { evaluateCreateRequirements, evaluateUpdateRequirements } from '@shared/workshop-requirements'
 import AppTopBar from './components/AppTopBar.vue'
+import CreatePublishSection from './components/publish/CreatePublishSection.vue'
 import LoginSection from './components/LoginSection.vue'
 import LogsSection from './components/LogsSection.vue'
-import PublishSection from './components/PublishSection.vue'
+import UpdatePublishSection from './components/publish/UpdatePublishSection.vue'
 import WorkshopItemsSection from './components/WorkshopItemsSection.vue'
 import { createAppGlobalKeyDownHandler, createAppGlobalMouseDownHandler } from './events/keyboard-events'
 import './styles/themes/app.theme.css'
@@ -116,12 +117,14 @@ const workshopItems = ref<WorkshopItemSummary[]>([])
 const selectedWorkshopItemId = ref<string>('')
 const committedVisibility = ref<0 | 1 | 2 | 3>(0)
 const pendingVisibility = ref<0 | 1 | 2 | 3>(0)
+const createVisibility = ref<0 | 1 | 2 | 3>(0)
 
 const createStagedContentFiles = ref<StagedContentFile[]>([])
 const updateStagedContentFiles = ref<StagedContentFile[]>([])
 const isFullscreen = ref(false)
 const isAboutOpen = ref(false)
 const isUpdateConfirmOpen = ref(false)
+const isCreateConfirmOpen = ref(false)
 const isBootstrapping = ref(true)
 const activeToast = ref<UiToast | null>(null)
 const appVersion = ref('dev')
@@ -231,7 +234,6 @@ const hasPendingUpdateChanges = computed(() => {
 const updateChecklist = computed<PublishChecklistItem[]>(() => {
   return [
     { label: 'App ID', ok: updateRequirements.value.appId },
-    { label: 'Published File ID', ok: updateRequirements.value.publishedFileId },
     { label: 'Title', ok: hasMeaningfulUpdateTitleChange.value, optional: true },
     { label: 'Content folder or Thumbnail', ok: updateRequirements.value.contentOrPreview, optional: true },
     { label: 'Release notes', ok: updateDraft.releaseNotes.trim().length > 0, optional: true }
@@ -240,10 +242,10 @@ const updateChecklist = computed<PublishChecklistItem[]>(() => {
 
 const createChecklist = computed<PublishChecklistItem[]>(() => {
   return [
-    { label: 'App ID (numeric)', ok: createRequirements.value.appId },
+    { label: 'App ID', ok: createRequirements.value.appId },
     { label: 'Title', ok: createRequirements.value.title },
-    { label: 'Release notes', ok: createRequirements.value.releaseNotes },
-    { label: 'Content folder', ok: createDraft.contentFolder.trim().length > 0, optional: true },
+    { label: 'Content folder', ok: createRequirements.value.contentFolder },
+    { label: 'Release notes', ok: createDraft.releaseNotes.trim().length > 0, optional: true },
     { label: 'Preview image', ok: createDraft.previewFile.trim().length > 0, optional: true },
   ]
 })
@@ -459,19 +461,6 @@ function goToStep(step: FlowStep): void {
 
   if (step === 'update' && selectedWorkshopItemId.value.trim().length > 0 && updateDraft.publishedFileId.trim().length === 0) {
     updateDraft.publishedFileId = selectedWorkshopItemId.value
-  }
-
-  if (
-    (step === 'update' || step === 'create') &&
-    (flowStep.value === 'update' || flowStep.value === 'create') &&
-    flowStep.value !== step
-  ) {
-    const fromDraft = flowStep.value === 'create' ? createDraft : updateDraft
-    const toDraft = step === 'create' ? createDraft : updateDraft
-    const fromContentFolder = fromDraft.contentFolder.trim()
-    if (!toDraft.contentFolder.trim() && fromContentFolder.length > 0) {
-      toDraft.contentFolder = fromContentFolder
-    }
   }
 
   flowStep.value = step
@@ -848,6 +837,10 @@ function visibilityLabel(value: 0 | 1 | 2 | 3): string {
 
 function setPendingVisibility(value: 0 | 1 | 2 | 3): void {
   pendingVisibility.value = value
+}
+
+function setCreateVisibility(value: 0 | 1 | 2 | 3): void {
+  createVisibility.value = value
 }
 
 function setPasswordPeek(value: boolean): void {
@@ -1347,6 +1340,7 @@ async function signOut(): Promise<void> {
   selectedWorkshopItemId.value = ''
   committedVisibility.value = 0
   pendingVisibility.value = 0
+  createVisibility.value = 0
   workshopItems.value = []
   workshopFilterAppId.value = ''
   workshopVisibilityFilter.value = 'all'
@@ -1359,6 +1353,8 @@ async function signOut(): Promise<void> {
   createTagInput.value = ''
   updateTagInput.value = ''
   flowStep.value = 'mods'
+  isUpdateConfirmOpen.value = false
+  isCreateConfirmOpen.value = false
   showLoginLogs.value = false
   statusMessage.value = 'Signed out.'
   accountPersonaName.value = ''
@@ -1525,6 +1521,16 @@ function canCreate(): boolean {
   return loginState.value === 'signed_in' && createRequirements.value.valid
 }
 
+function resolveCreateBlockedMessage(): string {
+  if (loginState.value !== 'signed_in') {
+    return 'Create blocked: login required.'
+  }
+  if (!createRequirements.value.appId || !createRequirements.value.contentFolder || !createRequirements.value.title) {
+    return 'Create blocked: app ID, content folder, and title are required.'
+  }
+  return 'Create blocked: requirements not met.'
+}
+
 function resolveUpdateBlockedMessage(): string {
   if (!updateRequirements.value.appId || !updateRequirements.value.publishedFileId || !updateRequirements.value.title) {
     return 'Update blocked: title, app ID, and published file ID are required.'
@@ -1546,14 +1552,14 @@ function canUpdate(): boolean {
 
 async function upload(): Promise<void> {
   if (!canCreate()) {
-    statusMessage.value = 'Upload blocked: complete required fields and login first.'
+    statusMessage.value = resolveCreateBlockedMessage()
     return
   }
 
   try {
     const result = (await window.workshop.uploadMod({
       profileId: 'new-item',
-      draft: buildUploadDraft(createDraft, 'create')
+      draft: buildUploadDraft(createDraft, 'create', createVisibility.value)
     })) as { publishedFileId?: string }
 
     statusMessage.value = 'Upload completed successfully.'
@@ -1567,6 +1573,23 @@ async function upload(): Promise<void> {
   } catch (error) {
     handleActionFailure('upload', error)
   }
+}
+
+function openCreateConfirmation(): void {
+  if (!canCreate()) {
+    statusMessage.value = resolveCreateBlockedMessage()
+    return
+  }
+  isCreateConfirmOpen.value = true
+}
+
+function closeCreateConfirmation(): void {
+  isCreateConfirmOpen.value = false
+}
+
+async function confirmCreateItem(): Promise<void> {
+  isCreateConfirmOpen.value = false
+  await upload()
 }
 
 async function updateItem(): Promise<void> {
@@ -1886,9 +1909,8 @@ onUnmounted(() => {
           @select-item="selectWorkshopItem"
         />
 
-        <PublishSection
+        <UpdatePublishSection
           v-if="flowStep === 'update'"
-          mode="update"
           :selected-workshop-item="selectedWorkshopItem"
           :publish-checklist="updateChecklist"
           :draft="updateDraft"
@@ -1899,12 +1921,10 @@ onUnmounted(() => {
           :staged-content-files="updateStagedContentFiles"
           :staged-content-tree="updateStagedContentTree"
           :total-staged-content-size-bytes="updateTotalStagedContentSizeBytes"
-          :can-upload="false"
           :can-update="canUpdate()"
           @go-to-mods="goToStep('mods')"
           @refresh-workshop-item="refreshSelectedWorkshopItem"
           @open-workshop-item="openSelectedWorkshopItem"
-          @pick-content-folder="pickUpdateContentFolder"
           @pick-workspace-root="pickUpdateContentFolder"
           @clear-workspace="clearUpdateWorkspace"
           @pick-preview-file="pickUpdatePreviewFile"
@@ -1914,29 +1934,19 @@ onUnmounted(() => {
           @remove-tag="removeUpdateTag"
           @change-visibility-selection="setPendingVisibility"
           @update-visibility-only="updateVisibilityOnly"
-          @upload="upload"
           @update-item="openUpdateConfirmation"
         />
 
-        <PublishSection
+        <CreatePublishSection
           v-if="flowStep === 'create'"
-          mode="create"
-          :selected-workshop-item="selectedWorkshopItem"
           :publish-checklist="createChecklist"
           :draft="createDraft"
           :tag-input="createTagInput"
-          :visibility-committed="committedVisibility"
-          :visibility-pending="pendingVisibility"
-          :can-change-visibility="false"
+          :visibility-pending="createVisibility"
           :staged-content-files="createStagedContentFiles"
           :staged-content-tree="createStagedContentTree"
           :total-staged-content-size-bytes="createTotalStagedContentSizeBytes"
           :can-upload="canCreate()"
-          :can-update="false"
-          @go-to-mods="goToStep('mods')"
-          @refresh-workshop-item="refreshSelectedWorkshopItem"
-          @open-workshop-item="openSelectedWorkshopItem"
-          @pick-content-folder="pickCreateContentFolder"
           @pick-workspace-root="pickCreateContentFolder"
           @clear-workspace="clearCreateWorkspace"
           @pick-preview-file="pickCreatePreviewFile"
@@ -1944,10 +1954,8 @@ onUnmounted(() => {
           @change-tag-input="onChangeCreateTagInput"
           @add-tag="addCreateTag"
           @remove-tag="removeCreateTag"
-          @change-visibility-selection="setPendingVisibility"
-          @update-visibility-only="updateVisibilityOnly"
-          @upload="upload"
-          @update-item="openUpdateConfirmation"
+          @change-visibility-selection="setCreateVisibility"
+          @upload="openCreateConfirmation"
         />
 
         <div
@@ -1972,6 +1980,33 @@ onUnmounted(() => {
                 @click="confirmUpdateItem"
               >
                 Update Item
+              </button>
+            </div>
+          </article>
+        </div>
+
+        <div
+          v-if="isCreateConfirmOpen"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
+          @click.self="closeCreateConfirmation"
+        >
+          <article class="w-full max-w-md rounded-xl border border-[#2a475e] bg-[#162534] p-5 shadow-2xl">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Confirm Create</p>
+            <h2 class="mt-1 text-xl font-bold text-slate-100">Create Workshop Item?</h2>
+            <p class="mt-2 text-sm text-slate-300">
+              You are about to create:
+              <span class="font-semibold text-slate-100">{{ createDraft.title || 'New item' }}</span>
+            </p>
+            <p class="mt-2 text-xs text-slate-400">This will upload a new workshop item with your current create draft settings.</p>
+            <div class="mt-4 flex justify-end gap-2">
+              <button class="steam-btn-muted rounded px-3 py-1.5 text-xs font-semibold" @click="closeCreateConfirmation">
+                Cancel
+              </button>
+              <button
+                class="rounded border border-[#78c2f7] bg-[#2c7fb2] px-3 py-1.5 text-xs font-semibold text-slate-100"
+                @click="confirmCreateItem"
+              >
+                Create Item
               </button>
             </div>
           </article>

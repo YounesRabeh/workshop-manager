@@ -11,7 +11,7 @@ type RequirementFields = {
   visibility?: 0 | 1 | 2 | 3
 }
 
-type CreateMissingField = 'appId' | 'title' | 'releaseNotes'
+type CreateMissingField = 'appId' | 'contentFolder' | 'title'
 type UpdateMissingField = 'appId' | 'publishedFileId' | 'title'
 type VisibilityMissingField = 'appId' | 'publishedFileId' | 'visibility'
 
@@ -41,30 +41,30 @@ export function getUpdateDraftPath(fields: RequirementFields): UpdateDraftPath {
 
 export function evaluateCreateRequirements(fields: RequirementFields): {
   appId: boolean
+  contentFolder: boolean
   title: boolean
-  releaseNotes: boolean
   valid: boolean
   missing: CreateMissingField[]
 } {
   const appId = isNumericText(fields.appId)
+  const contentFolder = hasText(fields.contentFolder)
   const title = hasText(fields.title)
-  const releaseNotes = hasText(fields.releaseNotes ?? fields.changenote)
   const missing: CreateMissingField[] = []
 
   if (!appId) {
     missing.push('appId')
   }
+  if (!contentFolder) {
+    missing.push('contentFolder')
+  }
   if (!title) {
     missing.push('title')
-  }
-  if (!releaseNotes) {
-    missing.push('releaseNotes')
   }
 
   return {
     appId,
+    contentFolder,
     title,
-    releaseNotes,
     valid: missing.length === 0,
     missing
   }
