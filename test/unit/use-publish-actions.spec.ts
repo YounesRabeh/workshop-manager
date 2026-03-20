@@ -19,7 +19,7 @@ describe('usePublishActions composable', () => {
     ;(window as unknown as { workshop: typeof workshop }).workshop = workshop
   })
 
-  function createHarness() {
+  function createHarness(options?: { hasPendingUpdateChanges?: boolean }) {
     const loginState = ref<'signed_out' | 'signed_in'>('signed_in')
     const selectedWorkshopItemId = ref('100')
     const workshopItems = ref([{ publishedFileId: '100', title: 'Item', appId: '480', visibility: 0 as 0 | 1 | 2 | 3 }])
@@ -45,7 +45,7 @@ describe('usePublishActions composable', () => {
     })
     const createRequirements = computed(() => ({ valid: true, appId: true, contentFolder: true, title: true }))
     const updateRequirements = computed(() => ({ valid: true, appId: true, publishedFileId: true, title: true }))
-    const hasPendingUpdateChanges = computed(() => true)
+    const hasPendingUpdateChanges = computed(() => options?.hasPendingUpdateChanges ?? true)
     const updateTagsTouched = ref(false)
     const updateDraftCache = ref<Record<string, typeof updateDraft>>({})
     const statuses: string[] = []
@@ -109,5 +109,25 @@ describe('usePublishActions composable', () => {
     expect(harness.workshopItems.value[0]?.visibility).toBe(2)
     expect(harness.toasts.at(-1)?.title).toBe('Visibility Updated')
   })
-})
 
+  it('opens create confirmation and confirms upload flow', async () => {
+    const harness = createHarness()
+
+    harness.publish.openCreateConfirmation()
+    expect(harness.publish.isCreateConfirmOpen.value).toBe(true)
+
+    await harness.publish.confirmCreateItem()
+
+    expect(workshop.uploadMod).toHaveBeenCalledTimes(1)
+    expect(harness.publish.isCreateConfirmOpen.value).toBe(false)
+    expect(harness.toasts.at(-1)?.title).toBe('Upload Completed')
+  })
+
+  it('blocks update confirmation when no pending changes exist', () => {
+    const harness = createHarness({ hasPendingUpdateChanges: false })
+    harness.publish.openUpdateConfirmation()
+
+    expect(harness.publish.isUpdateConfirmOpen.value).toBe(false)
+    expect(harness.statuses.at(-1)).toContain('no changes detected')
+  })
+})

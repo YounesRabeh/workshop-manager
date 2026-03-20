@@ -97,5 +97,42 @@ describe('useAuthFlow composable', () => {
     expect(flow.steamGuardPromptType.value).toBe('steam_guard_code')
     expect(flow.statusMessage.value).toContain('Steam Guard code required')
   })
-})
 
+  it('clears stored session flags and password', async () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.loginForm.password = 'secret'
+    flow.loginForm.rememberAuth = true
+    flow.hasPersistedStoredSession.value = true
+
+    await flow.clearStoredSession()
+
+    expect(workshop.clearStoredSession).toHaveBeenCalledTimes(1)
+    expect(flow.loginForm.password).toBe('')
+    expect(flow.loginForm.rememberAuth).toBe(false)
+    expect(flow.hasPersistedStoredSession.value).toBe(false)
+  })
+
+  it('signs out and triggers callbacks', async () => {
+    const onHideTimeoutLogs = vi.fn()
+    const onSignedOut = vi.fn()
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs,
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut
+    })
+
+    flow.loginState.value = 'signed_in'
+    await flow.signOut()
+
+    expect(flow.loginState.value).toBe('signed_out')
+    expect(onHideTimeoutLogs).toHaveBeenCalledTimes(1)
+    expect(onSignedOut).toHaveBeenCalledTimes(1)
+  })
+})
