@@ -1,3 +1,7 @@
+<!--
+  Overview: AppTopBar.vue file in frontend/components.
+  Responsibility: Defines the main structure/content for this part of the app.
+-->
 <script setup lang="ts">
 import { computed } from 'vue'
 import profilePlaceholder from '../assets/profile-placeholder.svg'

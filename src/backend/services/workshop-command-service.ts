@@ -1,3 +1,7 @@
+/**
+ * Overview: workshop-command-service.ts module in backend/services.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { UploadDraft } from '@shared/contracts'

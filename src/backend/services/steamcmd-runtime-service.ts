@@ -1,3 +1,7 @@
+/**
+ * Overview: steamcmd-runtime-service.ts module in backend/services.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { EventEmitter } from 'node:events'
 import { mkdir } from 'node:fs/promises'
 import { spawn } from 'node:child_process'

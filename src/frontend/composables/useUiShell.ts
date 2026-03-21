@@ -1,3 +1,7 @@
+/**
+ * Overview: useUiShell.ts module in frontend/composables.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { ref, type Ref } from 'vue'
 import { createAppGlobalKeyDownHandler, createAppGlobalMouseDownHandler } from '../events/keyboard-events'
 import type { FlowStep, PersistedRunLog } from '../types/ui'

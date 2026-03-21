@@ -1,3 +1,7 @@
+/**
+ * Overview: ui.ts module in frontend/types.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 export type AuthIssueTone = 'danger' | 'warning' | 'info'
 
 export interface AuthIssue {

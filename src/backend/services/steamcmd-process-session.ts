@@ -1,3 +1,7 @@
+/**
+ * Overview: steamcmd-process-session.ts module in backend/services.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { mkdir } from 'node:fs/promises'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { RunEvent } from '@shared/contracts'

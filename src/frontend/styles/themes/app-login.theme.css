@@ -1,3 +1,7 @@
+/*
+ * Overview: app-login.theme.css stylesheet in frontend/styles/themes.
+ * Responsibility: Defines styling rules for this part of the app.
+ */
 .login-shell {
   min-height: calc(100vh - (var(--window-pad) * 2));
   padding: 8px;

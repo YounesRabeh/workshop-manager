@@ -1,3 +1,7 @@
+/**
+ * Overview: ipc.ts module in shared.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 export const IPC_CHANNELS = {
   ensureSteamCmdInstalled: 'workshop:ensureSteamCmdInstalled',
   getAppVersion: 'workshop:getAppVersion',

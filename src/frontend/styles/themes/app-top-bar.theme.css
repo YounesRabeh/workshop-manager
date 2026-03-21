@@ -1,3 +1,7 @@
+/*
+ * Overview: app-top-bar.theme.css stylesheet in frontend/styles/themes.
+ * Responsibility: Defines styling rules for this part of the app.
+ */
 .app-top-bar .session-avatar {
   width: 132px;
   height: 132px;

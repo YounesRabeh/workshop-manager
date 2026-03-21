@@ -1,3 +1,7 @@
+/**
+ * Overview: workshop-fetch-service.ts module in backend/services.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import type { SteamProfileSummary, WorkshopItemSummary } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
 import {

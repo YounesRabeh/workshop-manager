@@ -1,3 +1,7 @@
+/**
+ * Overview: useDrafts.ts module in frontend/composables.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { computed, reactive, ref } from 'vue'
 import type { ContentFolderFileEntry } from '@shared/contracts'
 import type { ContentTreeNode, StagedContentFile, UploadDraftState } from '../types/ui'

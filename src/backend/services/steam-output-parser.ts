@@ -1,3 +1,7 @@
+/**
+ * Overview: steam-output-parser.ts module in backend/services.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import type { UploadDraft, WorkshopItemSummary } from '@shared/contracts'
 
 export interface LoginFailure {

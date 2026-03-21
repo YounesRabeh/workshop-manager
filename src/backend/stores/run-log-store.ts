@@ -1,3 +1,7 @@
+/**
+ * Overview: run-log-store.ts module in backend/stores.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { RunResult } from '@shared/contracts'

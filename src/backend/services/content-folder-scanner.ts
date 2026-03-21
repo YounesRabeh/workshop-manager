@@ -1,3 +1,7 @@
+/**
+ * Overview: content-folder-scanner.ts module in backend/services.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { readdir, stat } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
 import type { ContentFolderFileEntry } from '@shared/contracts'

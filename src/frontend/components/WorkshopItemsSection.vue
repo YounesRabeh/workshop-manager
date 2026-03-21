@@ -1,3 +1,7 @@
+<!--
+  Overview: WorkshopItemsSection.vue file in frontend/components.
+  Responsibility: Defines the main structure/content for this part of the app.
+-->
 <script setup lang="ts">
 import type { WorkshopItemSummary } from '@shared/contracts'
 import VisibilityIcon from './VisibilityIcon.vue'

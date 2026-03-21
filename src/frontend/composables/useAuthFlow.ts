@@ -1,3 +1,7 @@
+/**
+ * Overview: useAuthFlow.ts module in frontend/composables.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { computed, reactive, ref } from 'vue'
 import type { RunEvent } from '@shared/contracts'
 import type {

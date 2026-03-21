@@ -1,3 +1,7 @@
+/**
+ * Overview: profile-store.ts module in backend/stores.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { ModProfile } from '@shared/contracts'

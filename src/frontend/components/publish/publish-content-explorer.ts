@@ -1,3 +1,7 @@
+/**
+ * Overview: publish-content-explorer.ts module in frontend/components/publish.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { computed, ref, watch, type ComputedRef } from 'vue'
 import type { ContentTreeNode } from '../../types/ui'
 
