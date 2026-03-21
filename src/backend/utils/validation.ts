@@ -1,3 +1,7 @@
+/**
+ * Overview: validation.ts module in backend/utils.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import type { UploadDraft } from '@shared/contracts'
 import {
   evaluateCreateRequirements,

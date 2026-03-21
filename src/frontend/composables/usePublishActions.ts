@@ -1,3 +1,7 @@
+/**
+ * Overview: usePublishActions.ts module in frontend/composables.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { UploadDraft, WorkshopItemSummary } from '@shared/contracts'
 import type { UploadDraftState } from '../types/ui'

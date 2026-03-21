@@ -1,3 +1,7 @@
+/**
+ * Overview: keyboard-events.ts module in frontend/events.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import type { FlowStep } from '../types/ui'
 
 type StepNavigator = (step: FlowStep) => void

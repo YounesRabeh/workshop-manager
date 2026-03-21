@@ -1,3 +1,7 @@
+<!--
+  Overview: LoginSection.vue file in frontend/components.
+  Responsibility: Defines the main structure/content for this part of the app.
+-->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type {

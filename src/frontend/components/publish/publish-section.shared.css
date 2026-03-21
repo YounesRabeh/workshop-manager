@@ -1,3 +1,7 @@
+/*
+ * Overview: publish-section.shared.css stylesheet in frontend/components/publish.
+ * Responsibility: Defines styling rules for this part of the app.
+ */
 .publish-layout {
   margin-top: 1.25rem;
   display: grid;

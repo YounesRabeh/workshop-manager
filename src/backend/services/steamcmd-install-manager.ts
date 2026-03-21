@@ -1,3 +1,7 @@
+/**
+ * Overview: steamcmd-install-manager.ts module in backend/services.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { createWriteStream } from 'node:fs'
 import { access, mkdir, rm } from 'node:fs/promises'
 import { get } from 'node:https'

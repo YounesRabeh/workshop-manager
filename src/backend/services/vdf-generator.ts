@@ -1,3 +1,7 @@
+/**
+ * Overview: vdf-generator.ts module in backend/services.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import type { UploadDraft } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
 

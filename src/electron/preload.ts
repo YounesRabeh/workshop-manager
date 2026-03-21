@@ -1,3 +1,7 @@
+/**
+ * Overview: preload.ts module in electron.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AdvancedSettings,

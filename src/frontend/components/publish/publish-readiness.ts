@@ -1,3 +1,7 @@
+/**
+ * Overview: publish-readiness.ts module in frontend/components/publish.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import type { PublishChecklistItem } from '../../types/ui'
 
 export interface ReadinessStyleContext {

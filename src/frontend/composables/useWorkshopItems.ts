@@ -1,3 +1,7 @@
+/**
+ * Overview: useWorkshopItems.ts module in frontend/composables.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { computed, ref } from 'vue'
 import type { WorkshopItemSummary } from '@shared/contracts'
 import type { WorkshopVisibilityFilter } from '../types/ui'

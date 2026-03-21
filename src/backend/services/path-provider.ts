@@ -1,3 +1,7 @@
+/**
+ * Overview: path-provider.ts module in backend/services.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { app } from 'electron'
 import { join } from 'node:path'
 

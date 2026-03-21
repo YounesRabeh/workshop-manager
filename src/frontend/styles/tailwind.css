@@ -1,3 +1,7 @@
+/*
+ * Overview: tailwind.css stylesheet in frontend/styles.
+ * Responsibility: Defines styling rules for this part of the app.
+ */
 @import 'tailwindcss';
 
 :root {

@@ -1,3 +1,7 @@
+/**
+ * Overview: main.ts module in electron.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron'
 import { dirname, extname, join } from 'node:path'
 import { access, copyFile, mkdir, readFile, readdir } from 'node:fs/promises'

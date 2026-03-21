@@ -1,3 +1,7 @@
+/**
+ * Overview: publish-visibility.ts module in frontend/components/publish.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 export const visibilityOptions = [0, 1, 2, 3] as const
 
 export function visibilityLabel(value: 0 | 1 | 2 | 3): string {

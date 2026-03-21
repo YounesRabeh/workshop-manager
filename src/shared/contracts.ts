@@ -1,3 +1,7 @@
+/**
+ * Overview: contracts.ts module in shared.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 export type ErrorCode =
   | 'validation'
   | 'install'

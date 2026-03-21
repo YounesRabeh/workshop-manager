@@ -1,3 +1,7 @@
+/**
+ * Overview: size-format.ts module in frontend/utils.
+ * Responsibility: Holds the primary logic/exports for this area of the app.
+ */
 const SIZE_UNITS = ['B', 'KB', 'MB', 'GB'] as const
 
 export function formatSizeLabel(sizeBytes: number): string {

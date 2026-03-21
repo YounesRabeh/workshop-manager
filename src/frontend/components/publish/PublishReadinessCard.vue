@@ -1,3 +1,7 @@
+<!--
+  Overview: PublishReadinessCard.vue file in frontend/components/publish.
+  Responsibility: Defines the main structure/content for this part of the app.
+-->
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { PublishChecklistItem } from '../../types/ui'
