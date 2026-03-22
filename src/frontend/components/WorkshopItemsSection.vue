@@ -1,6 +1,7 @@
 <!--
-  Overview: WorkshopItemsSection.vue file in frontend/components.
-  Responsibility: Defines the main structure/content for this part of the app.
+  Overview: Workshop item browser section for filtering and selecting published mods.
+  Responsibility: Renders visibility/App ID filters and item cards, 
+  then emits refresh/reset/filter/selection actions to the parent flow.
 -->
 <script setup lang="ts">
 import type { WorkshopItemSummary } from '@shared/contracts'

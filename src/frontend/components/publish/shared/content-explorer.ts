@@ -1,9 +1,9 @@
 /**
- * Overview: publish-content-explorer.ts module in frontend/components/publish.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Shared content-explorer state utilities for publish section panels.
+ * Responsibility: Flattens staged file trees and manages collapsed/expanded folder state plus explorer toggle behavior.
  */
 import { computed, ref, watch, type ComputedRef } from 'vue'
-import type { ContentTreeNode } from '../../types/ui'
+import type { ContentTreeNode } from '../../../types/ui'
 
 export interface FlattenedContentNode {
   node: ContentTreeNode

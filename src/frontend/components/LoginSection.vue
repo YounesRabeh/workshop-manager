@@ -1,6 +1,7 @@
 <!--
-  Overview: LoginSection.vue file in frontend/components.
-  Responsibility: Defines the main structure/content for this part of the app.
+  Overview: Login and advanced-auth settings interface for unauthenticated users.
+  Responsibility: Renders credential/Steam Guard flows, stored-session controls, 
+  and Web API advanced options while emitting normalized auth interaction events.
 -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'

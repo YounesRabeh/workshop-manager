@@ -1,16 +1,16 @@
 <!--
-  Overview: PublishReadinessCard.vue file in frontend/components/publish.
-  Responsibility: Defines the main structure/content for this part of the app.
+  Overview: Reusable readiness checklist card for create/update publish forms.
+  Responsibility: Renders prioritized readiness items with contextual status styling and supports collapsible details.
 -->
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { PublishChecklistItem } from '../../types/ui'
+import type { PublishChecklistItem } from '../../../types/ui'
 import {
   readinessItemClass as sharedReadinessItemClass,
   readinessStatusClass as sharedReadinessStatusClass,
   readinessStatusLabel as sharedReadinessStatusLabel,
   type ReadinessStyleContext
-} from './publish-section.shared'
+} from '../shared'
 
 const props = defineProps<{
   title: string

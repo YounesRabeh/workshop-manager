@@ -1,6 +1,6 @@
 <!--
-  Overview: VisibilityIcon.vue file in frontend/components.
-  Responsibility: Defines the main structure/content for this part of the app.
+  Overview: Small presentational icon component for Workshop visibility states.
+  Responsibility: Renders the correct SVG glyph for public, friends-only, hidden, unlisted, or unknown visibility values.
 -->
 <script setup lang="ts">
 type Visibility = 0 | 1 | 2 | 3 | undefined

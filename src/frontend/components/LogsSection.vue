@@ -1,6 +1,7 @@
 <!--
-  Overview: LogsSection.vue file in frontend/components.
-  Responsibility: Defines the main structure/content for this part of the app.
+  Overview: Dedicated run-log viewer for SteamCMD execution history.
+  Responsibility: Lists recent runs, supports run selection/refresh, 
+  and renders status, summary, and recent output lines for the selected run.
 -->
 <script setup lang="ts">
 import type { PersistedRunLog } from '../types/ui'

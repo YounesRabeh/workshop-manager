@@ -1,15 +1,17 @@
 <!--
-  Overview: UpdatePublishSection.vue file in frontend/components/publish.
-  Responsibility: Defines the main structure/content for this part of the app.
+  Overview: Update-mode publish section for editing an existing Workshop item.
+  Responsibility: Coordinates visibility changes, readiness checks, shared draft metadata fields, 
+  and content explorer interactions for update actions.
 -->
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { WorkshopItemSummary } from '@shared/contracts'
-import type { ContentTreeNode, PublishChecklistItem, StagedContentFile, UploadDraftState } from '../../types/ui'
-import { formatSizeLabel } from '../../utils/size-format'
-import PublishContentExplorerPanel from './PublishContentExplorerPanel.vue'
-import PublishReadinessCard from './PublishReadinessCard.vue'
-import VisibilityIcon from '../VisibilityIcon.vue'
+import type { ContentTreeNode, PublishChecklistItem, StagedContentFile, UploadDraftState } from '../../../types/ui'
+import { formatSizeLabel } from '../../../utils/size-format'
+import PublishContentExplorerPanel from '../panels/PublishContentExplorerPanel.vue'
+import PublishDraftMetadataFields from '../panels/PublishDraftMetadataFields.vue'
+import PublishReadinessCard from '../panels/PublishReadinessCard.vue'
+import VisibilityIcon from '../../VisibilityIcon.vue'
 import {
   previewBorderClass,
   splitReadinessItems,
@@ -22,8 +24,8 @@ import {
   visibilityOptionClass,
   visibilityOptions,
   visibilityTooltip
-} from './publish-section.shared'
-import './publish-section.shared.css'
+} from '../shared'
+import '../styles/publish-section.shared.css'
 
 const props = defineProps<{
   selectedWorkshopItem: WorkshopItemSummary | undefined
@@ -54,19 +56,6 @@ const emit = defineEmits<{
   (e: 'change-visibility-selection', value: 0 | 1 | 2 | 3): void
   (e: 'update-visibility-only'): void
 }>()
-
-function onTagInput(event: Event): void {
-  const target = event.target as HTMLInputElement | null
-  emit('change-tag-input', target?.value ?? '')
-}
-
-function onTagKeydown(event: KeyboardEvent): void {
-  if (event.key !== 'Enter' && event.key !== ',' && event.key !== ';') {
-    return
-  }
-  event.preventDefault()
-  emit('add-tag')
-}
 
 function onVisibilityOptionClick(value: 0 | 1 | 2 | 3): void {
   emit('change-visibility-selection', value)
@@ -247,93 +236,22 @@ function submitPrimaryAction(): void {
         :context="readinessContext"
       />
 
-      <label class="mt-3 block text-sm text-slate-300">Title</label>
-      <input v-model="draft.title" class="publish-field-input mt-1" />
-
-      <label class="mt-3 block text-sm text-slate-300">Release Notes (optional)</label>
-      <textarea
-        v-model="draft.releaseNotes"
-        rows="2"
-        :disabled="!hasContentFolder"
-        :placeholder="!hasContentFolder ? 'Select a content folder to enable release notes.' : ''"
-        class="publish-field-textarea mt-1"
+      <PublishDraftMetadataFields
+        :draft="draft"
+        :tag-input="tagInput"
+        :has-content-folder="hasContentFolder"
+        :preview-file-value="previewFileValue"
+        :upload-preview-image-src="uploadPreviewImageSrc"
+        :preview-image-load-failed="previewImageLoadFailed"
+        :preview-image-is-square="previewImageIsSquare"
+        @pick-preview-file="emit('pick-preview-file')"
+        @clear-preview-file="emit('clear-preview-file')"
+        @change-tag-input="emit('change-tag-input', $event)"
+        @add-tag="emit('add-tag')"
+        @remove-tag="emit('remove-tag', $event)"
+        @preview-load="onUploadPreviewLoad"
+        @preview-error="onUploadPreviewError"
       />
-
-      <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
-        <div class="max-w-[22rem]">
-          <label class="text-sm text-slate-300">Thumbnail (optional)</label>
-          <button
-            type="button"
-            class="publish-preview-picker mt-1"
-            @click="emit('pick-preview-file')"
-          >
-            <div class="aspect-square w-full">
-              <img
-                v-if="uploadPreviewImageSrc && !previewImageLoadFailed"
-                :src="uploadPreviewImageSrc"
-                alt="Workshop preview thumbnail"
-                class="h-full w-full object-cover"
-                @load="onUploadPreviewLoad"
-                @error="onUploadPreviewError"
-              />
-              <div v-else class="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-xs text-slate-300">
-                <svg class="h-12 w-12 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
-                  <circle cx="9" cy="10" r="1.5" />
-                  <path d="m6.5 16 3.3-3.5 2.7 2.6 2.1-2.2 2.9 3.1" />
-                </svg>
-                <span>Click to choose an image</span>
-              </div>
-            </div>
-          </button>
-          <div class="mt-2 flex items-center justify-between gap-2">
-            <p class="truncate text-xs text-slate-400">
-              {{ previewFileValue || 'No preview file selected' }}
-            </p>
-            <button
-              v-if="previewFileValue"
-              type="button"
-              title="Clear selected image"
-              aria-label="Clear selected image"
-              class="publish-preview-clear-button shrink-0"
-              @click="emit('clear-preview-file')"
-            >
-              Clear
-            </button>
-          </div>
-          <p
-            v-if="previewFileValue && previewImageIsSquare === false && !previewImageLoadFailed"
-            class="mt-1 text-[11px] text-amber-300"
-          >
-            Warning: preview image is not square (1:1). Steam thumbnails look best when square.
-          </p>
-        </div>
-
-        <div>
-          <label class="text-sm text-slate-300">Tags</label>
-          <div class="mt-1 flex gap-2">
-            <input
-              :value="tagInput"
-              placeholder="Add tags (Enter, comma, or semicolon)"
-              class="publish-tag-input"
-              @input="onTagInput"
-              @keydown="onTagKeydown"
-            />
-            <button
-              type="button"
-              class="publish-tag-add-button"
-              @click="emit('add-tag')"
-            >
-              Add
-            </button>
-          </div>
-          <div class="mt-2 flex flex-wrap gap-2">
-            <button type="button" v-for="tag in draft.tags" :key="tag" class="rounded-full border border-[#386487] bg-[#122638] px-3 py-1 text-xs font-semibold text-sky-200" @click="emit('remove-tag', tag)">
-              {{ tag }} x
-            </button>
-          </div>
-        </div>
-      </div>
 
       <div class="mt-4">
         <button
