@@ -1,6 +1,7 @@
 /**
- * Overview: usePublishActions.ts module in frontend/composables.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Encapsulates create/update/visibility publish command flows for workshop items.
+ * Responsibility: Builds payloads, enforces action preconditions, 
+ * coordinates IPC requests, and updates UI-facing publish/visibility state with user feedback.
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { UploadDraft, WorkshopItemSummary } from '@shared/contracts'
@@ -356,4 +357,3 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     updateVisibilityOnly
   }
 }
-

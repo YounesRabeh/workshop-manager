@@ -1,6 +1,6 @@
 /*
- * Overview: app-login.theme.css stylesheet in frontend/styles/themes.
- * Responsibility: Defines styling rules for this part of the app.
+ * Overview: Styles for unauthenticated/login flow surfaces and controls.
+ * Responsibility: Skins login panels, auth status/guard messaging, and login-specific action button states.
  */
 .login-shell {
   min-height: calc(100vh - (var(--window-pad) * 2));

@@ -1,6 +1,6 @@
 /*
- * Overview: tailwind.css stylesheet in frontend/styles.
- * Responsibility: Defines styling rules for this part of the app.
+ * Overview: Global frontend stylesheet entrypoint with Tailwind import and base visual tokens.
+ * Responsibility: Defines app-wide root variables, baseline body styling, and shared foundational animations.
  */
 @import 'tailwindcss';
 

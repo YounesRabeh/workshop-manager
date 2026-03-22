@@ -1,6 +1,7 @@
 /*
- * Overview: app-workshop.theme.css stylesheet in frontend/styles/themes.
- * Responsibility: Defines styling rules for this part of the app.
+ * Overview: Styles for workshop listing cards, publish surfaces, and shared action controls.
+ * Responsibility: Defines responsive item-grid behavior, card interaction states, visibility badges,
+  and Steam-themed utility button variants.
  */
 .workshop-grid {
   display: grid;

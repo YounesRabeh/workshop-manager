@@ -1,6 +1,6 @@
 /*
- * Overview: app-base.theme.css stylesheet in frontend/styles/themes.
- * Responsibility: Defines styling rules for this part of the app.
+ * Overview: Core Steam-inspired foundation styles shared across all app screens.
+ * Responsibility: Defines global layout primitives, scrollbar styling, splash screen visuals, and base shell/panel theming.
  */
 html,
 body,

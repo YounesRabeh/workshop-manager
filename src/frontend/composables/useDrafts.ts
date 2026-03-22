@@ -1,6 +1,7 @@
 /**
- * Overview: useDrafts.ts module in frontend/composables.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Centralizes create/update draft state and content-file workspace helpers.
+ * Responsibility: Provides draft cloning/mutation utilities, tag operations, 
+ * content file normalization/tree building, and staged content state per mode.
  */
 import { computed, reactive, ref } from 'vue'
 import type { ContentFolderFileEntry } from '@shared/contracts'

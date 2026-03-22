@@ -1,6 +1,6 @@
 /*
- * Overview: app-top-bar.theme.css stylesheet in frontend/styles/themes.
- * Responsibility: Defines styling rules for this part of the app.
+ * Overview: Styling layer for the application top bar and navigation strip.
+ * Responsibility: Controls session avatar/header, toolbar/menu interactions, and dev badge tooltip presentation.
  */
 .app-top-bar .session-avatar {
   width: 132px;

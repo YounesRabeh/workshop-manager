@@ -1,6 +1,6 @@
 /**
- * Overview: size-format.ts module in frontend/utils.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Small utility for rendering byte counts as readable size labels.
+ * Responsibility: Normalizes raw byte input and formats it into B/KB/MB/GB units for UI display.
  */
 const SIZE_UNITS = ['B', 'KB', 'MB', 'GB'] as const
 

@@ -1,6 +1,7 @@
 /**
- * Overview: ui.ts module in frontend/types.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Declares renderer-local UI state and view-model types.
+ * Responsibility: Defines typed shapes for auth, drafts, run logs, navigation steps, 
+ * and publish/filter UI contracts used across frontend components/composables.
  */
 export type AuthIssueTone = 'danger' | 'warning' | 'info'
 
