@@ -1,6 +1,6 @@
 /**
- * Overview: preload.ts module in electron.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Exposes a typed, minimal renderer API over Electron IPC.
+ * Responsibility: Bridges frontend calls/events to whitelisted main-process channels via `contextBridge` and `ipcRenderer`.
  */
 import { contextBridge, ipcRenderer } from 'electron'
 import type {

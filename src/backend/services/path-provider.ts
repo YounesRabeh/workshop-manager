@@ -1,6 +1,6 @@
 /**
- * Overview: path-provider.ts module in backend/services.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Provides canonical filesystem paths for backend persistence and runtime data.
+ * Responsibility: Derives user-data rooted locations for profiles, run logs, and SteamCMD runtime artifacts.
  */
 import { app } from 'electron'
 import { join } from 'node:path'

@@ -1,6 +1,7 @@
 /**
- * Overview: steam-output-parser.ts module in backend/services.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Provides SteamCMD output parsers and helpers used by runtime/workshop services.
+ * Responsibility: Detects login/workshop outcomes, normalizes Steam API/community payloads,
+ *  and builds safe argument fragments for SteamCMD commands.
  */
 import type { UploadDraft, WorkshopItemSummary } from '@shared/contracts'
 
@@ -368,6 +369,6 @@ export function escapeInteractiveArg(value: string): string {
 }
 
 export function normalizeReleaseNoteForDraft(draft: UploadDraft): string | undefined {
-  const normalizedReleaseNote = draft.releaseNotes.replace(/\r\n/g, '\n').trim()
+  const normalizedReleaseNote = (draft.changenote ?? '').replace(/\r\n/g, '\n').trim()
   return normalizedReleaseNote.length > 0 ? normalizedReleaseNote : undefined
 }

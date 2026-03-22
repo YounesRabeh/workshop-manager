@@ -1,6 +1,7 @@
 /**
- * Overview: main.ts module in electron.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Electron main-process entrypoint for app startup, window lifecycle, and IPC wiring.
+ * Responsibility: Bootstraps runtime/storage services, 
+ * configures platform-specific behavior, and handles renderer requests for SteamCMD workflows and filesystem actions.
  */
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron'
 import { dirname, extname, join } from 'node:path'
@@ -234,7 +235,8 @@ app.whenReady().then(async () => {
 
   if (process.platform === 'linux') {
     app.setName('Workshop Manager')
-    app.setDesktopName('workshop-manager.desktop')
+    const linuxApp = app as Electron.App & { setDesktopName?: (desktopFileName: string) => void }
+    linuxApp.setDesktopName?.('workshop-manager.desktop')
   }
 
   Menu.setApplicationMenu(null)

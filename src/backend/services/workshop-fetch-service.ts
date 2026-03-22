@@ -1,6 +1,7 @@
 /**
- * Overview: workshop-fetch-service.ts module in backend/services.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Fetches Steam profile and workshop item metadata for the authenticated user.
+ * Responsibility: Loads profile details, 
+ * aggregates workshop listings from Steam Web API and Community pages, and normalizes merged results.
  */
 import type { SteamProfileSummary, WorkshopItemSummary } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
