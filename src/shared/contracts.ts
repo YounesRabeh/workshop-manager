@@ -1,6 +1,6 @@
 /**
- * Overview: contracts.ts module in shared.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Declares shared TypeScript contracts used across Electron main, preload, and renderer layers.
+ * Responsibility: Defines canonical data models, IPC payload/result shapes, and error/run/install typing for end-to-end consistency.
  */
 export type ErrorCode =
   | 'validation'

@@ -1,6 +1,6 @@
 /**
- * Overview: ipc.ts module in shared.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Central registry of IPC channel names shared between Electron main and preload/renderer.
+ * Responsibility: Defines stable, typed channel identifiers for all app commands, queries, and run-event streaming.
  */
 export const IPC_CHANNELS = {
   ensureSteamCmdInstalled: 'workshop:ensureSteamCmdInstalled',
