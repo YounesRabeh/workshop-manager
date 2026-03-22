@@ -6,22 +6,44 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 
 describe('frontend publish structure', () => {
-  it('keeps canonical publish components under components/publish', () => {
+  it('keeps publish feature grouped under components/publish subfolders', () => {
     expect(
       existsSync(
-        resolve(root, 'src/frontend/components/publish/CreatePublishSection.vue')
+        resolve(root, 'src/frontend/components/publish/sections/CreatePublishSection.vue')
       )
     ).toBe(true)
     expect(
       existsSync(
-        resolve(root, 'src/frontend/components/publish/UpdatePublishSection.vue')
+        resolve(root, 'src/frontend/components/publish/sections/UpdatePublishSection.vue')
       )
     ).toBe(true)
     expect(
       existsSync(
-        resolve(root, 'src/frontend/components/publish/publish-section.shared.ts')
+        resolve(root, 'src/frontend/components/publish/shared/index.ts')
       )
     ).toBe(true)
+    expect(
+      existsSync(
+        resolve(root, 'src/frontend/components/publish/panels/PublishReadinessCard.vue')
+      )
+    ).toBe(true)
+    expect(
+      existsSync(
+        resolve(root, 'src/frontend/components/publish/styles/publish-section.shared.css')
+      )
+    ).toBe(true)
+  })
+
+  it('removes legacy flat files under components/publish', () => {
+    expect(
+      existsSync(resolve(root, 'src/frontend/components/publish/CreatePublishSection.vue'))
+    ).toBe(false)
+    expect(
+      existsSync(resolve(root, 'src/frontend/components/publish/UpdatePublishSection.vue'))
+    ).toBe(false)
+    expect(
+      existsSync(resolve(root, 'src/frontend/components/publish/publish-section.shared.ts'))
+    ).toBe(false)
   })
 
   it('removes legacy top-level publish compatibility files', () => {
