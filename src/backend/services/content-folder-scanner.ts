@@ -1,6 +1,7 @@
 /**
- * Overview: content-folder-scanner.ts module in backend/services.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Recursively scans a selected workshop content folder and returns normalized file metadata.
+ * Responsibility: Validates the input directory, 
+ * traverses regular files safely, and reports relative paths with byte sizes for upload/update checks.
  */
 import { readdir, stat } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'

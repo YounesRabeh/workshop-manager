@@ -1,6 +1,7 @@
 /**
- * Overview: steamcmd-runtime-service.ts module in backend/services.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Orchestrates authenticated SteamCMD runtime workflows for login and workshop operations.
+ * Responsibility: Coordinates process sessions, login state, 
+ * run events/logging, and delegates command preparation and workshop/profile fetching to specialized services.
  */
 import { EventEmitter } from 'node:events'
 import { mkdir } from 'node:fs/promises'

@@ -1,6 +1,6 @@
 /**
- * Overview: run-log-store.ts module in backend/stores.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Maintains in-memory run log state and persists session output to disk.
+ * Responsibility: Creates run records, batches/appends live output, finalizes run status, and exposes run retrieval/listing APIs.
  */
 import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'

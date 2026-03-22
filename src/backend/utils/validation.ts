@@ -1,6 +1,6 @@
 /**
- * Overview: validation.ts module in backend/utils.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Validates workshop upload/update/visibility drafts before command execution.
+ * Responsibility: Enforces mode-specific required fields, visibility constraints, and tag-shape checks using shared requirement evaluators.
  */
 import type { UploadDraft } from '@shared/contracts'
 import {

@@ -1,6 +1,7 @@
 /**
- * Overview: workshop-command-service.ts module in backend/services.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Prepares SteamCMD workshop command inputs for upload, update, and visibility operations.
+ * Responsibility: Validates drafts, checks update content folders,
+ *  writes run-scoped VDF files, and returns executable command arguments.
  */
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'

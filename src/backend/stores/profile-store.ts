@@ -1,6 +1,6 @@
 /**
- * Overview: profile-store.ts module in backend/stores.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Persists profile and preference state in a local JSON-backed store.
+ * Responsibility: Reads/writes mod profiles, remembered auth options, and Web API settings, with directory bootstrap and reset support.
  */
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'

@@ -1,6 +1,7 @@
 /**
- * Overview: steamcmd-install-manager.ts module in backend/services.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Resolves and installs the SteamCMD executable for the backend runtime.
+ * Responsibility: Reports install status, supports manual executable overrides,
+ *  and performs OS-aware download/extraction when SteamCMD is missing.
  */
 import { createWriteStream } from 'node:fs'
 import { access, mkdir, rm } from 'node:fs/promises'

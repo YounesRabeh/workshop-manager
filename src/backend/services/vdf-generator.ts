@@ -1,6 +1,7 @@
 /**
- * Overview: vdf-generator.ts module in backend/services.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Generates Steam Workshop VDF payloads from validated upload or update drafts.
+ * Responsibility: Escapes and normalizes field values, 
+ * enforces mode-specific validation, and emits VDF text compatible with SteamCMD.
  */
 import type { UploadDraft } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
