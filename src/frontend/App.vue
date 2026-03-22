@@ -8,10 +8,10 @@ import { computed, ref, watch } from 'vue'
 import type { WorkshopItemSummary } from '@shared/contracts'
 import { evaluateCreateRequirements, evaluateUpdateRequirements } from '@shared/workshop-requirements'
 import AppTopBar from './components/AppTopBar.vue'
-import CreatePublishSection from './components/publish/CreatePublishSection.vue'
+import CreatePublishSection from './components/publish/sections/CreatePublishSection.vue'
 import LoginSection from './components/LoginSection.vue'
 import LogsSection from './components/LogsSection.vue'
-import UpdatePublishSection from './components/publish/UpdatePublishSection.vue'
+import UpdatePublishSection from './components/publish/sections/UpdatePublishSection.vue'
 import WorkshopItemsSection from './components/WorkshopItemsSection.vue'
 import {
   applyDraft,

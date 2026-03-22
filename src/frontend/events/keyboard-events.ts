@@ -1,6 +1,7 @@
 /**
  * Overview: Provides global keyboard/mouse interaction handlers for app navigation and accessibility.
- * Responsibility: Maps hotkeys to flow navigation/fullscreen/back actions, manages directional focus movement, and normalizes keyboard behavior for form controls.
+ * Responsibility: Maps hotkeys to flow navigation/fullscreen/back actions, 
+ * manages directional focus movement, and normalizes keyboard behavior for form controls.
  */
 import type { FlowStep } from '../types/ui'
 

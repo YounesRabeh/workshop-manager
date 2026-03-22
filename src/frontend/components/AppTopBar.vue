@@ -1,6 +1,6 @@
 <!--
-  Overview: AppTopBar.vue file in frontend/components.
-  Responsibility: Defines the main structure/content for this part of the app.
+  Overview: Authenticated app header and primary navigation surface.
+  Responsibility: Displays account/session summary, exposes top-level actions (about/fullscreen/sign out), and routes between mods/update/create steps.
 -->
 <script setup lang="ts">
 import { computed } from 'vue'

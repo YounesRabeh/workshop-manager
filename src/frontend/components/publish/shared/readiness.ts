@@ -1,8 +1,8 @@
 /**
- * Overview: publish-readiness.ts module in frontend/components/publish.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Shared readiness presentation rules for publish checklist items.
+ * Responsibility: Computes checklist item tone/status labels and splits prioritized readiness groups for create/update UI cards.
  */
-import type { PublishChecklistItem } from '../../types/ui'
+import type { PublishChecklistItem } from '../../../types/ui'
 
 export interface ReadinessStyleContext {
   isUpdateMode: boolean

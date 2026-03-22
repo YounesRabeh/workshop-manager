@@ -1,6 +1,7 @@
 /**
- * Overview: publish-visibility.ts module in frontend/components/publish.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Shared visibility metadata and styling helpers for publish/update flows.
+ * Responsibility: Maps Steam visibility values to labels/hints/tooltips and returns mode-aware style classes for cards, 
+ * options, actions, and preview accents.
  */
 export const visibilityOptions = [0, 1, 2, 3] as const
 

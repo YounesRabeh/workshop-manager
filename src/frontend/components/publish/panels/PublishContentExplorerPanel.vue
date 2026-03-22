@@ -1,11 +1,12 @@
 <!--
-  Overview: PublishContentExplorerPanel.vue file in frontend/components/publish.
-  Responsibility: Defines the main structure/content for this part of the app.
+  Overview: Side-panel content explorer for staged workshop files.
+  Responsibility: Displays selected content-folder summary and interactive file tree controls 
+  (collapse/expand/reset/select-folder) for publish flows.
 -->
 <script setup lang="ts">
-import type { FlattenedContentNode } from './publish-section.shared'
-import type { StagedContentFile } from '../../types/ui'
-import { formatSizeLabel } from '../../utils/size-format'
+import type { FlattenedContentNode } from '../shared'
+import type { StagedContentFile } from '../../../types/ui'
+import { formatSizeLabel } from '../../../utils/size-format'
 
 defineProps<{
   stagedContentFiles: StagedContentFile[]
