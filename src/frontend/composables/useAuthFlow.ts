@@ -1,6 +1,6 @@
 /**
- * Overview: useAuthFlow.ts module in frontend/composables.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Manages frontend authentication state and Steam session interactions.
+ * Responsibility: Handles login/logout/guard flows, advanced settings persistence, profile loading, and run-event auth state updates.
  */
 import { computed, reactive, ref } from 'vue'
 import type { RunEvent } from '@shared/contracts'

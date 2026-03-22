@@ -1,6 +1,6 @@
 /**
- * Overview: keyboard-events.ts module in frontend/events.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Provides global keyboard/mouse interaction handlers for app navigation and accessibility.
+ * Responsibility: Maps hotkeys to flow navigation/fullscreen/back actions, manages directional focus movement, and normalizes keyboard behavior for form controls.
  */
 import type { FlowStep } from '../types/ui'
 

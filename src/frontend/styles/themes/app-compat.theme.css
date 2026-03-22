@@ -1,6 +1,6 @@
 /*
- * Overview: app-compat.theme.css stylesheet in frontend/styles/themes.
- * Responsibility: Defines styling rules for this part of the app.
+ * Overview: Compatibility override layer aligning utility classes with the Steam visual theme.
+ * Responsibility: Remaps framework utility colors/borders/inputs/buttons so mixed class usage stays visually consistent.
  */
 .steam-theme .bg-white,
 .steam-theme .bg-white\/85,

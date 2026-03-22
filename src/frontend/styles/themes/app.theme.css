@@ -1,6 +1,6 @@
 /*
- * Overview: app.theme.css stylesheet in frontend/styles/themes.
- * Responsibility: Defines styling rules for this part of the app.
+ * Overview: Theme aggregation stylesheet for the renderer app shell.
+ * Responsibility: Imports and composes base, login, workshop, and compatibility theme layers in load order.
  */
 @import './app-base.theme.css';
 @import './app-login.theme.css';

@@ -1,6 +1,7 @@
 /**
- * Overview: useWorkshopItems.ts module in frontend/composables.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Handles workshop item list state, filtering, and selection behavior in the renderer.
+ * Responsibility: Loads items from IPC, applies app/visibility filters, 
+ * tracks selection, and exposes open/refresh actions with status updates.
  */
 import { computed, ref } from 'vue'
 import type { WorkshopItemSummary } from '@shared/contracts'

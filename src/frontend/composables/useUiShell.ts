@@ -1,6 +1,7 @@
 /**
- * Overview: useUiShell.ts module in frontend/composables.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Provides app-shell UI state and global interaction helpers.
+ * Responsibility: Manages toasts, about/fullscreen state, run-log selection/loading, 
+ * and global keyboard/mouse listeners tied to app navigation.
  */
 import { ref, type Ref } from 'vue'
 import { createAppGlobalKeyDownHandler, createAppGlobalMouseDownHandler } from '../events/keyboard-events'
