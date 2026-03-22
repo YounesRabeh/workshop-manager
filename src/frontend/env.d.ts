@@ -1,6 +1,6 @@
 /**
- * Overview: env.d.ts module in frontend.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Frontend ambient type declarations for Vite and preload-exposed globals.
+ * Responsibility: Registers Vite client typings and augments `window` with the typed `workshop` IPC API.
  */
 /// <reference types="vite/client" />
 

@@ -1,6 +1,6 @@
 /**
- * Overview: vue-shim.d.ts module in frontend.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: TypeScript shim for importing Vue single-file components.
+ * Responsibility: Declares the `*.vue` module type so SFC imports are recognized as typed Vue components.
  */
 declare module '*.vue' {
   import type { DefineComponent } from 'vue'

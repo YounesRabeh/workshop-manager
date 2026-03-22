@@ -1,6 +1,6 @@
 <!--
-  Overview: App.vue file in frontend.
-  Responsibility: Defines the main structure/content for this part of the app.
+  Overview: Root Vue component for the Workshop Manager renderer UI.
+  Responsibility: Orchestrates auth, workshop browsing, publish/update flows, run-log UX, and shared app-level state/composable coordination.
 -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'

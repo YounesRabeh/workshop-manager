@@ -1,6 +1,7 @@
 /**
- * Overview: workshop-requirements.ts module in shared.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Shared requirement evaluators for Steam Workshop create, update, and visibility flows.
+ * Responsibility: Computes field validity, missing requirements,
+ *  and update path shape so frontend and backend enforce consistent draft rules.
  */
 export type UpdateDraftPath = 'none' | 'content' | 'preview' | 'content_and_preview'
 
