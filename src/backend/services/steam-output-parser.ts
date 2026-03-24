@@ -91,6 +91,10 @@ export function parseWorkshopRunFailure(
   const retryMatches = joined.match(/\bretrying\.\.\./gi)
   const retryCount = retryMatches?.length ?? 0
 
+  if (/failed to create new workshop item\s*\(access denied\)|access denied/i.test(joined)) {
+    return 'Steam denied creating this Workshop item (Access Denied). Verify app ownership/permissions and ensure your Steam account can publish for this game.'
+  }
+
   if (/build for workshop item has no content|has no content/i.test(joined)) {
     return 'No mod content found. Select a content folder with files, then retry.'
   }

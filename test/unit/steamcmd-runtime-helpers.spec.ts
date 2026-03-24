@@ -319,4 +319,15 @@ describe('steamcmd runtime helpers', () => {
 
     expect(failure).toBe('No mod content found. Select a content folder with files, then retry.')
   })
+
+  it('classifies create access denied failures with a permissions-focused message', () => {
+    const failure = parseWorkshopRunFailure(
+      ['ERROR! Failed to create new workshop item (Access Denied).'],
+      'upload'
+    )
+
+    expect(failure).toBe(
+      'Steam denied creating this Workshop item (Access Denied). Verify app ownership/permissions and ensure your Steam account can publish for this game.'
+    )
+  })
 })
