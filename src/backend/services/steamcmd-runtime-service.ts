@@ -310,11 +310,37 @@ export class SteamCmdRuntimeService extends EventEmitter {
     const prepared = await this.workshopCommandService.prepare(this.loginState.username, draft, mode)
     this.emitRunEvent({ runId: prepared.runId, ts: Date.now(), type: 'phase_changed', phase: mode })
 
-    const commandResult = await this.processSession.run(prepared.runId, prepared.args, {
-      phase: mode,
-      timeoutMs: 10 * 60_000,
-      emitOutputEvents: false
-    })
+    let commandResult: { lines: string[]; exitCode: number }
+    try {
+      commandResult = await this.processSession.run(prepared.runId, prepared.args, {
+        phase: mode,
+        timeoutMs: 60_000,
+        emitOutputEvents: false
+      })
+    } catch (error) {
+      const runError =
+        error instanceof AppError ? error : new AppError('command_failed', errorMessage(error))
+      this.emitRunEvent({
+        runId: prepared.runId,
+        ts: Date.now(),
+        type: 'run_failed',
+        phase: mode,
+        errorCode: runError.code
+      })
+      await this.runLogStore.finalize(prepared.runId, {
+        success: false,
+        status: 'failed'
+      })
+
+      if (runError.code === 'timeout' && mode === 'upload') {
+        throw new AppError(
+          'timeout',
+          'Steam upload timed out after 60s. Steam may still finish creating the item in the background. Refresh My Workshop Items to confirm.'
+        )
+      }
+
+      throw runError
+    }
 
     if (commandResult.exitCode !== 0) {
       const parsedFailure = parseWorkshopRunFailure(commandResult.lines, mode)

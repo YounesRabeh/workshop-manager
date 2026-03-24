@@ -51,7 +51,10 @@ const emit = defineEmits<{
       <div class="flex items-center justify-between gap-2">
         <p class="text-sm text-orange-100/85">Selected Content Folder</p>
       </div>
-      <p class="mt-1 select-text break-all text-lg font-semibold text-orange-100">
+      <p
+        class="mt-1 truncate text-lg font-semibold text-orange-100"
+        :title="hasContentFolder ? contentFolderValue : 'Not selected'"
+      >
         {{ hasContentFolder ? contentFolderValue : 'Not selected' }}
       </p>
     </div>
@@ -102,7 +105,7 @@ const emit = defineEmits<{
           <li
             v-for="{ node, depth } in flattenedContentNodes"
             :key="node.id"
-            class="group flex items-center justify-between gap-3 rounded-lg border border-[#355874] bg-[linear-gradient(120deg,#122638,#152d41)] px-3 py-2 transition-colors hover:border-[#5d88ab] hover:bg-[linear-gradient(120deg,#16314a,#1a3850)]"
+            class="group min-w-0 flex items-center justify-between gap-3 rounded-lg border border-[#355874] bg-[linear-gradient(120deg,#122638,#152d41)] px-3 py-2 transition-colors hover:border-[#5d88ab] hover:bg-[linear-gradient(120deg,#16314a,#1a3850)]"
             :style="{ paddingLeft: `${0.75 + depth * 0.85}rem` }"
           >
             <button
@@ -124,18 +127,18 @@ const emit = defineEmits<{
               <svg class="h-4 w-4 shrink-0 text-sky-300/90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                 <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5l1.8 2H19.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-11Z" />
               </svg>
-              <div class="min-w-0 flex-1">
-                <p class="truncate whitespace-nowrap text-[14px] font-semibold text-slate-100">{{ node.name }}</p>
+              <div class="min-w-0 flex-1 overflow-hidden">
+                <p class="truncate text-[14px] font-semibold text-slate-100" :title="node.name">{{ node.name }}</p>
                 <p class="mt-0.5 truncate text-[11px] text-slate-400">{{ node.fileCount }} file(s) • {{ formatSizeLabel(node.sizeBytes) }}</p>
               </div>
             </button>
-            <div v-else class="min-w-0 flex flex-1 items-center gap-2">
+            <div v-else class="min-w-0 flex flex-1 items-center gap-2 overflow-hidden">
               <span class="w-4 shrink-0" aria-hidden="true" />
               <svg class="h-4 w-4 shrink-0 text-cyan-200/90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                 <path d="M8 3h6l5 5v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
                 <path d="M14 3v6h6" />
               </svg>
-              <p class="min-w-0 truncate whitespace-nowrap text-[14px] font-semibold text-slate-100">{{ node.name }}</p>
+              <p class="min-w-0 truncate text-[14px] font-semibold text-slate-100" :title="node.name">{{ node.name }}</p>
             </div>
             <div class="flex items-center gap-2">
               <span class="shrink-0 rounded-md border border-[#466887] bg-[#102335] px-2.5 py-0.5 text-xs font-medium text-slate-100">
