@@ -102,7 +102,7 @@ function buildUploadDraft(
 export function usePublishActions(options: UsePublishActionsOptions) {
   const committedVisibility = ref<0 | 1 | 2 | 3>(0)
   const pendingVisibility = ref<0 | 1 | 2 | 3>(0)
-  const createVisibility = ref<0 | 1 | 2 | 3>(0)
+  const createVisibility = ref<0 | 1 | 2 | 3>(2)
   const isUpdateConfirmOpen = ref(false)
   const isCreateConfirmOpen = ref(false)
 
@@ -207,6 +207,17 @@ export function usePublishActions(options: UsePublishActionsOptions) {
           ? `Published File ID: ${result.publishedFileId}`
           : 'Workshop item upload finished successfully.'
       })
+
+      try {
+        const refreshedItems = await window.workshop.getMyWorkshopItems({
+          appId: options.workshopFilterAppId.value || undefined
+        })
+        options.workshopItems.value = refreshedItems
+        options.setStatusMessage('Upload completed successfully. Mod list refreshed.')
+      } catch (refreshError) {
+        const parsed = options.normalizeError(refreshError)
+        options.setStatusMessage(`Upload completed, but mod list refresh failed (${parsed.code}): ${parsed.message}`)
+      }
     } catch (error) {
       handleActionFailure('upload', error)
     }
