@@ -31,7 +31,7 @@ const avatarSrc = computed(() => props.profileImageUrl?.trim() || profilePlaceho
 </script>
 
 <template>
-  <section class="app-top-bar fade-in app-panel overflow-hidden rounded-3xl border border-[#2a475e] bg-white/85 p-6 shadow-lg md:p-7">
+  <section class="app-top-bar fade-in app-panel overflow-hidden rounded-xl border border-[#2a475e] bg-white/85 p-6 shadow-lg md:p-7">
     <div class="topbar-header flex flex-wrap items-start justify-between gap-5 px-1 py-1">
       <div class="session-media flex min-w-0 items-center gap-5">
         <img :src="avatarSrc" :alt="`${accountDisplayName} avatar`" class="session-avatar" />

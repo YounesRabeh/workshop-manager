@@ -315,7 +315,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
       commandResult = await this.processSession.run(prepared.runId, prepared.args, {
         phase: mode,
         timeoutMs: 60_000,
-        emitOutputEvents: false
+        emitOutputEvents: true
       })
     } catch (error) {
       const runError =

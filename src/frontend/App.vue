@@ -4,8 +4,8 @@
    publish/update flows, run-log UX, and shared app-level state/composable coordination.
 -->
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import type { WorkshopItemSummary } from '@shared/contracts'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import type { RunEvent, WorkshopItemSummary } from '@shared/contracts'
 import { evaluateCreateRequirements, evaluateUpdateRequirements } from '@shared/workshop-requirements'
 import AppTopBar from './components/AppTopBar.vue'
 import CreatePublishSection from './components/publish/sections/CreatePublishSection.vue'
@@ -26,6 +26,7 @@ import { usePublishActions } from './composables/usePublishActions'
 import { useUiShell } from './composables/useUiShell'
 import { useWorkshopItems } from './composables/useWorkshopItems'
 import './styles/themes/app.theme.css'
+import { PublishProgressTracker } from './utils/publish-progress-tracker'
 import { formatSizeLabel } from './utils/size-format'
 import type {
   FlowStep,
@@ -36,6 +37,7 @@ import type {
 
 const flowStep = ref<FlowStep>('mods')
 const appVersion = ref('dev')
+const publishProgress = new PublishProgressTracker()
 
 const {
   createDraft,
@@ -75,10 +77,11 @@ const authFlow = useAuthFlow({
     await Promise.all([workshopStore.loadWorkshopItems(), authFlow.refreshCurrentProfile()])
   },
   onSignedOut: () => {
+    publishProgress.reset()
     selectedWorkshopItemId.value = ''
     publishActions.committedVisibility.value = 0
     publishActions.pendingVisibility.value = 0
-    publishActions.createVisibility.value = 0
+    publishActions.createVisibility.value = 2
     workshopItems.value = []
     workshopFilterAppId.value = ''
     workshopVisibilityFilter.value = 'all'
@@ -133,7 +136,7 @@ const {
   signOut,
   quitApp,
   submitSteamGuardCode,
-  handleRunEvent
+  handleRunEvent: handleAuthRunEvent
 } = authFlow
 
 const uiShell = useUiShell({
@@ -307,6 +310,21 @@ const createChecklist = computed<PublishChecklistItem[]>(() => {
     { label: 'Release notes', ok: createDraft.releaseNotes.trim().length > 0, optional: true },
     { label: 'Preview image', ok: createDraft.previewFile.trim().length > 0, optional: true },
   ]
+})
+
+const publishProgressVisible = publishProgress.visible
+const publishProgressPercent = publishProgress.percent
+const publishProgressLabel = publishProgress.label
+const publishProgressLastLine = publishProgress.lastLine
+const publishProgressTitle = publishProgress.title
+
+function handleRunEvent(event: RunEvent): void {
+  handleAuthRunEvent(event)
+  publishProgress.handleRunEvent(event)
+}
+
+onUnmounted(() => {
+  publishProgress.destroy()
 })
 
 function goToStep(step: FlowStep): void {
@@ -544,6 +562,30 @@ watch(
           @toggle-fullscreen="toggleFullscreen"
           @sign-out="signOut"
         />
+
+        <section
+          v-if="publishProgressVisible"
+          class="my-5 rounded-xl border border-[#2c4b63] bg-[linear-gradient(180deg,rgba(27,45,63,0.94)_0%,rgba(16,30,43,0.94)_100%)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(102,192,244,0.22)]"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#95c6e7]">
+              {{ publishProgressTitle }}
+            </p>
+            <p class="text-xs font-bold text-[#dff1fc]">{{ publishProgressPercent }}%</p>
+          </div>
+          <div class="mt-2 h-2 overflow-hidden rounded-full border border-[#305777] bg-[#0f1c2b]">
+            <div
+              class="h-full rounded-full bg-[linear-gradient(90deg,#3f90bf_0%,#66c0f4_55%,#7dd4ff_100%)] transition-[width] duration-200 ease-out"
+              :style="{ width: `${publishProgressPercent}%` }"
+            ></div>
+          </div>
+          <p class="mt-2 text-xs text-slate-300">{{ publishProgressLabel }}</p>
+          <p v-if="publishProgressLastLine" class="mt-1 truncate text-[11px] text-slate-400" :title="publishProgressLastLine">
+            {{ publishProgressLastLine }}
+          </p>
+        </section>
 
         <WorkshopItemsSection
           v-show="flowStep === 'mods'"
