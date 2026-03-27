@@ -1,3 +1,8 @@
+/**
+ * Overview: Best-effort cleanup for stale dev/build app processes.
+ * Responsibility: Detects old Workshop Manager Electron instances and terminates
+ *  them before starting a new dev session or packaging run.
+ */
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
@@ -68,6 +73,9 @@ function listUnixProcesses() {
     .filter((entry) => entry !== null)
 }
 
+/**
+ * Builds the PowerShell snippet used on Windows so tests can validate it directly.
+ */
 export function buildPowershellKillScript(projectRootPath) {
   const escapedRoot = projectRootPath.replace(/'/g, "''")
   return [

@@ -1,3 +1,8 @@
+/**
+ * Type declarations for `scripts/build-executable.mjs`.
+ * These keep script-focused unit tests typed without converting the script itself
+ * away from plain ESM JavaScript.
+ */
 export interface PackagingTarget {
   platformArg: '--win' | '--mac' | '--linux'
   target: 'nsis' | 'dmg' | 'AppImage'
@@ -17,14 +22,19 @@ export interface BuildStep {
   args: string[]
 }
 
+/** Resolves the correct pnpm executable for the requested platform. */
 export function resolvePnpmCommand(platform?: string): string
 
+/** Returns the electron-builder target tuple supported by this repository. */
 export function getPackagingTargetForPlatform(platform: string): PackagingTarget
 
+/** Builds the `pnpm exec electron-builder ...` argument list for a host platform. */
 export function getElectronBuilderArgsForPlatform(platform: string): string[]
 
+/** Parses supported CLI flags for the executable packaging script. */
 export function parseBuildExecutableOptions(argv?: string[]): ParsedBuildExecutableOptions
 
+/** Describes the ordered subprocess steps the packaging workflow will run. */
 export function buildStepsForPlatform(
   platform: string,
   options?: BuildExecutableOptions
