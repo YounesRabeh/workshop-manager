@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -27,6 +27,55 @@ describe('profile and run-log persistence', () => {
     const profiles = await store.getProfiles()
     expect(profiles).toHaveLength(1)
     expect((await store.getRememberedUsername()) ?? '').toBe('alice')
+    expect(await store.getRememberAuth()).toBe(true)
+    expect(await store.getWebApiEnabled()).toBe(true)
+    expect(await store.getWebApiKeyEncrypted()).toBe('encrypted-key')
+    expect(await store.getSteamCmdManualPath()).toBe('/tools/steamcmd.sh')
+  })
+
+  it('backs up malformed profile data and recreates a clean database', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'profile-store-corrupt-'))
+    const dbPath = join(root, 'profiles.json')
+    const store = new ProfileStore(dbPath)
+
+    await writeFile(dbPath, '{"profiles": [', 'utf8')
+
+    expect(await store.getProfiles()).toEqual([])
+
+    const entries = await readdir(root)
+    const backupName = entries.find((entry) => /^profiles\.corrupt\.\d+\.json$/.test(entry))
+    expect(backupName).toBeDefined()
+    expect(await readFile(join(root, backupName!), 'utf8')).toBe('{"profiles": [')
+    expect(JSON.parse(await readFile(dbPath, 'utf8'))).toEqual({ profiles: [] })
+  })
+
+  it('serializes concurrent profile and preference updates without dropping fields', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'profile-store-concurrent-'))
+    const dbPath = join(root, 'profiles.json')
+    const store = new ProfileStore(dbPath)
+
+    await Promise.all([
+      store.saveProfile({
+        id: 'p1',
+        appId: '480',
+        contentFolder: '/mods',
+        previewFile: '/mods/preview.png',
+        title: 'Concurrent Profile',
+        tags: ['tag-a']
+      }),
+      store.setRememberedLoginState({
+        rememberedUsername: 'TheYuyuBoy',
+        rememberAuth: true
+      }),
+      store.setAdvancedSettingsState({
+        webApiEnabled: true,
+        webApiKeyEncrypted: 'encrypted-key',
+        steamCmdManualPath: '/tools/steamcmd.sh'
+      })
+    ])
+
+    expect(await store.getProfiles()).toHaveLength(1)
+    expect(await store.getRememberedUsername()).toBe('TheYuyuBoy')
     expect(await store.getRememberAuth()).toBe(true)
     expect(await store.getWebApiEnabled()).toBe(true)
     expect(await store.getWebApiKeyEncrypted()).toBe('encrypted-key')

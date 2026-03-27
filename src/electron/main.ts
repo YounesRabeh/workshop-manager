@@ -341,8 +341,10 @@ app.whenReady().then(async () => {
       // Stored session needs username next launch, so keep username when rememberAuth is enabled.
       const rememberAuth = payload.rememberAuth === true
       const rememberUsername = payload.rememberUsername === true || rememberAuth
-      await profileStore.setRememberedUsername(rememberUsername ? payload.username : undefined)
-      await profileStore.setRememberAuth(rememberAuth)
+      await profileStore.setRememberedLoginState({
+        rememberedUsername: rememberUsername ? payload.username : undefined,
+        rememberAuth
+      })
       return {
         ...state,
         rememberedUsername: rememberUsername ? payload.username : undefined
@@ -473,9 +475,11 @@ app.whenReady().then(async () => {
         }
       }
 
-      await profileStore.setWebApiKeyEncrypted(nextEncryptedWebApiKey)
-      await profileStore.setWebApiEnabled(nextWebApiEnabled)
-      await profileStore.setSteamCmdManualPath(nextSteamCmdManualPath)
+      await profileStore.setAdvancedSettingsState({
+        webApiEnabled: nextWebApiEnabled,
+        webApiKeyEncrypted: nextEncryptedWebApiKey,
+        steamCmdManualPath: nextSteamCmdManualPath
+      })
 
       return await getAdvancedSettings()
     } catch (error) {

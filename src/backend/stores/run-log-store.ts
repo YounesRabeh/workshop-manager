@@ -4,12 +4,7 @@
  */
 import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { RunResult } from '@shared/contracts'
-
-export interface PersistedRunLog extends RunResult {
-  lines: string[]
-  status: 'running' | 'success' | 'failed' | 'cancelled'
-}
+import type { PersistedRunLog } from '@shared/contracts'
 
 const SESSION_LOG_FILE = 'steamcmd-output.log'
 const FLUSH_INTERVAL_MS = 120

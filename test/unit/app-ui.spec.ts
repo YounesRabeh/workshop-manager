@@ -3,7 +3,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from '../../src/frontend/App.vue'
-import type { PersistedRunLog } from '../../src/frontend/types/ui'
+import type { PersistedRunLog } from '../../src/shared/contracts'
 
 const workshop = {
   ensureSteamCmdInstalled: vi.fn(async () => ({
@@ -417,6 +417,7 @@ describe('App UI validation gates', () => {
 
     expect(workshop.getCurrentProfile).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Alice Persona')
+    expect(wrapper.text()).not.toContain('DEV')
 
     const avatar = wrapper.find('.session-avatar')
     expect(avatar.exists()).toBe(true)
@@ -742,7 +743,6 @@ describe('App UI validation gates', () => {
 
     expect(workshop.uploadMod).toHaveBeenCalledTimes(1)
     expect(workshop.uploadMod).toHaveBeenCalledWith({
-      profileId: 'new-item',
       draft: expect.objectContaining({
         appId: '480',
         title: 'Created With Hidden Visibility',
@@ -882,7 +882,6 @@ describe('App UI validation gates', () => {
 
     expect(workshop.updateMod).toHaveBeenCalledTimes(1)
     expect(workshop.updateMod).toHaveBeenCalledWith({
-      profileId: '123',
       draft: expect.objectContaining({
         appId: '480',
         publishedFileId: '123',
@@ -1025,7 +1024,6 @@ describe('App UI validation gates', () => {
 
     expect(workshop.updateMod).toHaveBeenCalledTimes(1)
     expect(workshop.updateMod).toHaveBeenCalledWith({
-      profileId: '123',
       draft: expect.objectContaining({
         appId: '480',
         publishedFileId: '123',

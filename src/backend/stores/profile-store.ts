@@ -2,8 +2,8 @@
  * Overview: Persists profile and preference state in a local JSON-backed store.
  * Responsibility: Reads/writes mod profiles, remembered auth options, and Web API settings, with directory bootstrap and reset support.
  */
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { dirname, join, parse } from 'node:path'
 import type { ModProfile } from '@shared/contracts'
 
 interface ProfileDb {
@@ -19,29 +19,100 @@ const DEFAULT_DB: ProfileDb = {
   profiles: []
 }
 
+class CorruptProfileDbError extends Error {}
+
+function cloneDefaultDb(): ProfileDb {
+  return {
+    profiles: [...DEFAULT_DB.profiles]
+  }
+}
+
+function isNodeErrorWithCode(error: unknown, code: string): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === code)
+}
+
+function normalizeDb(parsed: unknown): ProfileDb {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new CorruptProfileDbError('Profile database root must be an object.')
+  }
+
+  const record = parsed as Partial<ProfileDb>
+  if (!Array.isArray(record.profiles)) {
+    throw new CorruptProfileDbError('Profile database is missing a valid profiles array.')
+  }
+
+  return {
+    profiles: record.profiles,
+    rememberedUsername: record.rememberedUsername,
+    rememberAuth: record.rememberAuth,
+    webApiEnabled: record.webApiEnabled,
+    webApiKeyEncrypted: record.webApiKeyEncrypted,
+    steamCmdManualPath: record.steamCmdManualPath
+  }
+}
+
 export class ProfileStore {
+  private writeChain: Promise<void> = Promise.resolve()
+
   constructor(private readonly dbPath: string) {}
 
-  private async readDb(): Promise<ProfileDb> {
+  private async withWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+    const next = this.writeChain.then(operation, operation)
+    this.writeChain = next.then(
+      () => undefined,
+      () => undefined
+    )
+    return await next
+  }
+
+  private async recoverCorruptDb(originalBytes: string): Promise<ProfileDb> {
+    await mkdir(dirname(this.dbPath), { recursive: true })
+    const parsedPath = parse(this.dbPath)
+    const corruptPath = join(parsedPath.dir, `${parsedPath.name}.corrupt.${Date.now()}${parsedPath.ext}`)
+    await writeFile(corruptPath, originalBytes, 'utf8')
+    const defaultDb = cloneDefaultDb()
+    await this.writeDbFile(defaultDb)
+    return defaultDb
+  }
+
+  private async readDbUnlocked(): Promise<ProfileDb> {
     try {
       const data = await readFile(this.dbPath, 'utf8')
-      const parsed = JSON.parse(data) as ProfileDb
-      return {
-        profiles: parsed.profiles ?? [],
-        rememberedUsername: parsed.rememberedUsername,
-        rememberAuth: parsed.rememberAuth,
-        webApiEnabled: parsed.webApiEnabled,
-        webApiKeyEncrypted: parsed.webApiKeyEncrypted,
-        steamCmdManualPath: parsed.steamCmdManualPath
+      try {
+        return normalizeDb(JSON.parse(data))
+      } catch (error) {
+        if (error instanceof SyntaxError || error instanceof CorruptProfileDbError) {
+          return await this.recoverCorruptDb(data)
+        }
+        throw error
       }
-    } catch {
-      return { ...DEFAULT_DB }
+    } catch (error) {
+      if (isNodeErrorWithCode(error, 'ENOENT')) {
+        return cloneDefaultDb()
+      }
+      throw error
     }
   }
 
-  private async writeDb(db: ProfileDb): Promise<void> {
+  private async readDb(): Promise<ProfileDb> {
+    await this.writeChain
+    return await this.readDbUnlocked()
+  }
+
+  private async writeDbFile(db: ProfileDb): Promise<void> {
     await mkdir(dirname(this.dbPath), { recursive: true })
-    await writeFile(this.dbPath, `${JSON.stringify(db, null, 2)}\n`, 'utf8')
+    const tempPath = `${this.dbPath}.${process.pid}.${Date.now()}.tmp`
+    await writeFile(tempPath, `${JSON.stringify(db, null, 2)}\n`, 'utf8')
+    await rename(tempPath, this.dbPath)
+  }
+
+  private async updateDb<T>(mutate: (db: ProfileDb) => T | Promise<T>): Promise<T> {
+    return await this.withWriteLock(async () => {
+      const db = await this.readDbUnlocked()
+      const result = await mutate(db)
+      await this.writeDbFile(db)
+      return result
+    })
   }
 
   async getProfiles(): Promise<ModProfile[]> {
@@ -50,23 +121,23 @@ export class ProfileStore {
   }
 
   async saveProfile(profile: ModProfile): Promise<ModProfile> {
-    const db = await this.readDb()
-    const existingIndex = db.profiles.findIndex((item) => item.id === profile.id)
+    return await this.updateDb(async (db) => {
+      const existingIndex = db.profiles.findIndex((item) => item.id === profile.id)
 
-    if (existingIndex >= 0) {
-      db.profiles[existingIndex] = profile
-    } else {
-      db.profiles.push(profile)
-    }
+      if (existingIndex >= 0) {
+        db.profiles[existingIndex] = profile
+      } else {
+        db.profiles.push(profile)
+      }
 
-    await this.writeDb(db)
-    return profile
+      return profile
+    })
   }
 
   async deleteProfile(profileId: string): Promise<void> {
-    const db = await this.readDb()
-    db.profiles = db.profiles.filter((item) => item.id !== profileId)
-    await this.writeDb(db)
+    await this.updateDb(async (db) => {
+      db.profiles = db.profiles.filter((item) => item.id !== profileId)
+    })
   }
 
   async getRememberedUsername(): Promise<string | undefined> {
@@ -75,9 +146,9 @@ export class ProfileStore {
   }
 
   async setRememberedUsername(username: string | undefined): Promise<void> {
-    const db = await this.readDb()
-    db.rememberedUsername = username
-    await this.writeDb(db)
+    await this.updateDb(async (db) => {
+      db.rememberedUsername = username
+    })
   }
 
   async getRememberAuth(): Promise<boolean> {
@@ -86,9 +157,19 @@ export class ProfileStore {
   }
 
   async setRememberAuth(enabled: boolean): Promise<void> {
-    const db = await this.readDb()
-    db.rememberAuth = enabled
-    await this.writeDb(db)
+    await this.updateDb(async (db) => {
+      db.rememberAuth = enabled
+    })
+  }
+
+  async setRememberedLoginState(input: {
+    rememberedUsername: string | undefined
+    rememberAuth: boolean
+  }): Promise<void> {
+    await this.updateDb(async (db) => {
+      db.rememberedUsername = input.rememberedUsername
+      db.rememberAuth = input.rememberAuth
+    })
   }
 
   async getWebApiEnabled(): Promise<boolean> {
@@ -97,9 +178,9 @@ export class ProfileStore {
   }
 
   async setWebApiEnabled(enabled: boolean): Promise<void> {
-    const db = await this.readDb()
-    db.webApiEnabled = enabled
-    await this.writeDb(db)
+    await this.updateDb(async (db) => {
+      db.webApiEnabled = enabled
+    })
   }
 
   async getWebApiKeyEncrypted(): Promise<string | undefined> {
@@ -108,9 +189,9 @@ export class ProfileStore {
   }
 
   async setWebApiKeyEncrypted(value: string | undefined): Promise<void> {
-    const db = await this.readDb()
-    db.webApiKeyEncrypted = value
-    await this.writeDb(db)
+    await this.updateDb(async (db) => {
+      db.webApiKeyEncrypted = value
+    })
   }
 
   async getSteamCmdManualPath(): Promise<string | undefined> {
@@ -119,12 +200,20 @@ export class ProfileStore {
   }
 
   async setSteamCmdManualPath(path: string | undefined): Promise<void> {
-    const db = await this.readDb()
-    db.steamCmdManualPath = path
-    await this.writeDb(db)
+    await this.updateDb(async (db) => {
+      db.steamCmdManualPath = path
+    })
   }
 
-  async clear(): Promise<void> {
-    await rm(join(dirname(this.dbPath)), { recursive: true, force: true })
+  async setAdvancedSettingsState(input: {
+    webApiEnabled: boolean
+    webApiKeyEncrypted: string | undefined
+    steamCmdManualPath: string | undefined
+  }): Promise<void> {
+    await this.updateDb(async (db) => {
+      db.webApiEnabled = input.webApiEnabled
+      db.webApiKeyEncrypted = input.webApiKeyEncrypted
+      db.steamCmdManualPath = input.steamCmdManualPath
+    })
   }
 }

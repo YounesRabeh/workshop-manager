@@ -4,7 +4,7 @@
   and renders status, summary, and recent output lines for the selected run.
 -->
 <script setup lang="ts">
-import type { PersistedRunLog } from '../types/ui'
+import type { PersistedRunLog } from '@shared/contracts'
 
 const props = defineProps<{
   recentRuns: PersistedRunLog[]

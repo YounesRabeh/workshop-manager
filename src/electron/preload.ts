@@ -9,10 +9,12 @@ import type {
   InstallStatus,
   LoginInput,
   ModProfile,
+  PersistedRunLog,
   RunEvent,
+  RunResult,
   SaveAdvancedSettingsInput,
   SteamProfileSummary,
-  UploadDraft,
+  UploadInput,
   VisibilityUpdateInput,
   WorkshopItemSummary
 } from '@shared/contracts'
@@ -26,8 +28,8 @@ export interface WorkshopApi {
   logout: () => Promise<{ ok: true }>
   clearStoredSession: () => Promise<{ ok: true }>
   submitSteamGuardCode: (payload: { sessionId: string; code: string }) => Promise<{ ok: true }>
-  uploadMod: (payload: { profileId: string; draft: UploadDraft }) => Promise<unknown>
-  updateMod: (payload: { profileId: string; draft: UploadDraft }) => Promise<unknown>
+  uploadMod: (payload: UploadInput) => Promise<RunResult>
+  updateMod: (payload: UploadInput) => Promise<RunResult>
   updateVisibility: (payload: VisibilityUpdateInput) => Promise<unknown>
   getProfiles: () => Promise<{
     profiles: ModProfile[]
@@ -39,8 +41,8 @@ export interface WorkshopApi {
   saveAdvancedSettings: (payload: SaveAdvancedSettingsInput) => Promise<AdvancedSettings>
   saveProfile: (payload: { profile: ModProfile }) => Promise<ModProfile>
   deleteProfile: (payload: { profileId: string }) => Promise<{ ok: true }>
-  getRunLogs: () => Promise<unknown>
-  getRunLog: (runId: string) => Promise<unknown>
+  getRunLogs: () => Promise<PersistedRunLog[]>
+  getRunLog: (runId: string) => Promise<PersistedRunLog | null>
   getCurrentProfile: () => Promise<SteamProfileSummary>
   getMyWorkshopItems: (payload: { appId?: string }) => Promise<WorkshopItemSummary[]>
   listContentFolderFiles: (payload: { folderPath: string }) => Promise<ContentFolderFileEntry[]>

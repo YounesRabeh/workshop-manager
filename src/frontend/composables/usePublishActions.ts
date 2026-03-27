@@ -194,10 +194,9 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     }
 
     try {
-      const result = (await window.workshop.uploadMod({
-        profileId: 'new-item',
+      const result = await window.workshop.uploadMod({
         draft: buildUploadDraft(options.createDraft, 'create', options.updateTagsTouched.value, createVisibility.value)
-      })) as { publishedFileId?: string }
+      })
 
       options.setStatusMessage('Upload completed successfully.')
       options.showToast({
@@ -250,10 +249,9 @@ export function usePublishActions(options: UsePublishActionsOptions) {
       options.selectedWorkshopItemId.value.trim() || options.updateDraft.publishedFileId.trim()
 
     try {
-      const result = (await window.workshop.updateMod({
-        profileId: options.selectedWorkshopItemId.value || options.updateDraft.publishedFileId,
+      const result = await window.workshop.updateMod({
         draft: buildUploadDraft(options.updateDraft, 'update', options.updateTagsTouched.value, pendingVisibility.value)
-      })) as { publishedFileId?: string }
+      })
 
       committedVisibility.value = pendingVisibility.value
       options.workshopItems.value = options.workshopItems.value.map((item) =>
