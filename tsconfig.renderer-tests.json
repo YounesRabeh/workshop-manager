@@ -1,14 +1,11 @@
 {
   "extends": "./tsconfig.base.json",
   "include": [
-    "electron.vite.config.ts",
-    "src/electron/**/*.ts",
-    "src/backend/**/*.ts",
+    "src/electron/preload.ts",
+    "src/frontend/**/*.ts",
+    "src/frontend/**/*.vue",
     "src/frontend/**/*.d.ts",
     "src/shared/**/*.ts",
-    "test/**/*.ts"
-  ],
-  "exclude": [
     "test/unit/app-ui.spec.ts",
     "test/unit/use-auth-flow.spec.ts",
     "test/unit/use-drafts.spec.ts",
@@ -17,6 +14,7 @@
   ],
   "compilerOptions": {
     "composite": true,
-    "types": ["node", "vitest"]
+    "jsx": "preserve",
+    "types": ["node", "vite/client", "vitest/globals"]
   }
 }

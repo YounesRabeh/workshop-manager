@@ -10,7 +10,7 @@ describe('validateDraft', () => {
           contentFolder: '',
           previewFile: '',
           title: '',
-          releaseNotes: '',
+          changenote: '',
           tags: []
         },
         'upload'
@@ -26,7 +26,7 @@ describe('validateDraft', () => {
           contentFolder: '/mods/content',
           previewFile: '',
           title: 'Created Title',
-          releaseNotes: '',
+          changenote: '',
           tags: []
         },
         'upload'

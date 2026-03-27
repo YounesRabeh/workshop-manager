@@ -3,6 +3,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from '../../src/frontend/App.vue'
+import type { PersistedRunLog } from '../../src/frontend/types/ui'
 
 const workshop = {
   ensureSteamCmdInstalled: vi.fn(async () => ({
@@ -56,8 +57,8 @@ const workshop = {
   openPath: vi.fn(async () => ({ ok: true })),
   saveProfile: vi.fn(async ({ profile }) => profile),
   deleteProfile: vi.fn(async () => ({ ok: true })),
-  getRunLogs: vi.fn(async () => []),
-  getRunLog: vi.fn(async () => null),
+  getRunLogs: vi.fn<() => Promise<PersistedRunLog[]>>(async () => []),
+  getRunLog: vi.fn<(runId: string) => Promise<PersistedRunLog | null>>(async () => null),
   pickFolder: vi.fn(async () => '/mods'),
   pickFile: vi.fn(async () => '/mods/preview.png'),
   pickSteamCmdExecutable: vi.fn(async () => '/tools/steamcmd.sh'),
