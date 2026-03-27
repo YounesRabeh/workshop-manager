@@ -47,6 +47,14 @@ Cross-platform desktop app for Steam Workshop publish/update workflows, built wi
      - macOS: `*.dmg`
      - Linux: `*.AppImage`
 
+## Changing The App Icon
+
+- Put your replacement icon at `resources/app-icon.png`.
+- This file is the single source of truth for the app icon used by the renderer and packaged builds.
+- After replacing it, run `pnpm sync:icon` to copy/sync the generated icon assets used by the app during development.
+- When building an executable, run `pnpm build:exe:icon` if you want the Windows/macOS packaging icons regenerated first.
+- If you are starting from a file in another folder such as `res/`, move or copy it to `resources/app-icon.png`.
+
 ## Notes
 
 - Username persistence is supported when selected; password is kept in memory only.
