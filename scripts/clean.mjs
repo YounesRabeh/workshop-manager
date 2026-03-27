@@ -1,3 +1,8 @@
+/**
+ * Overview: Removes local build artifacts created by development and packaging commands.
+ * Responsibility: Deletes generated output folders and root tsbuildinfo files,
+ *  with an optional `--dry-run` mode for previewing the cleanup.
+ */
 import { access, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -14,6 +19,7 @@ async function pathExists(path) {
 }
 
 const rootEntries = await readdir(rootDir, { withFileTypes: true })
+// Keep the cleanup scope intentionally narrow so app data and resources are untouched.
 const buildInfoTargets = rootEntries
   .filter((entry) => entry.isFile() && /^tsconfig(?:\..+)?\.tsbuildinfo$/.test(entry.name))
   .map((entry) => entry.name)

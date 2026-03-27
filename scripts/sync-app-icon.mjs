@@ -1,3 +1,9 @@
+/**
+ * Overview: Keeps app icon assets in sync across the renderer, packaging targets,
+ *  and Linux launcher integrations.
+ * Responsibility: Treats `resources/app-icon.png` as the single source of truth,
+ *  derives platform-specific icon formats, and refreshes desktop launcher metadata.
+ */
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -36,6 +42,10 @@ export function escapeSingleQuotesForBash(value) {
   return value.replace(/'/g, "'\"'\"'")
 }
 
+/**
+ * Produces a Linux desktop entry that launches the project from source with the
+ * correct icon and WM class metadata.
+ */
 export function buildLinuxLauncherContent({ displayName, projectRootPath, appId, iconAbsolutePath }) {
   const escapedRoot = escapeSingleQuotesForBash(projectRootPath)
   return `[Desktop Entry]
@@ -54,6 +64,10 @@ Exec=/bin/bash -lc "cd '${escapedRoot}' && env CHROME_DESKTOP=${appId}.desktop -
 `
 }
 
+/**
+ * Updates only the launcher fields this project owns while preserving the rest
+ * of an existing `.desktop` file.
+ */
 export function rewriteDesktopEntryMappings(original, { displayName, appId, iconAbsolutePath }) {
   const withName = /^Name=.*$/m.test(original)
     ? original.replace(/^Name=.*$/m, `Name=${displayName}`)
@@ -275,6 +289,9 @@ async function syncLinuxDesktopIcon(inputIconPath) {
   }
 }
 
+/**
+ * Main sync routine used by `pnpm sync:icon`.
+ */
 async function syncIcon() {
   await assertReadable(sourceIconPath)
   const effectiveIconPath = await generateNormalizedPng()

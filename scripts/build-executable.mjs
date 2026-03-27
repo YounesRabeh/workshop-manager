@@ -1,11 +1,22 @@
+/**
+ * Overview: Orchestrates the local executable packaging workflow.
+ * Responsibility: Resolves platform-specific electron-builder arguments,
+ *  assembles the ordered build steps, and runs them when invoked as a CLI.
+ */
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+/**
+ * Uses the Windows shim when packaging on win32 and the plain binary elsewhere.
+ */
 export function resolvePnpmCommand(platform = process.platform) {
   return platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 }
 
+/**
+ * Maps the current host platform to the electron-builder target this repo ships.
+ */
 export function getPackagingTargetForPlatform(platform) {
   if (platform === 'win32') {
     return { platformArg: '--win', target: 'nsis' }
@@ -24,6 +35,9 @@ export function getElectronBuilderArgsForPlatform(platform) {
   return ['exec', 'electron-builder', mapping.platformArg, mapping.target, '--publish', 'never']
 }
 
+/**
+ * Only `--generate-icon` is supported today; everything else is ignored on purpose.
+ */
 export function parseBuildExecutableOptions(argv = []) {
   const normalized = Array.isArray(argv) ? argv : []
   return {
@@ -31,6 +45,9 @@ export function parseBuildExecutableOptions(argv = []) {
   }
 }
 
+/**
+ * Builds the exact sequence used by `pnpm build:exe`, including optional icon sync.
+ */
 export function buildStepsForPlatform(platform, options = {}) {
   const pnpmCommand = resolvePnpmCommand(platform)
   const steps = [
