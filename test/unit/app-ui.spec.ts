@@ -545,12 +545,12 @@ describe('App UI validation gates', () => {
 
     const browseButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Browse SteamCMD'))
+      .find((button) => button.text().trim() === 'Browse')
     expect(browseButton).toBeDefined()
     await browseButton?.trigger('click')
     await flushPromises()
 
-    const pathInput = wrapper.find('input[placeholder="Path to steamcmd.sh or steamcmd.exe"]')
+    const pathInput = wrapper.find('input[placeholder="Path to executable"]')
     expect(pathInput.exists()).toBe(true)
     expect((pathInput.element as HTMLInputElement).value).toBe('/tools/steamcmd.sh')
 

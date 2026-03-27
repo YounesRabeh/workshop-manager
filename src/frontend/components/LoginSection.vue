@@ -106,6 +106,60 @@ const canSaveAdvancedSettings = computed(() => {
   return !props.advancedSettings.isSaving
 })
 
+const canClearSteamCmdPath = computed(() => {
+  return !props.advancedSettings.isSaving && props.advancedSettings.steamCmdManualPath.trim().length > 0
+})
+
+const steamCmdStatusLabel = computed(() => {
+  if (props.advancedSettings.steamCmdSource === 'manual') {
+    return 'Manual Path'
+  }
+  if (props.advancedSettings.steamCmdSource === 'auto') {
+    return 'App Install'
+  }
+  return 'Needs Setup'
+})
+
+const steamCmdStatusClass = computed(() => {
+  if (props.advancedSettings.steamCmdSource === 'manual') {
+    return 'advanced-badge-success'
+  }
+  if (props.advancedSettings.steamCmdSource === 'auto') {
+    return 'advanced-badge-info'
+  }
+  return 'advanced-badge-warning'
+})
+
+const webApiStatusLabel = computed(() => {
+  if (props.advancedSettings.hasWebApiKey) {
+    return 'Saved'
+  }
+  if (!props.advancedSettings.secureStorageAvailable) {
+    return 'Unavailable'
+  }
+  return 'Optional'
+})
+
+const webApiStatusClass = computed(() => {
+  if (props.advancedSettings.hasWebApiKey) {
+    return 'advanced-badge-success'
+  }
+  if (!props.advancedSettings.secureStorageAvailable) {
+    return 'advanced-badge-warning'
+  }
+  return 'advanced-badge-muted'
+})
+
+const steamCmdHint = computed(() => {
+  if (props.advancedSettings.steamCmdSource === 'manual') {
+    return 'Using a custom executable path saved for this device.'
+  }
+  if (props.advancedSettings.steamCmdSource === 'auto') {
+    return 'Using the app-managed SteamCMD install.'
+  }
+  return 'Auto-install is available on Linux and Windows. On macOS, set this manually.'
+})
+
 const usernameInputRef = ref<HTMLInputElement | null>(null)
 const passwordInputRef = ref<HTMLInputElement | null>(null)
 const rememberUsernameRef = ref<HTMLInputElement | null>(null)
@@ -292,93 +346,106 @@ watch(
           {{ isAdvancedOptionsOpen ? 'Hide Advanced Options' : 'Advanced Developer Options' }}
         </button>
 
-        <div v-if="isAdvancedOptionsOpen" class="mt-3 rounded border border-[#2a475e] bg-[#122233] p-3">
-          <p class="text-sm text-slate-200">Saving a Steam Web API key enables Dev mode.</p>
-
-          <label class="mt-3 block text-xs font-semibold uppercase tracking-wide text-slate-400">SteamCMD Executable Path</label>
-          <div class="mt-1 flex flex-col gap-2 sm:flex-row">
-            <input
-              :value="advancedSettings.steamCmdManualPath"
-              placeholder="Path to steamcmd.sh or steamcmd.exe"
-              autocomplete="off"
-              class="login-input w-full rounded border border-slate-300 px-3 py-2"
-              @input="onSteamCmdManualPathInput"
-            />
-            <button
-              type="button"
-              class="login-peek rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
-              @click="emit('pick-steamcmd-manual-path')"
-            >
-              Browse SteamCMD
-            </button>
-            <button
-              type="button"
-              class="login-peek rounded border border-slate-300 px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="advancedSettings.isSaving || advancedSettings.steamCmdManualPath.trim().length === 0"
-              @click="emit('update-steamcmd-manual-path', '')"
-            >
-              Clear Path
-            </button>
+        <div v-if="isAdvancedOptionsOpen" class="advanced-panel mt-3">
+          <div class="advanced-header">
+            <div>
+              <p class="advanced-kicker">Advanced Developer Options</p>
+              <p class="advanced-summary">Configure a custom SteamCMD path and optional Steam Web API access for this device.</p>
+            </div>
           </div>
 
-          <p class="mt-2 text-[11px] text-slate-400">
-            Optional override on Linux and Windows. On macOS, set this manually because auto-install is unavailable.
-          </p>
-          <p
-            class="mt-1 text-[11px]"
-            :class="
-              advancedSettings.steamCmdSource === 'manual'
-                ? 'text-emerald-300'
-                : advancedSettings.steamCmdSource === 'auto'
-                  ? 'text-slate-300'
-                  : 'text-amber-300'
-            "
-          >
-            {{
-              advancedSettings.steamCmdSource === 'manual'
-                ? 'Using saved manual SteamCMD path.'
-                : advancedSettings.steamCmdSource === 'auto'
-                  ? 'Using app-managed SteamCMD install.'
-                  : 'No working SteamCMD executable is configured yet.'
-            }}
-          </p>
+          <div class="advanced-card-grid mt-4">
+            <section class="advanced-card">
+              <div class="advanced-card-header">
+                <div>
+                  <h3 class="advanced-card-title">SteamCMD Executable</h3>
+                  <p class="advanced-card-copy">{{ steamCmdHint }}</p>
+                </div>
+                <span class="advanced-badge" :class="steamCmdStatusClass">{{ steamCmdStatusLabel }}</span>
+              </div>
 
-          <label class="mt-3 block text-xs font-semibold uppercase tracking-wide text-slate-400">Steam Web API Key</label>
-          <div class="mt-1 flex items-center gap-2">
-            <input
-              :type="isWebApiKeyPeek ? 'text' : 'password'"
-              :value="advancedSettings.webApiKey"
-              :placeholder="advancedSettings.hasWebApiKey ? 'Saved securely (enter new key to replace)' : 'Paste key...'"
-              autocomplete="off"
-              class="login-input w-full rounded border border-slate-300 px-3 py-2"
-              @input="onWebApiKeyInput"
-            />
-            <button
-              type="button"
-              class="login-peek rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
-              @mouseenter="emit('set-web-api-key-peek', true)"
-              @mouseleave="emit('set-web-api-key-peek', false)"
-              @focus="emit('set-web-api-key-peek', true)"
-              @blur="emit('set-web-api-key-peek', false)"
-            >
-              Show
-            </button>
+              <p v-if="advancedSettings.steamCmdManualPath.trim()" class="advanced-path-preview">
+                {{ advancedSettings.steamCmdManualPath }}
+              </p>
+              <p v-else class="advanced-path-placeholder">No manual path saved. The app will use its managed install when available.</p>
+
+              <label class="advanced-label mt-4">SteamCMD Executable Path</label>
+              <div class="advanced-path-row">
+                <input
+                  :value="advancedSettings.steamCmdManualPath"
+                  placeholder="Path to executable"
+                  autocomplete="off"
+                  class="login-input advanced-input"
+                  @input="onSteamCmdManualPathInput"
+                />
+              </div>
+              <div class="advanced-path-actions">
+                <button
+                  type="button"
+                  class="login-peek advanced-inline-button"
+                  @click="emit('pick-steamcmd-manual-path')"
+                >
+                  Browse
+                </button>
+                <button
+                  type="button"
+                  class="login-peek advanced-inline-button disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="!canClearSteamCmdPath"
+                  @click="emit('update-steamcmd-manual-path', '')"
+                >
+                  Clear Path
+                </button>
+              </div>
+            </section>
+
+            <section class="advanced-card">
+              <div class="advanced-card-header">
+                <div>
+                  <h3 class="advanced-card-title">Steam Web API Key</h3>
+                  <p class="advanced-card-copy">Save a Steam Web API key for API-backed lookups and store it securely when supported.</p>
+                </div>
+                <span class="advanced-badge" :class="webApiStatusClass">{{ webApiStatusLabel }}</span>
+              </div>
+
+              <label class="advanced-label mt-4">Steam Web API Key</label>
+              <div class="advanced-key-row">
+                <input
+                  :type="isWebApiKeyPeek ? 'text' : 'password'"
+                  :value="advancedSettings.webApiKey"
+                  :placeholder="advancedSettings.hasWebApiKey ? 'Saved securely (enter new key to replace)' : 'Paste key...'"
+                  autocomplete="off"
+                  class="login-input advanced-input"
+                  @input="onWebApiKeyInput"
+                />
+                <button
+                  type="button"
+                  class="login-peek advanced-inline-button"
+                  @mouseenter="emit('set-web-api-key-peek', true)"
+                  @mouseleave="emit('set-web-api-key-peek', false)"
+                  @focus="emit('set-web-api-key-peek', true)"
+                  @blur="emit('set-web-api-key-peek', false)"
+                >
+                  Show
+                </button>
+              </div>
+
+              <p class="advanced-meta">
+                {{
+                  advancedSettings.secureStorageAvailable
+                    ? 'Key is stored encrypted using OS secure storage.'
+                    : 'Secure storage is not available. Key saving is disabled on this device.'
+                }}
+              </p>
+              <p v-if="advancedSettings.hasWebApiKey" class="advanced-meta advanced-meta-success">Saved key detected and ready to use.</p>
+            </section>
           </div>
 
-          <p class="mt-2 text-[11px] text-slate-400">
-            {{
-              advancedSettings.secureStorageAvailable
-                ? 'Key is stored encrypted using OS secure storage.'
-                : 'Secure storage is not available. Key saving is disabled on this device.'
-            }}
-          </p>
-          <p v-if="advancedSettings.hasWebApiKey" class="mt-1 text-[11px] text-emerald-300">Saved key detected ✓</p>
-          <p v-if="advancedSettings.statusMessage" class="mt-1 text-[11px] text-slate-300">{{ advancedSettings.statusMessage }}</p>
+          <p v-if="advancedSettings.statusMessage" class="advanced-feedback mt-4">{{ advancedSettings.statusMessage }}</p>
 
-          <div class="mt-3 flex gap-2">
+          <div class="advanced-actions mt-4">
             <button
               type="button"
-              class="login-submit w-full rounded px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              class="login-submit advanced-primary-action text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               :disabled="!canSaveAdvancedSettings || !advancedSettings.secureStorageAvailable"
               @click="emit('save-advanced-settings')"
             >
@@ -386,7 +453,7 @@ watch(
             </button>
             <button
               type="button"
-              class="login-peek w-full rounded border border-slate-300 px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+              class="login-peek advanced-secondary-action text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
               :disabled="advancedSettings.isSaving || !advancedSettings.hasWebApiKey"
               @click="emit('clear-web-api-key')"
             >
