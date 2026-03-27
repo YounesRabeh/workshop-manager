@@ -43,6 +43,9 @@ export interface AdvancedSettingsState {
   webApiKey: string
   hasWebApiKey: boolean
   secureStorageAvailable: boolean
+  steamCmdManualPath: string
+  steamCmdInstalled: boolean
+  steamCmdSource: 'auto' | 'manual' | 'missing'
   isSaving: boolean
   statusMessage: string
 }

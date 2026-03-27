@@ -123,11 +123,13 @@ const {
   setPasswordPeek,
   setWebApiKeyPeek,
   setWebApiKey,
+  setSteamCmdManualPath,
   toggleAdvancedOptions,
   setSteamGuardCode,
   ensureSteamCmdInstalled,
   refreshRememberedLoginState,
   loadAdvancedSettings,
+  pickSteamCmdManualPath,
   saveAdvancedSettings,
   clearSavedWebApiKey,
   clearStoredSession,
@@ -518,6 +520,8 @@ watch(
         @update-steam-guard-code="setSteamGuardCode"
         @toggle-advanced-options="toggleAdvancedOptions"
         @update-web-api-key="setWebApiKey"
+        @update-steamcmd-manual-path="setSteamCmdManualPath"
+        @pick-steamcmd-manual-path="pickSteamCmdManualPath"
         @set-web-api-key-peek="setWebApiKeyPeek"
         @save-advanced-settings="saveAdvancedSettings"
         @clear-web-api-key="clearSavedWebApiKey"

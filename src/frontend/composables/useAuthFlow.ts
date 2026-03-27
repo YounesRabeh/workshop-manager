@@ -3,7 +3,7 @@
  * Responsibility: Handles login/logout/guard flows, advanced settings persistence, profile loading, and run-event auth state updates.
  */
 import { computed, reactive, ref } from 'vue'
-import type { RunEvent } from '@shared/contracts'
+import type { AdvancedSettings, RunEvent } from '@shared/contracts'
 import type {
   AdvancedSettingsState,
   AuthIssue,
@@ -52,6 +52,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     webApiKey: '',
     hasWebApiKey: false,
     secureStorageAvailable: true,
+    steamCmdManualPath: '',
+    steamCmdInstalled: false,
+    steamCmdSource: 'missing',
     isSaving: false,
     statusMessage: ''
   })
@@ -59,7 +62,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   const isAuthenticated = computed(() => loginState.value === 'signed_in')
   const canAccessMods = computed(() => loginState.value === 'signed_in')
   const accountDisplayName = computed(() => accountPersonaName.value || loginForm.username.trim() || 'Steam account')
-  const loginHeaderStatusMessage = computed(() => (isSteamCmdDetected.value ? 'SteamCMD found ✓' : ''))
+  const loginHeaderStatusMessage = computed(() => statusMessage.value || (isSteamCmdDetected.value ? 'SteamCMD found ✓' : ''))
 
   function normalizeError(error: unknown): ApiFailure {
     const fallback: ApiFailure = {
@@ -206,6 +209,10 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     advancedSettings.webApiKey = value
   }
 
+  function setSteamCmdManualPath(value: string): void {
+    advancedSettings.steamCmdManualPath = value
+  }
+
   function toggleAdvancedOptions(): void {
     isAdvancedOptionsOpen.value = !isAdvancedOptionsOpen.value
   }
@@ -214,16 +221,31 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     steamGuardCode.value = value
   }
 
+  function applyAdvancedSettings(payload: AdvancedSettings): void {
+    advancedSettings.webApiEnabled = payload.webApiEnabled
+    advancedSettings.hasWebApiKey = payload.hasWebApiKey
+    advancedSettings.secureStorageAvailable = payload.secureStorageAvailable
+    advancedSettings.steamCmdManualPath = payload.steamCmdManualPath ?? ''
+    advancedSettings.steamCmdInstalled = payload.steamCmdInstalled === true
+    advancedSettings.steamCmdSource = payload.steamCmdSource
+  }
+
   async function ensureSteamCmdInstalled(): Promise<void> {
     isSteamCmdDetected.value = false
     statusMessage.value = 'Checking SteamCMD installation...'
     try {
-      await window.workshop.ensureSteamCmdInstalled()
+      const payload = await window.workshop.ensureSteamCmdInstalled()
       isSteamCmdDetected.value = true
+      advancedSettings.steamCmdInstalled = true
+      advancedSettings.steamCmdSource = payload.source
+      if (payload.source === 'manual') {
+        advancedSettings.steamCmdManualPath = payload.executablePath
+      }
       statusMessage.value = 'SteamCMD is ready.'
     } catch (error) {
       const parsed = normalizeError(error)
       isSteamCmdDetected.value = false
+      advancedSettings.steamCmdInstalled = false
       statusMessage.value = `Install error (${parsed.code}): ${parsed.message}`
     }
   }
@@ -244,12 +266,24 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   async function loadAdvancedSettings(): Promise<void> {
     try {
       const payload = await window.workshop.getAdvancedSettings()
-      advancedSettings.webApiEnabled = payload.webApiEnabled
-      advancedSettings.hasWebApiKey = payload.hasWebApiKey
-      advancedSettings.secureStorageAvailable = payload.secureStorageAvailable
+      applyAdvancedSettings(payload)
     } catch (error) {
       const parsed = normalizeError(error)
       advancedSettings.statusMessage = `Advanced options load failed (${parsed.code}): ${parsed.message}`
+    }
+  }
+
+  async function pickSteamCmdManualPath(): Promise<void> {
+    try {
+      const path = await window.workshop.pickSteamCmdExecutable()
+      if (!path) {
+        return
+      }
+      advancedSettings.steamCmdManualPath = path
+      advancedSettings.statusMessage = 'SteamCMD executable selected. Save Advanced Options to apply it.'
+    } catch (error) {
+      const parsed = normalizeError(error)
+      advancedSettings.statusMessage = `SteamCMD path selection failed (${parsed.code}): ${parsed.message}`
     }
   }
 
@@ -265,11 +299,12 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       const implicitEnable = normalizedKey.length > 0 ? true : advancedSettings.webApiEnabled
       const payload = await window.workshop.saveAdvancedSettings({
         webApiEnabled: implicitEnable,
-        webApiKey: normalizedKey.length > 0 ? normalizedKey : undefined
+        webApiKey: normalizedKey.length > 0 ? normalizedKey : undefined,
+        steamCmdManualPath: advancedSettings.steamCmdManualPath
       })
-      advancedSettings.webApiEnabled = payload.webApiEnabled
-      advancedSettings.hasWebApiKey = payload.hasWebApiKey
-      advancedSettings.secureStorageAvailable = payload.secureStorageAvailable
+      applyAdvancedSettings(payload)
+      isSteamCmdDetected.value = payload.steamCmdInstalled
+      statusMessage.value = payload.steamCmdInstalled ? 'SteamCMD is ready.' : 'SteamCMD executable is not configured yet.'
       advancedSettings.webApiKey = ''
       advancedSettings.statusMessage = 'Advanced options saved.'
     } catch (error) {
@@ -292,9 +327,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         webApiEnabled: advancedSettings.webApiEnabled,
         clearWebApiKey: true
       })
-      advancedSettings.webApiEnabled = payload.webApiEnabled
-      advancedSettings.hasWebApiKey = payload.hasWebApiKey
-      advancedSettings.secureStorageAvailable = payload.secureStorageAvailable
+      applyAdvancedSettings(payload)
       advancedSettings.webApiKey = ''
       advancedSettings.statusMessage = 'Saved Web API key removed.'
     } catch (error) {
@@ -624,11 +657,13 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     setPasswordPeek,
     setWebApiKeyPeek,
     setWebApiKey,
+    setSteamCmdManualPath,
     toggleAdvancedOptions,
     setSteamGuardCode,
     ensureSteamCmdInstalled,
     refreshRememberedLoginState,
     loadAdvancedSettings,
+    pickSteamCmdManualPath,
     saveAdvancedSettings,
     clearSavedWebApiKey,
     clearStoredSession,

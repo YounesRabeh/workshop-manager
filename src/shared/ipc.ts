@@ -28,6 +28,7 @@ export const IPC_CHANNELS = {
   getLocalImagePreview: 'workshop:getLocalImagePreview',
   pickFolder: 'workshop:pickFolder',
   pickFile: 'workshop:pickFile',
+  pickSteamCmdExecutable: 'workshop:pickSteamCmdExecutable',
   pickFiles: 'workshop:pickFiles',
   runEvent: 'workshop:runEvent'
 } as const

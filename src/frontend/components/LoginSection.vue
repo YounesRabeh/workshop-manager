@@ -37,6 +37,8 @@ const emit = defineEmits<{
   (e: 'update-steam-guard-code', value: string): void
   (e: 'toggle-advanced-options'): void
   (e: 'update-web-api-key', value: string): void
+  (e: 'update-steamcmd-manual-path', value: string): void
+  (e: 'pick-steamcmd-manual-path'): void
   (e: 'set-web-api-key-peek', value: boolean): void
   (e: 'save-advanced-settings'): void
   (e: 'clear-web-api-key'): void
@@ -62,6 +64,11 @@ function onSteamGuardInput(event: Event): void {
 function onWebApiKeyInput(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit('update-web-api-key', target?.value ?? '')
+}
+
+function onSteamCmdManualPathInput(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit('update-steamcmd-manual-path', target?.value ?? '')
 }
 
 const canSubmitLogin = computed(() => {
@@ -286,10 +293,54 @@ watch(
         </button>
 
         <div v-if="isAdvancedOptionsOpen" class="mt-3 rounded border border-[#2a475e] bg-[#122233] p-3">
-          <p class="text-sm text-slate-200">
-            Saving a Steam Web API key will enables <b>
-              
-            </b>Dev mode.
+          <p class="text-sm text-slate-200">Saving a Steam Web API key enables Dev mode.</p>
+
+          <label class="mt-3 block text-xs font-semibold uppercase tracking-wide text-slate-400">SteamCMD Executable Path</label>
+          <div class="mt-1 flex flex-col gap-2 sm:flex-row">
+            <input
+              :value="advancedSettings.steamCmdManualPath"
+              placeholder="Path to steamcmd.sh or steamcmd.exe"
+              autocomplete="off"
+              class="login-input w-full rounded border border-slate-300 px-3 py-2"
+              @input="onSteamCmdManualPathInput"
+            />
+            <button
+              type="button"
+              class="login-peek rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
+              @click="emit('pick-steamcmd-manual-path')"
+            >
+              Browse SteamCMD
+            </button>
+            <button
+              type="button"
+              class="login-peek rounded border border-slate-300 px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="advancedSettings.isSaving || advancedSettings.steamCmdManualPath.trim().length === 0"
+              @click="emit('update-steamcmd-manual-path', '')"
+            >
+              Clear Path
+            </button>
+          </div>
+
+          <p class="mt-2 text-[11px] text-slate-400">
+            Optional override on Linux and Windows. On macOS, set this manually because auto-install is unavailable.
+          </p>
+          <p
+            class="mt-1 text-[11px]"
+            :class="
+              advancedSettings.steamCmdSource === 'manual'
+                ? 'text-emerald-300'
+                : advancedSettings.steamCmdSource === 'auto'
+                  ? 'text-slate-300'
+                  : 'text-amber-300'
+            "
+          >
+            {{
+              advancedSettings.steamCmdSource === 'manual'
+                ? 'Using saved manual SteamCMD path.'
+                : advancedSettings.steamCmdSource === 'auto'
+                  ? 'Using app-managed SteamCMD install.'
+                  : 'No working SteamCMD executable is configured yet.'
+            }}
           </p>
 
           <label class="mt-3 block text-xs font-semibold uppercase tracking-wide text-slate-400">Steam Web API Key</label>

@@ -61,11 +61,13 @@ export interface RunResult {
   logPath: string
 }
 
+export type InstallSource = 'auto' | 'manual' | 'missing'
+
 export interface InstallStatus {
   installed: boolean
   version?: string
   executablePath: string
-  source: 'auto' | 'manual' | 'missing'
+  source: InstallSource
 }
 
 export interface ApiError {
@@ -96,12 +98,16 @@ export interface AdvancedSettings {
   webApiEnabled: boolean
   hasWebApiKey: boolean
   secureStorageAvailable: boolean
+  steamCmdManualPath?: string
+  steamCmdInstalled: boolean
+  steamCmdSource: InstallSource
 }
 
 export interface SaveAdvancedSettingsInput {
   webApiEnabled: boolean
   webApiKey?: string
   clearWebApiKey?: boolean
+  steamCmdManualPath?: string
 }
 
 export interface SteamGuardInput {

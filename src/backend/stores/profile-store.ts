@@ -11,6 +11,7 @@ interface ProfileDb {
   rememberAuth?: boolean
   webApiEnabled?: boolean
   webApiKeyEncrypted?: string
+  steamCmdManualPath?: string
   profiles: ModProfile[]
 }
 
@@ -30,7 +31,8 @@ export class ProfileStore {
         rememberedUsername: parsed.rememberedUsername,
         rememberAuth: parsed.rememberAuth,
         webApiEnabled: parsed.webApiEnabled,
-        webApiKeyEncrypted: parsed.webApiKeyEncrypted
+        webApiKeyEncrypted: parsed.webApiKeyEncrypted,
+        steamCmdManualPath: parsed.steamCmdManualPath
       }
     } catch {
       return { ...DEFAULT_DB }
@@ -108,6 +110,17 @@ export class ProfileStore {
   async setWebApiKeyEncrypted(value: string | undefined): Promise<void> {
     const db = await this.readDb()
     db.webApiKeyEncrypted = value
+    await this.writeDb(db)
+  }
+
+  async getSteamCmdManualPath(): Promise<string | undefined> {
+    const db = await this.readDb()
+    return db.steamCmdManualPath
+  }
+
+  async setSteamCmdManualPath(path: string | undefined): Promise<void> {
+    const db = await this.readDb()
+    db.steamCmdManualPath = path
     await this.writeDb(db)
   }
 

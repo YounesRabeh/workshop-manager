@@ -247,6 +247,7 @@ app.whenReady().then(async () => {
   const profileStore = new ProfileStore(paths.profilesPath)
   const runLogStore = new RunLogStore(paths.runLogsDir)
   const installManager = new SteamCmdInstallManager(paths.dataDir)
+  installManager.setManualExecutablePath(await profileStore.getSteamCmdManualPath())
   const runtimeService = new SteamCmdRuntimeService(
     async () => {
       const status = await installManager.getStatus()
@@ -297,6 +298,8 @@ app.whenReady().then(async () => {
   const getAdvancedSettings = async (): Promise<AdvancedSettings> => {
     const storedWebApiEnabled = await profileStore.getWebApiEnabled()
     const resolvedKey = await resolveSavedWebApiKey()
+    const steamCmdManualPath = await profileStore.getSteamCmdManualPath()
+    const steamCmdStatus = await installManager.getStatus()
     const effectiveWebApiEnabled = storedWebApiEnabled && resolvedKey.hasUsableKey
     if (storedWebApiEnabled !== effectiveWebApiEnabled) {
       await profileStore.setWebApiEnabled(effectiveWebApiEnabled)
@@ -305,7 +308,10 @@ app.whenReady().then(async () => {
     return {
       webApiEnabled: effectiveWebApiEnabled,
       hasWebApiKey: resolvedKey.hasUsableKey,
-      secureStorageAvailable: resolvedKey.secureStorageAvailable
+      secureStorageAvailable: resolvedKey.secureStorageAvailable,
+      steamCmdManualPath,
+      steamCmdInstalled: steamCmdStatus.installed,
+      steamCmdSource: steamCmdStatus.source
     }
   }
 
@@ -435,20 +441,41 @@ app.whenReady().then(async () => {
   ipcMain.handle(IPC_CHANNELS.saveAdvancedSettings, async (_event, payload: SaveAdvancedSettingsInput) => {
     try {
       let nextWebApiEnabled = payload.webApiEnabled === true
+      const previousSteamCmdManualPath = await profileStore.getSteamCmdManualPath()
+      const previousSteamCmdManualPathValue = previousSteamCmdManualPath?.trim() ?? ''
+      let nextEncryptedWebApiKey = await profileStore.getWebApiKeyEncrypted()
+      let nextSteamCmdManualPath = previousSteamCmdManualPath
 
       if (payload.clearWebApiKey === true) {
-        await profileStore.setWebApiKeyEncrypted(undefined)
+        nextEncryptedWebApiKey = undefined
         nextWebApiEnabled = false
       }
 
       const normalizedKey = payload.webApiKey?.trim()
       if (normalizedKey && normalizedKey.length > 0) {
-        const encrypted = encryptSecret(normalizedKey)
-        await profileStore.setWebApiKeyEncrypted(encrypted)
+        nextEncryptedWebApiKey = encryptSecret(normalizedKey)
         nextWebApiEnabled = true
       }
 
+      if (payload.steamCmdManualPath !== undefined) {
+        const normalizedSteamCmdPath = payload.steamCmdManualPath.trim()
+        nextSteamCmdManualPath = normalizedSteamCmdPath.length > 0 ? normalizedSteamCmdPath : undefined
+      }
+
+      installManager.setManualExecutablePath(nextSteamCmdManualPath)
+
+      const nextSteamCmdManualPathValue = nextSteamCmdManualPath?.trim() ?? ''
+      if (nextSteamCmdManualPath && nextSteamCmdManualPathValue !== previousSteamCmdManualPathValue) {
+        const installStatus = await installManager.getStatus()
+        if (!installStatus.installed || installStatus.source !== 'manual') {
+          installManager.setManualExecutablePath(previousSteamCmdManualPath)
+          throw new AppError('install', 'Selected SteamCMD path is not a usable executable.')
+        }
+      }
+
+      await profileStore.setWebApiKeyEncrypted(nextEncryptedWebApiKey)
       await profileStore.setWebApiEnabled(nextWebApiEnabled)
+      await profileStore.setSteamCmdManualPath(nextSteamCmdManualPath)
 
       return await getAdvancedSettings()
     } catch (error) {
@@ -570,6 +597,17 @@ app.whenReady().then(async () => {
           properties: ['openFile'],
           filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
         })
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle(IPC_CHANNELS.pickSteamCmdExecutable, async () => {
+    const dialogOptions: Electron.OpenDialogOptions = {
+      title: 'Select SteamCMD executable',
+      properties: ['openFile']
+    }
+    const result = mainWindow
+      ? await dialog.showOpenDialog(mainWindow, dialogOptions)
+      : await dialog.showOpenDialog(dialogOptions)
     return result.filePaths[0]
   })
 

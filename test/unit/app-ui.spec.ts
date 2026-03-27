@@ -5,7 +5,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 import App from '../../src/frontend/App.vue'
 
 const workshop = {
-  ensureSteamCmdInstalled: vi.fn(async () => ({ installed: true })),
+  ensureSteamCmdInstalled: vi.fn(async () => ({
+    installed: true,
+    executablePath: '/managed/steamcmd.sh',
+    source: 'auto'
+  })),
   getAppVersion: vi.fn(async () => ({ version: '0.1.0' })),
   login: vi.fn(async () => ({ sessionId: 's1' })),
   quitApp: vi.fn(async () => ({ ok: true })),
@@ -19,12 +23,18 @@ const workshop = {
   getAdvancedSettings: vi.fn(async () => ({
     webApiEnabled: false,
     hasWebApiKey: false,
-    secureStorageAvailable: true
+    secureStorageAvailable: true,
+    steamCmdManualPath: undefined,
+    steamCmdInstalled: true,
+    steamCmdSource: 'auto'
   })),
-  saveAdvancedSettings: vi.fn(async (payload: { webApiEnabled: boolean; webApiKey?: string; clearWebApiKey?: boolean }) => ({
+  saveAdvancedSettings: vi.fn(async (payload: { webApiEnabled: boolean; webApiKey?: string; clearWebApiKey?: boolean; steamCmdManualPath?: string }) => ({
     webApiEnabled: payload.webApiEnabled,
     hasWebApiKey: Boolean(payload.webApiKey && payload.webApiKey.trim().length > 0 && !payload.clearWebApiKey),
-    secureStorageAvailable: true
+    secureStorageAvailable: true,
+    steamCmdManualPath: payload.steamCmdManualPath?.trim() || undefined,
+    steamCmdInstalled: true,
+    steamCmdSource: payload.steamCmdManualPath?.trim() ? 'manual' : 'auto'
   })),
   getCurrentProfile: vi.fn(async () => ({
     steamId64: '76561197960265729',
@@ -50,6 +60,7 @@ const workshop = {
   getRunLog: vi.fn(async () => null),
   pickFolder: vi.fn(async () => '/mods'),
   pickFile: vi.fn(async () => '/mods/preview.png'),
+  pickSteamCmdExecutable: vi.fn(async () => '/tools/steamcmd.sh'),
   onRunEvent: vi.fn(() => () => undefined)
 }
 
@@ -458,7 +469,8 @@ describe('App UI validation gates', () => {
 
     expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
       webApiEnabled: true,
-      webApiKey: 'dev-key-123'
+      webApiKey: 'dev-key-123',
+      steamCmdManualPath: ''
     })
   })
 
@@ -482,7 +494,8 @@ describe('App UI validation gates', () => {
 
     expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
       webApiEnabled: false,
-      webApiKey: undefined
+      webApiKey: undefined,
+      steamCmdManualPath: ''
     })
   })
 
@@ -490,7 +503,10 @@ describe('App UI validation gates', () => {
     workshop.getAdvancedSettings.mockResolvedValueOnce({
       webApiEnabled: true,
       hasWebApiKey: true,
-      secureStorageAvailable: true
+      secureStorageAvailable: true,
+      steamCmdManualPath: undefined,
+      steamCmdInstalled: true,
+      steamCmdSource: 'auto'
     })
 
     const wrapper = mount(App)
@@ -513,6 +529,43 @@ describe('App UI validation gates', () => {
     expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
       webApiEnabled: true,
       clearWebApiKey: true
+    })
+  })
+
+  it('browses and saves a manual SteamCMD path from advanced settings', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const advancedToggle = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Advanced Developer Options'))
+    expect(advancedToggle).toBeDefined()
+    await advancedToggle?.trigger('click')
+    await flushPromises()
+
+    const browseButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Browse SteamCMD'))
+    expect(browseButton).toBeDefined()
+    await browseButton?.trigger('click')
+    await flushPromises()
+
+    const pathInput = wrapper.find('input[placeholder="Path to steamcmd.sh or steamcmd.exe"]')
+    expect(pathInput.exists()).toBe(true)
+    expect((pathInput.element as HTMLInputElement).value).toBe('/tools/steamcmd.sh')
+
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Save Advanced Options'))
+    expect(saveButton).toBeDefined()
+    await saveButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.pickSteamCmdExecutable).toHaveBeenCalledTimes(1)
+    expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
+      webApiEnabled: false,
+      webApiKey: undefined,
+      steamCmdManualPath: '/tools/steamcmd.sh'
     })
   })
 

@@ -22,6 +22,7 @@ describe('profile and run-log persistence', () => {
     await store.setRememberAuth(true)
     await store.setWebApiEnabled(true)
     await store.setWebApiKeyEncrypted('encrypted-key')
+    await store.setSteamCmdManualPath('/tools/steamcmd.sh')
 
     const profiles = await store.getProfiles()
     expect(profiles).toHaveLength(1)
@@ -29,6 +30,7 @@ describe('profile and run-log persistence', () => {
     expect(await store.getRememberAuth()).toBe(true)
     expect(await store.getWebApiEnabled()).toBe(true)
     expect(await store.getWebApiKeyEncrypted()).toBe('encrypted-key')
+    expect(await store.getSteamCmdManualPath()).toBe('/tools/steamcmd.sh')
   })
 
   it('stores steamcmd output in a single session file and overwrites it on next run', async () => {

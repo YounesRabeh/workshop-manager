@@ -3,8 +3,9 @@
  * Responsibility: Reports install status, supports manual executable overrides,
  *  and performs OS-aware download/extraction when SteamCMD is missing.
  */
-import { createWriteStream } from 'node:fs'
-import { access, mkdir, rm } from 'node:fs/promises'
+import { constants, createWriteStream } from 'node:fs'
+import { access, mkdir, rm, stat } from 'node:fs/promises'
+import type { IncomingMessage } from 'node:http'
 import { get } from 'node:https'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -25,9 +26,30 @@ const STEAMCMD_URLS: Record<NodeJS.Platform, string | undefined> = {
   sunos: undefined
 }
 
-async function exists(path: string): Promise<boolean> {
+function toInstallError(prefix: string, error: unknown): AppError {
+  if (error instanceof AppError) {
+    return error
+  }
+
+  const message = error instanceof Error ? error.message : String(error)
+  return new AppError('install', `${prefix}: ${message}`)
+}
+
+function escapePowerShellSingleQuotedValue(value: string): string {
+  return value.replace(/'/g, "''")
+}
+
+async function isUsableExecutable(path: string): Promise<boolean> {
   try {
-    await access(path)
+    const entry = await stat(path)
+    if (!entry.isFile()) {
+      return false
+    }
+
+    if (process.platform !== 'win32') {
+      await access(path, constants.X_OK)
+    }
+
     return true
   } catch {
     return false
@@ -37,7 +59,9 @@ async function exists(path: string): Promise<boolean> {
 async function run(command: string, args: string[], cwd: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, { cwd, stdio: 'ignore' })
-    child.once('error', reject)
+    child.once('error', (error) => {
+      reject(toInstallError('Extraction command failed', error))
+    })
     child.once('close', (code) => {
       if (code === 0) {
         resolve()
@@ -51,17 +75,60 @@ async function run(command: string, args: string[], cwd: string): Promise<void> 
 function download(url: string, targetPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const file = createWriteStream(targetPath)
-    get(url, (res) => {
-      if (!res.statusCode || res.statusCode >= 400) {
-        reject(new AppError('install', `SteamCMD download failed with status ${res.statusCode}`))
+    let settled = false
+    let activeResponse: IncomingMessage | null = null
+
+    const rejectOnce = (error: AppError) => {
+      if (settled) {
         return
       }
+      settled = true
+      activeResponse?.destroy()
+      file.destroy()
+      void rm(targetPath, { force: true })
+        .catch(() => undefined)
+        .finally(() => reject(error))
+    }
+
+    const resolveOnce = () => {
+      if (settled) {
+        return
+      }
+      settled = true
+      resolve()
+    }
+
+    file.once('error', (error) => {
+      rejectOnce(toInstallError('SteamCMD download failed', error))
+    })
+
+    const request = get(url, (res) => {
+      activeResponse = res
+      if (!res.statusCode || res.statusCode >= 400) {
+        res.resume()
+        rejectOnce(new AppError('install', `SteamCMD download failed with status ${res.statusCode}`))
+        return
+      }
+
+      res.once('error', (error) => {
+        rejectOnce(toInstallError('SteamCMD download failed', error))
+      })
+
       res.pipe(file)
       file.on('finish', () => {
-        file.close()
-        resolve()
+        file.close((error) => {
+          if (error) {
+            rejectOnce(toInstallError('SteamCMD download failed', error))
+            return
+          }
+          resolveOnce()
+        })
       })
-    }).on('error', reject)
+    })
+
+    request.once('error', (error) => {
+      rejectOnce(toInstallError('SteamCMD download failed', error))
+    })
   })
 }
 
@@ -80,12 +147,13 @@ export class SteamCmdInstallManager {
       : join(this.installDir, 'steamcmd.sh')
   }
 
-  setManualExecutablePath(path: string): void {
-    this.manualExecutablePath = path
+  setManualExecutablePath(path: string | null | undefined): void {
+    const normalizedPath = path?.trim()
+    this.manualExecutablePath = normalizedPath && normalizedPath.length > 0 ? normalizedPath : null
   }
 
   async getStatus(): Promise<InstallStatus> {
-    if (this.manualExecutablePath && (await exists(this.manualExecutablePath))) {
+    if (this.manualExecutablePath && (await isUsableExecutable(this.manualExecutablePath))) {
       return {
         installed: true,
         executablePath: this.manualExecutablePath,
@@ -94,7 +162,7 @@ export class SteamCmdInstallManager {
     }
 
     const executablePath = this.defaultExecutablePath
-    if (await exists(executablePath)) {
+    if (await isUsableExecutable(executablePath)) {
       return {
         installed: true,
         executablePath,
@@ -126,7 +194,16 @@ export class SteamCmdInstallManager {
     await download(downloadUrl, archivePath)
 
     if (process.platform === 'win32') {
-      await run('powershell', ['-Command', `Expand-Archive -Path '${archivePath}' -DestinationPath '${this.installDir}' -Force`], this.installDir)
+      const escapedArchivePath = escapePowerShellSingleQuotedValue(archivePath)
+      const escapedInstallDir = escapePowerShellSingleQuotedValue(this.installDir)
+      await run(
+        'powershell',
+        [
+          '-Command',
+          `Expand-Archive -LiteralPath '${escapedArchivePath}' -DestinationPath '${escapedInstallDir}' -Force`
+        ],
+        this.installDir
+      )
     } else {
       await run('tar', ['-xzf', archivePath, '-C', this.installDir], this.installDir)
     }

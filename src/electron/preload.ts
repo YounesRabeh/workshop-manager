@@ -6,6 +6,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AdvancedSettings,
   ContentFolderFileEntry,
+  InstallStatus,
   LoginInput,
   ModProfile,
   RunEvent,
@@ -18,7 +19,7 @@ import type {
 import { IPC_CHANNELS } from '@shared/ipc'
 
 export interface WorkshopApi {
-  ensureSteamCmdInstalled: () => Promise<unknown>
+  ensureSteamCmdInstalled: () => Promise<InstallStatus>
   getAppVersion: () => Promise<{ version: string }>
   login: (input: LoginInput) => Promise<{ sessionId: string; rememberedUsername?: string }>
   quitApp: () => Promise<{ ok: true }>
@@ -48,6 +49,7 @@ export interface WorkshopApi {
   getLocalImagePreview: (payload: { path: string }) => Promise<string | undefined>
   pickFolder: () => Promise<string | undefined>
   pickFile: () => Promise<string | undefined>
+  pickSteamCmdExecutable: () => Promise<string | undefined>
   pickFiles: () => Promise<string[]>
   onRunEvent: (callback: (event: RunEvent) => void) => () => void
 }
@@ -78,6 +80,7 @@ const api: WorkshopApi = {
   getLocalImagePreview: (payload) => ipcRenderer.invoke(IPC_CHANNELS.getLocalImagePreview, payload),
   pickFolder: () => ipcRenderer.invoke(IPC_CHANNELS.pickFolder),
   pickFile: () => ipcRenderer.invoke(IPC_CHANNELS.pickFile),
+  pickSteamCmdExecutable: () => ipcRenderer.invoke(IPC_CHANNELS.pickSteamCmdExecutable),
   pickFiles: () => ipcRenderer.invoke(IPC_CHANNELS.pickFiles),
   onRunEvent: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: RunEvent) => {

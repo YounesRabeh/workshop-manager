@@ -9,7 +9,11 @@ describe('useAuthFlow composable', () => {
     logout: vi.fn(async () => ({ ok: true })),
     clearStoredSession: vi.fn(async () => ({ ok: true })),
     submitSteamGuardCode: vi.fn(async () => ({ ok: true })),
-    ensureSteamCmdInstalled: vi.fn(async () => ({ installed: true })),
+    ensureSteamCmdInstalled: vi.fn(async () => ({
+      installed: true,
+      executablePath: '/managed/steamcmd.sh',
+      source: 'auto'
+    })),
     getProfiles: vi.fn(async () => ({
       profiles: [],
       rememberedUsername: 'alice',
@@ -19,12 +23,18 @@ describe('useAuthFlow composable', () => {
     getAdvancedSettings: vi.fn(async () => ({
       webApiEnabled: false,
       hasWebApiKey: false,
-      secureStorageAvailable: true
+      secureStorageAvailable: true,
+      steamCmdManualPath: undefined,
+      steamCmdInstalled: true,
+      steamCmdSource: 'auto'
     })),
     saveAdvancedSettings: vi.fn(async () => ({
       webApiEnabled: false,
       hasWebApiKey: false,
-      secureStorageAvailable: true
+      secureStorageAvailable: true,
+      steamCmdManualPath: undefined,
+      steamCmdInstalled: true,
+      steamCmdSource: 'auto'
     })),
     getCurrentProfile: vi.fn(async () => ({
       steamId64: '7656119',
@@ -32,7 +42,8 @@ describe('useAuthFlow composable', () => {
       avatarUrl: ''
     })),
     getAppVersion: vi.fn(async () => ({ version: '0.1.0' })),
-    quitApp: vi.fn(async () => ({ ok: true }))
+    quitApp: vi.fn(async () => ({ ok: true })),
+    pickSteamCmdExecutable: vi.fn(async () => '/tools/steamcmd.sh')
   }
 
   beforeEach(() => {
@@ -134,5 +145,19 @@ describe('useAuthFlow composable', () => {
     expect(flow.loginState.value).toBe('signed_out')
     expect(onHideTimeoutLogs).toHaveBeenCalledTimes(1)
     expect(onSignedOut).toHaveBeenCalledTimes(1)
+  })
+
+  it('picks a manual SteamCMD path into advanced settings', async () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    await flow.pickSteamCmdManualPath()
+
+    expect(workshop.pickSteamCmdExecutable).toHaveBeenCalledTimes(1)
+    expect(flow.advancedSettings.steamCmdManualPath).toBe('/tools/steamcmd.sh')
   })
 })
