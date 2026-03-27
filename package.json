@@ -65,7 +65,7 @@
     "build:exe:icon": "node scripts/build-executable.mjs --generate-icon",
     "prepreview": "pnpm sync:icon",
     "preview": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.renderer.json",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.renderer.json && vue-tsc --noEmit -p tsconfig.renderer-tests.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },

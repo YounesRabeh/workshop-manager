@@ -4,8 +4,9 @@
  * and global keyboard/mouse listeners tied to app navigation.
  */
 import { ref, type Ref } from 'vue'
+import type { PersistedRunLog } from '@shared/contracts'
 import { createAppGlobalKeyDownHandler, createAppGlobalMouseDownHandler } from '../events/keyboard-events'
-import type { FlowStep, PersistedRunLog } from '../types/ui'
+import type { FlowStep } from '../types/ui'
 
 interface UseUiShellOptions {
   flowStep: Ref<FlowStep>
@@ -57,7 +58,7 @@ export function useUiShell(options: UseUiShellOptions) {
   async function selectRun(runId: string): Promise<void> {
     selectedRunId.value = runId
     try {
-      const payload = (await window.workshop.getRunLog(runId)) as PersistedRunLog | null
+      const payload = await window.workshop.getRunLog(runId)
       if (payload) {
         selectedRun.value = payload
         return
@@ -71,7 +72,7 @@ export function useUiShell(options: UseUiShellOptions) {
 
   async function refreshRunLogs(): Promise<void> {
     try {
-      const payload = (await window.workshop.getRunLogs()) as PersistedRunLog[] | null | undefined
+      const payload = await window.workshop.getRunLogs()
       const runs = Array.isArray(payload) ? payload : []
       recentRuns.value = runs
 

@@ -21,16 +21,6 @@ export type SteamGuardPromptType =
   | 'steam_guard_mobile'
   | 'steam_guard_approved'
 
-export interface PersistedRunLog {
-  runId: string
-  success: boolean
-  publishedFileId?: string
-  steamOutputSummary: string
-  logPath: string
-  lines: string[]
-  status: 'running' | 'success' | 'failed' | 'cancelled'
-}
-
 export interface LoginFormState {
   username: string
   password: string

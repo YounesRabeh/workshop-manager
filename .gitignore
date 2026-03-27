@@ -6,6 +6,7 @@ squashfs-root/
 *.log
 .DS_Store
 coverage/
+*.tsbuildinfo
 
 # Packaged executable artifacts
 *.AppImage

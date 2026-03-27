@@ -61,6 +61,11 @@ export interface RunResult {
   logPath: string
 }
 
+export interface PersistedRunLog extends RunResult {
+  lines: string[]
+  status: 'running' | 'success' | 'failed' | 'cancelled'
+}
+
 export type InstallSource = 'auto' | 'manual' | 'missing'
 
 export interface InstallStatus {
@@ -116,7 +121,6 @@ export interface SteamGuardInput {
 }
 
 export interface UploadInput {
-  profileId: string
   draft: UploadDraft
 }
 

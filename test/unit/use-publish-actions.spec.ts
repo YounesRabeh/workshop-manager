@@ -119,6 +119,12 @@ describe('usePublishActions composable', () => {
     await harness.publish.confirmCreateItem()
 
     expect(workshop.uploadMod).toHaveBeenCalledTimes(1)
+    expect(workshop.uploadMod).toHaveBeenCalledWith({
+      draft: expect.objectContaining({
+        appId: '480',
+        title: 'Create Item'
+      })
+    })
     expect(harness.publish.isCreateConfirmOpen.value).toBe(false)
     expect(harness.toasts.at(-1)?.title).toBe('Upload Completed')
   })
