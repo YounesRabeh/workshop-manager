@@ -53,6 +53,7 @@
     }
   },
   "scripts": {
+    "clean": "node scripts/clean.mjs",
     "kill:instance": "node scripts/kill-old-instance.mjs",
     "predev": "pnpm kill:instance && pnpm sync:icon",
     "dev": "CHROME_DESKTOP=workshop-manager.desktop electron-vite dev",
