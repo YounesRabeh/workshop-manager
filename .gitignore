@@ -23,9 +23,8 @@ builder-effective-config.yaml
 #for doc-AI
 .codex
 
-# Generated icon artifacts (source is resources/app-icon.png)
-resources/app-icon.normalized.png
-resources/app-icon.ico
-resources/app-icon.icns
+# Generated icon artifacts (source is resources/img/app-icon.png)
+resources/img/app-icon.*
+!resources/img/app-icon.png
 resources/.icon-source
 **/public/app-icon.png
