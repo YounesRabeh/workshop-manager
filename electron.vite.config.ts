@@ -11,7 +11,7 @@ export default defineConfig({
         '@backend': resolve('src/backend')
       }
     },
-    plugins: [externalizeDepsPlugin()]
+    plugins: [externalizeDepsPlugin({ exclude: ['extract-zip'] })]
   },
   preload: {
     build: {

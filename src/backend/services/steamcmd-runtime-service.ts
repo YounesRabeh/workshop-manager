@@ -43,6 +43,10 @@ function createRunId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
 }
 
+function resolveLoginTimeoutMs(useStoredAuth: boolean): number {
+  return useStoredAuth ? 10_000 : 30_000
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
@@ -59,7 +63,8 @@ export {
   mergeWorkshopItems,
   normalizeWorkshopItems,
   parseSteamLoginFailure,
-  parseWorkshopRunFailure
+  parseWorkshopRunFailure,
+  resolveLoginTimeoutMs
 }
 
 export class SteamCmdRuntimeService extends EventEmitter {
@@ -103,7 +108,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
     const runId = createRunId()
     const args = this.processSession.buildLoginArgs(normalizedUsername, password, useStoredAuth)
-    const timeoutMs = useStoredAuth ? 10_000 : 20_000
+    const timeoutMs = resolveLoginTimeoutMs(useStoredAuth)
 
     if (
       useStoredAuth &&

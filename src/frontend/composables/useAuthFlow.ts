@@ -37,6 +37,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   const authIssue = ref<AuthIssue | null>(null)
   const isSteamCmdDetected = ref(false)
   const isAdvancedOptionsOpen = ref(false)
+  const installLogPath = ref('')
   const accountPersonaName = ref<string>('')
   const accountProfileImageUrl = ref<string | null>(null)
 
@@ -238,6 +239,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       isSteamCmdDetected.value = true
       advancedSettings.steamCmdInstalled = true
       advancedSettings.steamCmdSource = payload.source
+      installLogPath.value = ''
       if (payload.source === 'manual') {
         advancedSettings.steamCmdManualPath = payload.executablePath
       }
@@ -247,6 +249,38 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       isSteamCmdDetected.value = false
       advancedSettings.steamCmdInstalled = false
       statusMessage.value = `Install error (${parsed.code}): ${parsed.message}`
+      await loadInstallLogPath()
+    }
+  }
+
+  async function loadInstallLogPath(): Promise<void> {
+    try {
+      const payload = await window.workshop.getInstallLog()
+      installLogPath.value = payload.path
+    } catch (error) {
+      installLogPath.value = ''
+    }
+  }
+
+  async function openInstallLog(): Promise<void> {
+    if (installLogPath.value.trim().length === 0) {
+      await loadInstallLogPath()
+    }
+
+    const targetPath = installLogPath.value.trim()
+    if (!targetPath) {
+      statusMessage.value = 'SteamCMD install log path is not available yet.'
+      return
+    }
+
+    try {
+      const result = await window.workshop.openPath({ path: targetPath })
+      if (result.error) {
+        statusMessage.value = `Open install log failed: ${result.error}`
+      }
+    } catch (error) {
+      const parsed = normalizeError(error)
+      statusMessage.value = `Open install log failed (${parsed.code}): ${parsed.message}`
     }
   }
 
@@ -643,6 +677,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     authIssue,
     isSteamCmdDetected,
     isAdvancedOptionsOpen,
+    installLogPath,
     loginForm,
     advancedSettings,
     accountPersonaName,
@@ -661,6 +696,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     toggleAdvancedOptions,
     setSteamGuardCode,
     ensureSteamCmdInstalled,
+    openInstallLog,
     refreshRememberedLoginState,
     loadAdvancedSettings,
     pickSteamCmdManualPath,

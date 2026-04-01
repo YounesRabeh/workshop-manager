@@ -14,6 +14,11 @@ describe('useAuthFlow composable', () => {
       executablePath: '/managed/steamcmd.sh',
       source: 'auto'
     })),
+    getInstallLog: vi.fn(async () => ({
+      path: '/tmp/steamcmd-install.log',
+      content: '[log] example',
+      exists: true
+    })),
     getProfiles: vi.fn(async () => ({
       profiles: [],
       rememberedUsername: 'alice',
@@ -42,6 +47,7 @@ describe('useAuthFlow composable', () => {
       avatarUrl: ''
     })),
     getAppVersion: vi.fn(async () => ({ version: '0.1.0' })),
+    openPath: vi.fn(async () => ({ ok: true })),
     quitApp: vi.fn(async () => ({ ok: true })),
     pickSteamCmdExecutable: vi.fn(async () => '/tools/steamcmd.sh')
   }
@@ -159,5 +165,21 @@ describe('useAuthFlow composable', () => {
 
     expect(workshop.pickSteamCmdExecutable).toHaveBeenCalledTimes(1)
     expect(flow.advancedSettings.steamCmdManualPath).toBe('/tools/steamcmd.sh')
+  })
+
+  it('loads install log path when SteamCMD install fails', async () => {
+    workshop.ensureSteamCmdInstalled.mockRejectedValueOnce(new Error('[install] SteamCMD was downloaded but executable validation failed'))
+
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    await flow.ensureSteamCmdInstalled()
+
+    expect(workshop.getInstallLog).toHaveBeenCalledTimes(1)
+    expect(flow.installLogPath.value).toBe('/tmp/steamcmd-install.log')
   })
 })

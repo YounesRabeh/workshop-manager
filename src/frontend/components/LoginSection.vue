@@ -28,6 +28,7 @@ const props = defineProps<{
   isAdvancedOptionsOpen: boolean
   advancedSettings: AdvancedSettingsState
   isWebApiKeyPeek: boolean
+  installLogPath: string
 }>()
 
 const emit = defineEmits<{
@@ -42,6 +43,7 @@ const emit = defineEmits<{
   (e: 'set-web-api-key-peek', value: boolean): void
   (e: 'save-advanced-settings'): void
   (e: 'clear-web-api-key'): void
+  (e: 'open-install-log'): void
   (e: 'clear-stored-session'): void
   (e: 'quit-app'): void
 }>()
@@ -108,6 +110,10 @@ const canSaveAdvancedSettings = computed(() => {
 
 const canClearSteamCmdPath = computed(() => {
   return !props.advancedSettings.isSaving && props.advancedSettings.steamCmdManualPath.trim().length > 0
+})
+
+const shouldShowInstallLogButton = computed(() => {
+  return /install error/i.test(props.statusMessage) || props.installLogPath.trim().length > 0
 })
 
 const steamCmdStatusLabel = computed(() => {
@@ -269,6 +275,14 @@ watch(
         <h1 class="text-4xl font-extrabold tracking-tight text-slate-900">Sign in</h1>
         <p class="mt-2 text-sm text-slate-600">Use your Steam account to unlock mod management.</p>
         <p v-if="statusMessage" class="login-status">{{ statusMessage }}</p>
+        <button
+          v-if="shouldShowInstallLogButton"
+          type="button"
+          class="login-peek mt-3 rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
+          @click="emit('open-install-log')"
+        >
+          Open Log File
+        </button>
       </header>
 
       <form class="mt-5" @submit.prevent="emit('submit-login')">

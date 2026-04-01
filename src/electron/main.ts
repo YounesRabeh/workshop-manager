@@ -439,6 +439,14 @@ app.whenReady().then(async () => {
     }
   })
 
+  ipcMain.handle(IPC_CHANNELS.getInstallLog, async () => {
+    try {
+      return await installManager.getInstallLog()
+    } catch (error) {
+      throw toIpcError(error)
+    }
+  })
+
   ipcMain.handle(IPC_CHANNELS.saveAdvancedSettings, async (_event, payload: SaveAdvancedSettingsInput) => {
     try {
       let nextWebApiEnabled = payload.webApiEnabled === true

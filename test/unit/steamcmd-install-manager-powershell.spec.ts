@@ -5,17 +5,17 @@ import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { getMock, spawnMock } = vi.hoisted(() => ({
+const { extractZipMock, getMock } = vi.hoisted(() => ({
+  extractZipMock: vi.fn(),
   getMock: vi.fn(),
-  spawnMock: vi.fn()
 }))
 
 vi.mock('node:https', () => ({
   get: getMock
 }))
 
-vi.mock('node:child_process', () => ({
-  spawn: spawnMock
+vi.mock('extract-zip', () => ({
+  default: extractZipMock
 }))
 
 const { SteamCmdInstallManager } = await import('../../src/backend/services/steamcmd-install-manager')
@@ -30,12 +30,12 @@ async function withPlatform<T>(platform: NodeJS.Platform, run: () => Promise<T> 
   }
 }
 
-describe('SteamCmdInstallManager PowerShell extraction', () => {
+describe('SteamCmdInstallManager Windows ZIP extraction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('escapes apostrophes in Windows install paths before invoking PowerShell', async () => {
+  it('extracts ZIP archive in-process and records install log details on windows', async () => {
     const baseRoot = await mkdtemp(join(tmpdir(), 'steamcmd-install-'))
     const root = join(baseRoot, "o'connor")
     await mkdir(root, { recursive: true })
@@ -53,29 +53,22 @@ describe('SteamCmdInstallManager PowerShell extraction', () => {
       return request
     })
 
-    let invokedCommand = ''
-    spawnMock.mockImplementation((command: string, args: string[]) => {
-      const child = new EventEmitter()
-
-      queueMicrotask(async () => {
-        if (command === 'powershell') {
-          invokedCommand = String(args[1] ?? '')
-          await writeFile(join(root, 'steamcmd', 'steamcmd.exe'), 'steamcmd', 'utf8')
-        }
-        child.emit('close', 0)
-      })
-
-      return child
+    extractZipMock.mockImplementation(async (_archivePath: string, options: { dir: string }) => {
+      await writeFile(join(options.dir, 'steamcmd.exe'), 'steamcmd', 'utf8')
     })
 
     await withPlatform('win32', async () => {
       const manager = new SteamCmdInstallManager(root)
       const status = await manager.ensureInstalled()
+      const installLog = await manager.getInstallLog()
 
       expect(status.installed).toBe(true)
       expect(status.source).toBe('auto')
-      expect(invokedCommand).toContain('Expand-Archive -LiteralPath')
-      expect(invokedCommand).toContain("o''connor")
+      expect(extractZipMock).toHaveBeenCalledTimes(1)
+      expect(installLog.exists).toBe(true)
+      expect(installLog.content).toContain('SteamCMD install attempt started')
+      expect(installLog.content).toContain('Extracting ZIP archive in-process')
+      expect(installLog.content).toContain('SteamCMD install completed successfully')
     })
   })
 
@@ -95,18 +88,9 @@ describe('SteamCmdInstallManager PowerShell extraction', () => {
       return request
     })
 
-    spawnMock.mockImplementation((command: string) => {
-      const child = new EventEmitter()
-
-      queueMicrotask(async () => {
-        if (command === 'powershell') {
-          await mkdir(join(root, 'steamcmd', 'portable'), { recursive: true })
-          await writeFile(join(root, 'steamcmd', 'portable', 'steamcmd.exe'), 'steamcmd', 'utf8')
-        }
-        child.emit('close', 0)
-      })
-
-      return child
+    extractZipMock.mockImplementation(async (_archivePath: string, options: { dir: string }) => {
+      await mkdir(join(options.dir, 'portable'), { recursive: true })
+      await writeFile(join(options.dir, 'portable', 'steamcmd.exe'), 'steamcmd', 'utf8')
     })
 
     await withPlatform('win32', async () => {

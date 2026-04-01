@@ -72,6 +72,12 @@ export interface InstallStatus {
   source: InstallSource
 }
 
+export interface InstallLogSnapshot {
+  path: string
+  content: string
+  exists: boolean
+}
+
 export interface ApiError {
   message: string
   code: ErrorCode

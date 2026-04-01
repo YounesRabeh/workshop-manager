@@ -29,6 +29,11 @@ const workshop = {
     steamCmdInstalled: true,
     steamCmdSource: 'auto'
   })),
+  getInstallLog: vi.fn(async () => ({
+    path: '/tmp/steamcmd-install.log',
+    content: '[install] example log',
+    exists: true
+  })),
   saveAdvancedSettings: vi.fn(async (payload: { webApiEnabled: boolean; webApiKey?: string; clearWebApiKey?: boolean; steamCmdManualPath?: string }) => ({
     webApiEnabled: payload.webApiEnabled,
     hasWebApiKey: Boolean(payload.webApiKey && payload.webApiKey.trim().length > 0 && !payload.clearWebApiKey),
@@ -229,6 +234,28 @@ describe('App UI validation gates', () => {
     await flushPromises()
 
     expect(workshop.quitApp).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows only the install log open action when SteamCMD install fails during bootstrap', async () => {
+    workshop.ensureSteamCmdInstalled.mockRejectedValueOnce(
+      new Error('[install] SteamCMD was downloaded but executable validation failed')
+    )
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('SteamCMD Install Log')
+    expect(wrapper.text()).not.toContain('/tmp/steamcmd-install.log')
+    expect(wrapper.text()).not.toContain('[install] example log')
+
+    const openLogButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Open Log File')
+    expect(openLogButton).toBeDefined()
+    await openLogButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.openPath).toHaveBeenCalledWith({ path: '/tmp/steamcmd-install.log' })
   })
 
   it('keeps clear saved session disabled when only checkbox is ticked locally', async () => {
