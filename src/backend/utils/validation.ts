@@ -1,6 +1,6 @@
 /**
  * Overview: Validates workshop upload/update/visibility drafts before command execution.
- * Responsibility: Enforces mode-specific required fields, visibility constraints, and tag-shape checks using shared requirement evaluators.
+ * Responsibility: Enforces mode-specific required fields and visibility constraints using shared requirement evaluators.
  */
 import type { UploadDraft } from '@shared/contracts'
 import {
@@ -45,9 +45,5 @@ export function validateDraft(draft: UploadDraft, mode: 'upload' | 'update' | 'v
     if (!requirements.title) {
       throw new AppError('validation', 'title is required for updates')
     }
-  }
-
-  if (!Array.isArray(draft.tags)) {
-    throw new AppError('validation', 'tags must be an array')
   }
 }

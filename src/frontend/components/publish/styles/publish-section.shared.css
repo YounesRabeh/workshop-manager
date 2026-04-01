@@ -98,25 +98,6 @@
   background: #45212a;
 }
 
-.publish-tag-input {
-  width: 100%;
-  border: 1px solid #355874;
-  border-radius: 0.25rem;
-  background: #0f1f2e;
-  color: #f1f5f9;
-  padding: 0.25rem 0.5rem;
-}
-
-.publish-tag-add-button {
-  border: 1px solid #6ecbff;
-  border-radius: 0.25rem;
-  background: #59b9f8;
-  color: #05253a;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
 .publish-primary-action-button {
   border: 1px solid #78c2f7;
   border-radius: 0.25rem;

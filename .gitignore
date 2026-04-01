@@ -20,6 +20,9 @@ latest*.yml
 builder-debug.yml
 builder-effective-config.yaml
 
+#for doc-AI
+.codex
+
 # Generated icon artifacts (source is resources/app-icon.png)
 resources/app-icon.normalized.png
 resources/app-icon.ico

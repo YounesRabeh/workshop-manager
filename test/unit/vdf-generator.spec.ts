@@ -8,17 +8,15 @@ describe('generateWorkshopVdf', () => {
         appId: '480',
         contentFolder: '/mods/base',
         previewFile: '/mods/preview.png',
-        title: 'My "Quoted" Mod',
-        tags: ['fun', 'coop']
+        title: 'My "Quoted" Mod'
       },
       'upload'
     )
 
     expect(output).toContain('"appid"\t"480"')
     expect(output).toContain('"title"\t"My \\"Quoted\\" Mod"')
-    expect(output).toContain('"0"\t"fun"')
-    expect(output).toContain('"1"\t"coop"')
     expect(output).not.toContain('publishedfileid')
+    expect(output).not.toContain('"tags"')
   })
 
   it('requires publishedfileid for update mode', () => {
@@ -28,8 +26,7 @@ describe('generateWorkshopVdf', () => {
           appId: '480',
           contentFolder: '/mods/base',
           previewFile: '/mods/preview.png',
-          title: 'Test',
-          tags: []
+          title: 'Test'
         },
         'update'
       )
@@ -38,15 +35,14 @@ describe('generateWorkshopVdf', () => {
 
   it('omits optional preview fields when empty', () => {
     const output = generateWorkshopVdf(
-      {
-        appId: '480',
-        contentFolder: '/mods/base',
-        previewFile: '',
-        title: 'No Optional Fields',
-        tags: []
-      },
-      'upload'
-    )
+        {
+          appId: '480',
+          contentFolder: '/mods/base',
+          previewFile: '',
+          title: 'No Optional Fields'
+        },
+        'upload'
+      )
 
     expect(output).toContain('"title"\t"No Optional Fields"')
     expect(output).not.toContain('"previewfile"')
@@ -59,8 +55,7 @@ describe('generateWorkshopVdf', () => {
         publishedFileId: '12345',
         contentFolder: '/mods/base',
         title: 'Update Target',
-        changenote: 'Balance tweaks and crash fixes',
-        tags: []
+        changenote: 'Balance tweaks and crash fixes'
       },
       'update'
     )
@@ -77,8 +72,7 @@ describe('generateWorkshopVdf', () => {
         contentFolder: '/mods/base',
         previewFile: '/mods/preview.png',
         title: 'New Upload',
-        changenote: 'Initial release',
-        tags: []
+        changenote: 'Initial release'
       },
       'upload'
     )
@@ -93,8 +87,7 @@ describe('generateWorkshopVdf', () => {
         publishedFileId: '12345',
         contentFolder: '/mods/base',
         title: 'Update Target',
-        changenote: 'line one\nline two',
-        tags: []
+        changenote: 'line one\nline two'
       },
       'update'
     )
@@ -110,8 +103,7 @@ describe('generateWorkshopVdf', () => {
         publishedFileId: '12345',
         contentFolder: '',
         previewFile: '/mods/new-preview.png',
-        title: 'Update Target',
-        tags: []
+        title: 'Update Target'
       },
       'update'
     )
@@ -121,25 +113,6 @@ describe('generateWorkshopVdf', () => {
     expect(output).not.toContain('"contentfolder"')
   })
 
-  it('emits empty tags block when update explicitly requests tag sync', () => {
-    const output = generateWorkshopVdf(
-      {
-        appId: '480',
-        publishedFileId: '12345',
-        contentFolder: '',
-        previewFile: '/mods/new-preview.png',
-        title: 'Update Target',
-        tags: [],
-        forceTagsUpdate: true
-      },
-      'update'
-    )
-
-    expect(output).toContain('"publishedfileid"\t"12345"')
-    expect(output).toContain('"tags"')
-    expect(output).toContain('\t"tags"\n\t{\n\t}')
-  })
-
   it('emits visibility-only VDF structure', () => {
     const output = generateWorkshopVdf(
       {
@@ -147,7 +120,6 @@ describe('generateWorkshopVdf', () => {
         publishedFileId: '12345',
         contentFolder: '',
         title: '',
-        tags: [],
         visibility: 2
       },
       'visibility'
@@ -159,25 +131,5 @@ describe('generateWorkshopVdf', () => {
     expect(output).not.toContain('"contentfolder"')
     expect(output).not.toContain('"title"')
     expect(output).not.toContain('"tags"')
-  })
-
-  it('splits and deduplicates tags before generating VDF', () => {
-    const output = generateWorkshopVdf(
-      {
-        appId: '480',
-        contentFolder: '/mods/base',
-        previewFile: '/mods/preview.png',
-        title: 'My Mod',
-        tags: ['fun, coop', 'coop', 'PVP ; Builder', '  builder  ']
-      },
-      'upload'
-    )
-
-    expect(output).toContain('"0"\t"fun"')
-    expect(output).toContain('"1"\t"coop"')
-    expect(output).toContain('"2"\t"PVP"')
-    expect(output).toContain('"3"\t"Builder"')
-    expect((output.match(/\"coop\"/g) ?? []).length).toBe(1)
-    expect((output.match(/\"Builder\"/g) ?? []).length).toBe(1)
   })
 })

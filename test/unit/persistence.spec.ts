@@ -15,8 +15,7 @@ describe('profile and run-log persistence', () => {
       appId: '480',
       contentFolder: '/mods',
       previewFile: '/mods/preview.png',
-      title: 'Profile',
-      tags: ['a']
+      title: 'Profile'
     })
     await store.setRememberedUsername('alice')
     await store.setRememberAuth(true)
@@ -60,8 +59,7 @@ describe('profile and run-log persistence', () => {
         appId: '480',
         contentFolder: '/mods',
         previewFile: '/mods/preview.png',
-        title: 'Concurrent Profile',
-        tags: ['tag-a']
+        title: 'Concurrent Profile'
       }),
       store.setRememberedLoginState({
         rememberedUsername: 'TheYuyuBoy',

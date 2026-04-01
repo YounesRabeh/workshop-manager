@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContentTree, mergeContentFiles, useDrafts } from '../../src/frontend/composables/useDrafts'
+import { buildContentTree, mergeContentFiles } from '../../src/frontend/composables/useDrafts'
 
 describe('useDrafts composable', () => {
   it('deduplicates merged content files by absolute path', () => {
@@ -29,14 +29,5 @@ describe('useDrafts composable', () => {
     expect(tree[0]?.name).toBe('scripts')
     expect(tree[0]?.sizeBytes).toBe(9)
     expect(tree[1]?.name).toBe('readme.txt')
-  })
-
-  it('adds create tags once and clears input', () => {
-    const drafts = useDrafts()
-    drafts.createTagInput.value = 'alpha, beta, alpha'
-    drafts.addCreateTag()
-
-    expect(drafts.createDraft.tags).toEqual(['alpha', 'beta'])
-    expect(drafts.createTagInput.value).toBe('')
   })
 })

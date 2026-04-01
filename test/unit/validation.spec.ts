@@ -10,8 +10,7 @@ describe('validateDraft', () => {
           contentFolder: '',
           previewFile: '',
           title: '',
-          changenote: '',
-          tags: []
+          changenote: ''
         },
         'upload'
       )
@@ -26,8 +25,7 @@ describe('validateDraft', () => {
           contentFolder: '/mods/content',
           previewFile: '',
           title: 'Created Title',
-          changenote: '',
-          tags: []
+          changenote: ''
         },
         'upload'
       )
@@ -42,8 +40,7 @@ describe('validateDraft', () => {
           publishedFileId: '123',
           contentFolder: '',
           previewFile: '/mods/preview.png',
-          title: 'Updated Title',
-          tags: []
+          title: 'Updated Title'
         },
         'update'
       )
@@ -58,8 +55,7 @@ describe('validateDraft', () => {
           publishedFileId: '123',
           contentFolder: '/mods/content',
           previewFile: '',
-          title: 'Updated Title',
-          tags: []
+          title: 'Updated Title'
         },
         'update'
       )
@@ -74,8 +70,7 @@ describe('validateDraft', () => {
           publishedFileId: '123',
           contentFolder: '',
           previewFile: '',
-          title: 'Updated Title',
-          tags: []
+          title: 'Updated Title'
         },
         'update'
       )
@@ -90,8 +85,7 @@ describe('validateDraft', () => {
           publishedFileId: '123',
           contentFolder: '',
           previewFile: '',
-          title: '',
-          tags: []
+          title: ''
         },
         'update'
       )
@@ -105,8 +99,7 @@ describe('validateDraft', () => {
           appId: '',
           publishedFileId: '',
           contentFolder: '',
-          title: '',
-          tags: []
+          title: ''
         },
         'visibility'
       )

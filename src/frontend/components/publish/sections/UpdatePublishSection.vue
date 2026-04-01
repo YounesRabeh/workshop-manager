@@ -31,7 +31,6 @@ const props = defineProps<{
   selectedWorkshopItem: WorkshopItemSummary | undefined
   publishChecklist: PublishChecklistItem[]
   draft: UploadDraftState
-  tagInput: string
   visibilityCommitted: 0 | 1 | 2 | 3
   visibilityPending: 0 | 1 | 2 | 3
   canChangeVisibility: boolean
@@ -49,9 +48,6 @@ const emit = defineEmits<{
   (e: 'clear-workspace'): void
   (e: 'pick-preview-file'): void
   (e: 'clear-preview-file'): void
-  (e: 'change-tag-input', value: string): void
-  (e: 'add-tag'): void
-  (e: 'remove-tag', tag: string): void
   (e: 'update-item'): void
   (e: 'change-visibility-selection', value: 0 | 1 | 2 | 3): void
   (e: 'update-visibility-only'): void
@@ -238,7 +234,6 @@ function submitPrimaryAction(): void {
 
       <PublishDraftMetadataFields
         :draft="draft"
-        :tag-input="tagInput"
         :has-content-folder="hasContentFolder"
         :preview-file-value="previewFileValue"
         :upload-preview-image-src="uploadPreviewImageSrc"
@@ -246,9 +241,6 @@ function submitPrimaryAction(): void {
         :preview-image-is-square="previewImageIsSquare"
         @pick-preview-file="emit('pick-preview-file')"
         @clear-preview-file="emit('clear-preview-file')"
-        @change-tag-input="emit('change-tag-input', $event)"
-        @add-tag="emit('add-tag')"
-        @remove-tag="emit('remove-tag', $event)"
         @preview-load="onUploadPreviewLoad"
         @preview-error="onUploadPreviewError"
       />

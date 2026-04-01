@@ -1,13 +1,12 @@
 <!--
   Overview: Reusable publish form block for draft metadata and media fields.
-  Responsibility: Renders shared title/release-notes/thumbnail/tags inputs and emits normalized UI events for create/update flows.
+  Responsibility: Renders shared title/release-notes/thumbnail inputs and emits normalized UI events for create/update flows.
 -->
 <script setup lang="ts">
 import type { UploadDraftState } from '../../../types/ui'
 
 const props = defineProps<{
   draft: UploadDraftState
-  tagInput: string
   hasContentFolder: boolean
   previewFileValue: string
   uploadPreviewImageSrc: string
@@ -18,25 +17,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'pick-preview-file'): void
   (e: 'clear-preview-file'): void
-  (e: 'change-tag-input', value: string): void
-  (e: 'add-tag'): void
-  (e: 'remove-tag', tag: string): void
   (e: 'preview-load', event: Event): void
   (e: 'preview-error'): void
 }>()
-
-function onTagInput(event: Event): void {
-  const target = event.target as HTMLInputElement | null
-  emit('change-tag-input', target?.value ?? '')
-}
-
-function onTagKeydown(event: KeyboardEvent): void {
-  if (event.key !== 'Enter' && event.key !== ',' && event.key !== ';') {
-    return
-  }
-  event.preventDefault()
-  emit('add-tag')
-}
 
 function onPreviewLoad(event: Event): void {
   emit('preview-load', event)
@@ -106,29 +89,5 @@ function onPreviewLoad(event: Event): void {
       </p>
     </div>
 
-    <div>
-      <label class="text-sm text-slate-300">Tags</label>
-      <div class="mt-1 flex gap-2">
-        <input
-          :value="props.tagInput"
-          placeholder="Add tags (Enter, comma, or semicolon)"
-          class="publish-tag-input"
-          @input="onTagInput"
-          @keydown="onTagKeydown"
-        />
-        <button
-          type="button"
-          class="publish-tag-add-button"
-          @click="emit('add-tag')"
-        >
-          Add
-        </button>
-      </div>
-      <div class="mt-2 flex flex-wrap gap-2">
-        <button type="button" v-for="tag in props.draft.tags" :key="tag" class="rounded-full border border-[#386487] bg-[#122638] px-3 py-1 text-xs font-semibold text-sky-200" @click="emit('remove-tag', tag)">
-          {{ tag }} x
-        </button>
-      </div>
-    </div>
   </div>
 </template>

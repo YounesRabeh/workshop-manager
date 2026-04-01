@@ -47,7 +47,6 @@ export interface UploadDraftState {
   previewFile: string
   title: string
   releaseNotes: string
-  tags: string[]
 }
 
 export interface StagedContentFile {

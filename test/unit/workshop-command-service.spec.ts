@@ -27,8 +27,7 @@ describe('WorkshopCommandService', () => {
           contentFolder: '/mods',
           previewFile: '',
           title: 'Test Upload',
-          changenote: '',
-          tags: []
+          changenote: ''
         },
         'upload'
       )
@@ -58,8 +57,7 @@ describe('WorkshopCommandService', () => {
             contentFolder: '/mods',
             previewFile: '',
             title: 'Test Update',
-            changenote: '',
-            tags: []
+            changenote: ''
           },
           'update'
         )

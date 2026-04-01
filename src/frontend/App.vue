@@ -44,21 +44,12 @@ const {
   updateDraft,
   updateDraftCache,
   isHydratingUpdateDraft,
-  updateTagsTouched,
-  createTagInput,
-  updateTagInput,
   createStagedContentFiles,
   updateStagedContentFiles,
   createTotalStagedContentSizeBytes,
   updateTotalStagedContentSizeBytes,
   createStagedContentTree,
   updateStagedContentTree,
-  addCreateTag,
-  addUpdateTag,
-  removeCreateTag,
-  removeUpdateTag,
-  onChangeCreateTagInput,
-  onChangeUpdateTagInput,
   clearCreatePreviewFile,
   clearUpdatePreviewFile,
   getDraftForMode,
@@ -90,9 +81,6 @@ const authFlow = useAuthFlow({
     createStagedContentFiles.value = []
     updateStagedContentFiles.value = []
     updateDraftCache.value = {}
-    updateTagsTouched.value = false
-    createTagInput.value = ''
-    updateTagInput.value = ''
     flowStep.value = 'mods'
     publishActions.isUpdateConfirmOpen.value = false
     publishActions.isCreateConfirmOpen.value = false
@@ -231,7 +219,6 @@ const hasPendingUpdateChanges = computed(() => {
   const contentFolderChanged = updateDraft.contentFolder.trim().length > 0
   const previewChanged = updateDraft.previewFile.trim().length > 0
   const releaseNotesChanged = updateDraft.releaseNotes.trim().length > 0
-  const tagsChanged = updateTagsTouched.value
   const titleChanged = hasMeaningfulUpdateTitleChange.value
 
   const appIdChanged =
@@ -243,7 +230,6 @@ const hasPendingUpdateChanges = computed(() => {
     contentFolderChanged ||
     previewChanged ||
     releaseNotesChanged ||
-    tagsChanged ||
     titleChanged ||
     appIdChanged ||
     publishedFileIdChanged
@@ -261,7 +247,6 @@ const publishActions = usePublishActions({
   createRequirements,
   updateRequirements,
   hasPendingUpdateChanges,
-  updateTagsTouched,
   updateDraftCache,
   normalizeError,
   setStatusMessage: (message) => {
@@ -396,12 +381,10 @@ function hydrateSelectedWorkshopItem(item: WorkshopItemSummary): void {
       ...createEmptyDraft(),
       appId: item.appId ?? '',
       publishedFileId: item.publishedFileId,
-      title: item.title,
-      tags: item.tags ? [...item.tags] : []
+      title: item.title
     })
   }
   isHydratingUpdateDraft.value = false
-  updateTagsTouched.value = false
 
   setVisibilityFromSelection(visibility)
   statusMessage.value = `Loaded workshop item: ${item.title}`
@@ -609,7 +592,6 @@ watch(
           :selected-workshop-item="selectedWorkshopItem"
           :publish-checklist="updateChecklist"
           :draft="updateDraft"
-          :tag-input="updateTagInput"
           :visibility-committed="committedVisibility"
           :visibility-pending="pendingVisibility"
           :can-change-visibility="canChangeVisibility"
@@ -624,9 +606,6 @@ watch(
           @clear-workspace="clearUpdateWorkspace"
           @pick-preview-file="pickUpdatePreviewFile"
           @clear-preview-file="clearUpdatePreviewFile"
-          @change-tag-input="onChangeUpdateTagInput"
-          @add-tag="addUpdateTag"
-          @remove-tag="removeUpdateTag"
           @change-visibility-selection="setPendingVisibility"
           @update-visibility-only="updateVisibilityOnly"
           @update-item="openUpdateConfirmation"
@@ -636,7 +615,6 @@ watch(
           v-if="flowStep === 'create'"
           :publish-checklist="createChecklist"
           :draft="createDraft"
-          :tag-input="createTagInput"
           :visibility-pending="createVisibility"
           :staged-content-files="createStagedContentFiles"
           :staged-content-tree="createStagedContentTree"
@@ -646,9 +624,6 @@ watch(
           @clear-workspace="clearCreateWorkspace"
           @pick-preview-file="pickCreatePreviewFile"
           @clear-preview-file="clearCreatePreviewFile"
-          @change-tag-input="onChangeCreateTagInput"
-          @add-tag="addCreateTag"
-          @remove-tag="removeCreateTag"
           @change-visibility-selection="setCreateVisibility"
           @upload="openCreateConfirmation"
         />

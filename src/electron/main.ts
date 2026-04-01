@@ -410,7 +410,6 @@ app.whenReady().then(async () => {
           contentFolder: '',
           previewFile: '',
           title: '',
-          tags: [],
           visibility: payload.visibility
         },
         'visibility'

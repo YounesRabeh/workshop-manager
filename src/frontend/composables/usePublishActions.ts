@@ -37,7 +37,6 @@ interface UsePublishActionsOptions {
   createRequirements: ComputedRef<RequirementsResult>
   updateRequirements: ComputedRef<RequirementsResult>
   hasPendingUpdateChanges: ComputedRef<boolean>
-  updateTagsTouched: Ref<boolean>
   updateDraftCache: Ref<Record<string, UploadDraftState>>
   normalizeError: (error: unknown) => ApiFailure
   setStatusMessage: (message: string) => void
@@ -81,7 +80,6 @@ function actionFailureStatus(operation: 'upload' | 'update' | 'visibility'): str
 function buildUploadDraft(
   source: UploadDraftState,
   mode: 'update' | 'create',
-  updateTagsTouched: boolean,
   visibility?: 0 | 1 | 2 | 3
 ): UploadDraft {
   const normalizedReleaseNote = source.releaseNotes.replace(/\r\n/g, '\n').trim()
@@ -93,8 +91,6 @@ function buildUploadDraft(
     previewFile: source.previewFile,
     title: source.title,
     changenote: normalizedReleaseNote.length > 0 ? normalizedReleaseNote : undefined,
-    tags: [...source.tags],
-    forceTagsUpdate: mode === 'update' ? updateTagsTouched : undefined,
     visibility
   }
 }
@@ -172,7 +168,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
       return 'Update blocked: title, app ID, and published file ID are required.'
     }
     if (!options.hasPendingUpdateChanges.value) {
-      return 'Update blocked: no changes detected. Modify title/content/preview/tags/release notes first.'
+      return 'Update blocked: no changes detected. Modify title/content/preview/release notes first.'
     }
     return 'Update blocked: requirements not met.'
   }
@@ -195,7 +191,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
 
     try {
       const result = await window.workshop.uploadMod({
-        draft: buildUploadDraft(options.createDraft, 'create', options.updateTagsTouched.value, createVisibility.value)
+        draft: buildUploadDraft(options.createDraft, 'create', createVisibility.value)
       })
 
       options.setStatusMessage('Upload completed successfully.')
@@ -250,7 +246,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
 
     try {
       const result = await window.workshop.updateMod({
-        draft: buildUploadDraft(options.updateDraft, 'update', options.updateTagsTouched.value, pendingVisibility.value)
+        draft: buildUploadDraft(options.updateDraft, 'update', pendingVisibility.value)
       })
 
       committedVisibility.value = pendingVisibility.value

@@ -31,8 +31,7 @@ describe('usePublishActions composable', () => {
       contentFolder: '/mods',
       previewFile: '',
       title: 'Create Item',
-      releaseNotes: '',
-      tags: [] as string[]
+      releaseNotes: ''
     })
     const updateDraft = reactive({
       appId: '480',
@@ -40,13 +39,11 @@ describe('usePublishActions composable', () => {
       contentFolder: '/mods',
       previewFile: '',
       title: 'Update Item',
-      releaseNotes: '',
-      tags: [] as string[]
+      releaseNotes: ''
     })
     const createRequirements = computed(() => ({ valid: true, appId: true, contentFolder: true, title: true }))
     const updateRequirements = computed(() => ({ valid: true, appId: true, publishedFileId: true, title: true }))
     const hasPendingUpdateChanges = computed(() => options?.hasPendingUpdateChanges ?? true)
-    const updateTagsTouched = ref(false)
     const updateDraftCache = ref<Record<string, typeof updateDraft>>({})
     const statuses: string[] = []
     const toasts: Array<{ title: string; tone: string }> = []
@@ -62,7 +59,6 @@ describe('usePublishActions composable', () => {
       createRequirements,
       updateRequirements,
       hasPendingUpdateChanges,
-      updateTagsTouched,
       updateDraftCache,
       normalizeError: (error) => ({ code: 'command_failed', message: error instanceof Error ? error.message : 'error' }),
       setStatusMessage: (message) => {

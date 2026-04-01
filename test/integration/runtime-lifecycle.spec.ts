@@ -138,8 +138,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
         contentFolder: '/mods',
         previewFile: '/mods/preview.png',
         title: 'My Mod',
-        changenote: 'Initial release notes',
-        tags: ['tag-a']
+        changenote: 'Initial release notes'
       },
       'upload'
     )
@@ -189,8 +188,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
         publishedFileId: '123',
         contentFolder: '',
         previewFile: '/mods/preview.png',
-        title: 'My Mod',
-        tags: []
+        title: 'My Mod'
       },
       'update'
     )
@@ -235,8 +233,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
           publishedFileId: '123',
           contentFolder: '',
           previewFile: '/mods/preview.png',
-          title: 'My Mod',
-          tags: []
+          title: 'My Mod'
         },
         'update'
       )
@@ -329,8 +326,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
           publishedFileId: '123',
           contentFolder: emptyContentFolder,
           previewFile: '',
-          title: 'My Mod',
-          tags: []
+          title: 'My Mod'
         },
         'update'
       )

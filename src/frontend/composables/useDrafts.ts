@@ -14,8 +14,7 @@ export function createEmptyDraft(): UploadDraftState {
     contentFolder: '',
     previewFile: '',
     title: '',
-    releaseNotes: '',
-    tags: []
+    releaseNotes: ''
   }
 }
 
@@ -26,8 +25,7 @@ export function cloneDraft(source: UploadDraftState): UploadDraftState {
     contentFolder: source.contentFolder,
     previewFile: source.previewFile,
     title: source.title,
-    releaseNotes: source.releaseNotes,
-    tags: [...source.tags]
+    releaseNotes: source.releaseNotes
   }
 }
 
@@ -38,7 +36,6 @@ export function applyDraft(target: UploadDraftState, source: UploadDraftState): 
   target.previewFile = source.previewFile
   target.title = source.title
   target.releaseNotes = source.releaseNotes
-  target.tags = [...source.tags]
 }
 
 export function normalizeFsPath(path: string): string {
@@ -192,9 +189,6 @@ export function useDrafts() {
   const updateDraft = reactive<UploadDraftState>(createEmptyDraft())
   const updateDraftCache = ref<Record<string, UploadDraftState>>({})
   const isHydratingUpdateDraft = ref(false)
-  const updateTagsTouched = ref(false)
-  const createTagInput = ref('')
-  const updateTagInput = ref('')
   const createStagedContentFiles = ref<StagedContentFile[]>([])
   const updateStagedContentFiles = ref<StagedContentFile[]>([])
 
@@ -210,76 +204,6 @@ export function useDrafts() {
   const updateStagedContentTree = computed<ContentTreeNode[]>(() =>
     buildContentTree(updateStagedContentFiles.value)
   )
-
-  function addCreateTag(): void {
-    const normalizedTags = createTagInput.value
-      .split(/[;,]/g)
-      .map((tag) => tag.trim())
-      .filter(Boolean)
-
-    if (normalizedTags.length === 0) {
-      return
-    }
-
-    const existing = new Set(createDraft.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))
-    for (const tag of normalizedTags) {
-      const dedupeKey = tag.toLowerCase()
-      if (existing.has(dedupeKey)) {
-        continue
-      }
-      createDraft.tags.push(tag)
-      existing.add(dedupeKey)
-    }
-    createTagInput.value = ''
-  }
-
-  function addUpdateTag(): void {
-    const normalizedTags = updateTagInput.value
-      .split(/[;,]/g)
-      .map((tag) => tag.trim())
-      .filter(Boolean)
-
-    if (normalizedTags.length === 0) {
-      return
-    }
-
-    const existing = new Set(updateDraft.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))
-    let addedCount = 0
-    for (const tag of normalizedTags) {
-      const dedupeKey = tag.toLowerCase()
-      if (existing.has(dedupeKey)) {
-        continue
-      }
-      updateDraft.tags.push(tag)
-      existing.add(dedupeKey)
-      addedCount += 1
-    }
-
-    if (addedCount > 0) {
-      updateTagsTouched.value = true
-    }
-    updateTagInput.value = ''
-  }
-
-  function removeCreateTag(tag: string): void {
-    createDraft.tags = createDraft.tags.filter((value) => value !== tag)
-  }
-
-  function removeUpdateTag(tag: string): void {
-    const before = updateDraft.tags.length
-    updateDraft.tags = updateDraft.tags.filter((value) => value !== tag)
-    if (updateDraft.tags.length < before) {
-      updateTagsTouched.value = true
-    }
-  }
-
-  function onChangeCreateTagInput(value: string): void {
-    createTagInput.value = value
-  }
-
-  function onChangeUpdateTagInput(value: string): void {
-    updateTagInput.value = value
-  }
 
   function clearCreatePreviewFile(): void {
     createDraft.previewFile = ''
@@ -316,21 +240,12 @@ export function useDrafts() {
     updateDraft,
     updateDraftCache,
     isHydratingUpdateDraft,
-    updateTagsTouched,
-    createTagInput,
-    updateTagInput,
     createStagedContentFiles,
     updateStagedContentFiles,
     createTotalStagedContentSizeBytes,
     updateTotalStagedContentSizeBytes,
     createStagedContentTree,
     updateStagedContentTree,
-    addCreateTag,
-    addUpdateTag,
-    removeCreateTag,
-    removeUpdateTag,
-    onChangeCreateTagInput,
-    onChangeUpdateTagInput,
     clearCreatePreviewFile,
     clearUpdatePreviewFile,
     getDraftForMode,
