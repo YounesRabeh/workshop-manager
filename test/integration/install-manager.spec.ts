@@ -71,6 +71,23 @@ describe('SteamCmdInstallManager', () => {
     })
   })
 
+  it('finds nested auto-installed SteamCMD executable on windows', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'steamcmd-install-'))
+    const manager = new SteamCmdInstallManager(root)
+
+    await withPlatform('win32', async () => {
+      const nestedDir = join(root, 'steamcmd', 'nested')
+      const exePath = join(nestedDir, 'steamcmd.exe')
+      await mkdir(nestedDir, { recursive: true })
+      await writeFile(exePath, 'echo steamcmd\n', 'utf8')
+
+      const status = await manager.getStatus()
+      expect(status.installed).toBe(true)
+      expect(status.source).toBe('auto')
+      expect(status.executablePath).toBe(exePath)
+    })
+  })
+
   it('treats non-executable manual paths as missing on linux', async () => {
     const root = await mkdtemp(join(tmpdir(), 'steamcmd-install-'))
     const fakeExecutable = join(root, 'steamcmd.sh')
