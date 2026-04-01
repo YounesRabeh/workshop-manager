@@ -1,4 +1,5 @@
 node_modules/
+.pnpm-store/
 out/
 dist/
 squashfs-root/
@@ -7,6 +8,7 @@ squashfs-root/
 .DS_Store
 coverage/
 *.tsbuildinfo
+.vscode/
 
 # Packaged executable artifacts
 *.AppImage

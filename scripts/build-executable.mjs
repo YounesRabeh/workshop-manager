@@ -9,6 +9,8 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const require = createRequire(import.meta.url)
+export const NATIVE_BUNDLE_SCRIPT = 'build:bundle:native'
+export const SKIP_KILL_INSTANCE_FLAG = '--skip-kill-instance'
 
 /**
  * Uses the Windows shim when packaging on win32 and the plain binary elsewhere.
@@ -82,6 +84,7 @@ export function parseBuildExecutableOptions(argv = []) {
 
   return {
     generateIcon: normalized.includes('--generate-icon'),
+    skipKillInstance: normalized.includes(SKIP_KILL_INSTANCE_FLAG),
     targetPlatform: requestedTargets.size === 1 ? [...requestedTargets][0] : undefined
   }
 }
@@ -94,23 +97,28 @@ export function buildStepsForPlatform(platform, options = {}) {
   const targetPlatform = options.targetPlatform
     ? normalizeBuildTargetPlatform(options.targetPlatform)
     : platform
-  const steps = [
-    {
+  const steps = []
+
+  if (options.skipKillInstance !== true) {
+    steps.push({
       label: 'Kill old app instance',
       command: pnpmCommand,
       args: ['kill:instance']
-    },
+    })
+  }
+
+  steps.push(
     {
       label: 'Build app bundles',
       command: pnpmCommand,
-      args: ['build:bundle']
+      args: [NATIVE_BUNDLE_SCRIPT]
     },
     {
       label: 'Package executable artifacts',
       command: process.execPath,
       args: [resolveElectronBuilderCliEntry(), ...getElectronBuilderArgsForPlatform(targetPlatform)]
     }
-  ]
+  )
 
   if (options.generateIcon) {
     steps.splice(1, 0, {
@@ -123,14 +131,14 @@ export function buildStepsForPlatform(platform, options = {}) {
   return steps
 }
 function runStep(step) {
-  console.log(`\n[build:exe] ${step.label}`)
+  console.log(`\n[build:package] ${step.label}`)
   const result = spawnSync(step.command, step.args, {
     stdio: 'inherit',
     shell: false,
     env: step.env ?? process.env
   })
   if (result.status !== 0) {
-    throw new Error(`[build:exe] Step failed: ${step.label}`)
+    throw new Error(`[build:package] Step failed: ${step.label}`)
   }
 }
 

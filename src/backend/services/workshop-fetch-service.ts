@@ -17,6 +17,8 @@ interface WorkshopFetchContext {
   getLoginState: () => { username: string; steamId64?: string } | null
 }
 
+export type WorkshopWebApiAccessState = 'active' | 'configured_unavailable' | 'disabled'
+
 function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
@@ -24,13 +26,34 @@ function errorMessage(error: unknown): string {
   return 'unknown error'
 }
 
+function unresolvedIdentityMessage(
+  target: 'profile' | 'workshop',
+  webApiAccess: WorkshopWebApiAccessState = 'disabled'
+): string {
+  const action =
+    target === 'profile'
+      ? 'Profile loading cannot continue until Steam ID resolution succeeds.'
+      : 'Workshop loading cannot continue until Steam ID resolution succeeds.'
+  const webApiHint =
+    webApiAccess === 'active'
+      ? ' Steam Web API access is active, but these lookups still require a valid SteamID64.'
+      : webApiAccess === 'configured_unavailable'
+        ? ' Steam Web API key looks configured, but it is unavailable on this device right now.'
+        : ' Steam Web API access is not active for this device.'
+
+  return `Signed in to Steam, but account identity could not be resolved on this platform. ${action}${webApiHint}`
+}
+
 export class WorkshopFetchService {
   constructor(private readonly context: WorkshopFetchContext) {}
 
   async getCurrentProfile(): Promise<SteamProfileSummary> {
     const loginState = this.context.getLoginState()
-    if (!loginState?.steamId64) {
+    if (!loginState) {
       throw new AppError('auth', 'Login is required before loading profile info')
+    }
+    if (!loginState.steamId64) {
+      throw new AppError('auth', unresolvedIdentityMessage('profile'))
     }
 
     const steamId64 = loginState.steamId64
@@ -68,14 +91,24 @@ export class WorkshopFetchService {
   async getMyWorkshopItems(
     appId?: string,
     savedWebApiKey?: string,
-    allowWebApi = true
+    options: {
+      allowWebApi?: boolean
+      webApiAccess?: WorkshopWebApiAccessState
+    } = {}
   ): Promise<WorkshopItemSummary[]> {
     const loginState = this.context.getLoginState()
-    if (!loginState?.steamId64) {
+    if (!loginState) {
       throw new AppError('auth', 'Login is required before loading workshop items')
+    }
+    if (!loginState.steamId64) {
+      throw new AppError(
+        'auth',
+        unresolvedIdentityMessage('workshop', options.webApiAccess)
+      )
     }
 
     const normalizedAppId = appId?.trim() || undefined
+    const allowWebApi = options.allowWebApi ?? true
     const apiKey = allowWebApi ? savedWebApiKey?.trim() || process.env['STEAM_WEB_API_KEY']?.trim() : undefined
     const failures: string[] = []
     let webApiItems: WorkshopItemSummary[] = []

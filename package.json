@@ -7,6 +7,13 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.32.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "electron-winstaller"
+    ]
+  },
   "main": "out/main/index.js",
   "build": {
     "appId": "com.workshop.manager",
@@ -65,17 +72,18 @@
     "clean": "node scripts/clean.mjs",
     "kill:instance": "node scripts/kill-old-instance.mjs",
     "predev": "pnpm kill:instance && pnpm sync:icon",
-    "dev": "CHROME_DESKTOP=workshop-manager.desktop electron-vite dev",
+    "dev": "env -u ELECTRON_RUN_AS_NODE CHROME_DESKTOP=workshop-manager.desktop electron-vite dev",
     "sync:icon": "node scripts/sync-app-icon.mjs",
-    "prebuild": "pnpm kill:instance",
-    "build:bundle": "electron-vite build",
-    "build": "pnpm build:bundle",
-    "build:exe": "node scripts/build-executable.mjs",
-    "build:exe:icon": "node scripts/build-executable.mjs --generate-icon",
-    "build:win": "node scripts/build-executable.mjs --win",
-    "build:win:icon": "node scripts/build-executable.mjs --win --generate-icon",
+    "build:bundle:native": "electron-vite build",
+    "build:bundle": "node scripts/run-build-in-docker.mjs build:bundle:native",
+    "build": "node scripts/run-build-in-docker.mjs build:bundle:native",
+    "build:exe:native": "node scripts/build-executable.mjs",
+    "build:appImage": "node scripts/run-build-in-docker.mjs build:exe:native",
+    "build:appImage:icon": "node scripts/run-build-in-docker.mjs build:exe:native --generate-icon",
+    "build:win": "node scripts/run-build-in-docker.mjs build:exe:native --win",
+    "build:win:icon": "node scripts/run-build-in-docker.mjs build:exe:native --win --generate-icon",
     "prepreview": "pnpm sync:icon",
-    "preview": "electron-vite preview",
+    "preview": "env -u ELECTRON_RUN_AS_NODE CHROME_DESKTOP=workshop-manager.desktop electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.renderer.json && vue-tsc --noEmit -p tsconfig.renderer-tests.json",
     "test": "vitest run",
     "test:watch": "vitest"

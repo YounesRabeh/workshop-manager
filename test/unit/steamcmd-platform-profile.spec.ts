@@ -20,15 +20,16 @@ describe('steamcmd platform profile', () => {
     expect(getSteamCmdPlatformBehavior('linux')).toMatchObject({
       expectedExecutableName: 'steamcmd.sh',
       archiveKind: 'tar.gz',
-      loginExecution: 'interactive'
+      loginExecution: 'interactive',
+      identityResolution: 'steamcmd_output'
     })
 
     expect(getSteamCmdPlatformBehavior('windows')).toMatchObject({
       expectedExecutableName: 'steamcmd.exe',
       archiveKind: 'zip',
       loginExecution: 'one_shot',
-      persistentSessionStartup: 'startup_args'
+      persistentSessionStartup: 'startup_args',
+      identityResolution: 'steamcmd_output_then_custom_profile'
     })
   })
 })
-

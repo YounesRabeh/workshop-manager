@@ -66,5 +66,32 @@ describe('useWorkshopItems composable', () => {
     expect(onSelectWorkshopItem).toHaveBeenCalledTimes(2)
     expect(store.selectedWorkshopItemId.value).toBe('1')
   })
-})
 
+  it('stores an explicit error message instead of falling back to the empty-state copy', async () => {
+    workshop.getMyWorkshopItems.mockRejectedValueOnce(
+      new Error('[auth] Signed in to Steam, but account identity could not be resolved on this platform.')
+    )
+
+    const statuses: string[] = []
+    const store = useWorkshopItems({
+      canAccessMods: () => true,
+      normalizeError: (error) => ({
+        code: 'auth',
+        message:
+          error instanceof Error
+            ? error.message.replace(/^\[auth\]\s*/i, '')
+            : 'unexpected'
+      }),
+      setStatusMessage: (message) => {
+        statuses.push(message)
+      },
+      onSelectWorkshopItem: () => undefined
+    })
+
+    await store.loadWorkshopItems()
+
+    expect(store.hasWorkshopItemsError.value).toBe(true)
+    expect(store.workshopListMessage.value).toContain('Workshop list failed (auth)')
+    expect(statuses.at(-1)).toContain('account identity could not be resolved')
+  })
+})

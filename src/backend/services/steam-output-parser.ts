@@ -10,6 +10,10 @@ export interface LoginFailure {
   message: string
 }
 
+const STEAM_ID64_BASE = 76561197960265728n
+const INVALID_STEAM_ACCOUNT_ID = 0n
+const INVALID_STEAM_ID64 = STEAM_ID64_BASE.toString()
+
 export function isSteamGuardPrompt(line: string): boolean {
   return /two-factor|auth(?:entication)?\s*code|guard code|steam guard code/i.test(line)
 }
@@ -142,11 +146,36 @@ export function parsePublishedFileId(lines: string[]): string | undefined {
   return idMatch?.[1]
 }
 
+export function isValidSteamId64(value: string | undefined | null): value is string {
+  if (typeof value !== 'string') {
+    return false
+  }
+
+  const normalized = value.trim()
+  return /^7656119\d{10}$/.test(normalized) && normalized !== INVALID_STEAM_ID64
+}
+
+export function steamId64FromAccountId(accountId: string | number | bigint): string | undefined {
+  const raw =
+    typeof accountId === 'bigint'
+      ? accountId
+      : typeof accountId === 'number'
+        ? BigInt(accountId)
+        : /^\d+$/.test(accountId.trim())
+          ? BigInt(accountId.trim())
+          : null
+  if (raw === null || raw <= INVALID_STEAM_ACCOUNT_ID) {
+    return undefined
+  }
+
+  return (STEAM_ID64_BASE + raw).toString()
+}
+
 export function parseSteamId64(lines: string[]): string | undefined {
   const joined = lines.join('\n')
-  const direct = joined.match(/(7656119\d{10})/)
-  if (direct?.[1]) {
-    return direct[1]
+  const direct = joined.match(/\b(7656119\d{10})\b/)
+  if (isValidSteamId64(direct?.[1])) {
+    return direct[1].trim()
   }
 
   const account = joined.match(/\[U:1:(\d+)\]/)
@@ -154,8 +183,7 @@ export function parseSteamId64(lines: string[]): string | undefined {
     return undefined
   }
 
-  const base = 76561197960265728n
-  return (base + BigInt(account[1])).toString()
+  return steamId64FromAccountId(account[1])
 }
 
 function normalizeNumericString(value: unknown): string | undefined {

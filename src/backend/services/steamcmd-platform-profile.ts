@@ -18,6 +18,7 @@ export interface SteamCmdPlatformBehavior {
   loginExecution: 'interactive' | 'one_shot'
   workshopExecution: 'interactive' | 'one_shot'
   persistentSessionStartup: 'empty_process' | 'startup_args'
+  identityResolution: 'steamcmd_output' | 'steamcmd_output_then_custom_profile'
   waitForPromptBeforeInteractiveLogin: boolean
   enableInteractiveLoginRetry: boolean
   enablePromptDispatchFallback: boolean
@@ -37,6 +38,7 @@ const STEAMCMD_PLATFORM_BEHAVIORS: Record<SteamCmdPlatformProfile, SteamCmdPlatf
     loginExecution: 'interactive',
     workshopExecution: 'interactive',
     persistentSessionStartup: 'empty_process',
+    identityResolution: 'steamcmd_output',
     waitForPromptBeforeInteractiveLogin: false,
     enableInteractiveLoginRetry: false,
     enablePromptDispatchFallback: false
@@ -54,6 +56,7 @@ const STEAMCMD_PLATFORM_BEHAVIORS: Record<SteamCmdPlatformProfile, SteamCmdPlatf
     loginExecution: 'one_shot',
     workshopExecution: 'one_shot',
     persistentSessionStartup: 'startup_args',
+    identityResolution: 'steamcmd_output_then_custom_profile',
     waitForPromptBeforeInteractiveLogin: true,
     enableInteractiveLoginRetry: true,
     enablePromptDispatchFallback: true

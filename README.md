@@ -1,6 +1,6 @@
 # Workshop Manager
 
-Cross-platform desktop app for Steam Workshop publish/update workflows, built with Electron, Vue 3, TypeScript, and Tailwind.
+Workshop Manager is a desktop app for creating, updating, and maintaining Steam Workshop items. It is built with Electron, Vue 3, TypeScript, and Tailwind, and wraps the SteamCMD workflow in a more guided UI for Linux and Windows users.
 
 ## Screenshots
 
@@ -8,58 +8,148 @@ Cross-platform desktop app for Steam Workshop publish/update workflows, built wi
 | --- | --- |
 | ![Workshop Manager Screenshot 1](github/photo01.png) | ![Workshop Manager Screenshot 2](github/photo02.png) |
 
-## Included in V1
+## What It Does
 
-- SteamCMD install manager with auto-download and manual fallback path support.
-- Steam login with Steam Guard handling.
-- Upload new items and update existing items through generated VDF files.
-- Local JSON-backed persistence for app/profile data.
-- Per-run SteamCMD log persistence.
-- Secure Electron boundary (`nodeIntegration: false`, `contextIsolation: true`, preload bridge only).
+- Signs in to Steam, including Steam Guard flows
+- Installs or detects SteamCMD automatically, with a manual fallback path
+- Creates new Workshop items
+- Updates existing Workshop items
+- Changes Workshop item visibility
+- Persists profiles, settings, and run logs locally
+- Keeps the Electron boundary locked down with `nodeIntegration: false`, `contextIsolation: true`, and a preload bridge
 
-## Project Layout
+## Requirements
 
-- `src/electron`: main process and preload bridge.
-- `src/backend`: SteamCMD services, VDF generation, persistence stores.
-- `src/shared`: domain and IPC contract types.
-- `src/frontend`: Vue renderer UI.
-- `test`: unit + integration tests.
+### For development
 
-## Run From Source
+- Node.js 22.x
+- `pnpm` 10.x
+
+### For packaging builds
+
+- Docker on a Linux host
+
+`pnpm dev`, `pnpm preview`, `pnpm test`, and `pnpm typecheck` run natively on the host.
+
+All `pnpm build*` commands in this repo run through Docker on Linux.
+
+## Getting Started
 
 1. Install dependencies:
-   - `pnpm install`
-2. Start development app:
-   - `pnpm dev`
+
+   ```bash
+   pnpm install
+   ```
+
+2. Start the app in development mode:
+
+   ```bash
+   pnpm dev
+   ```
+
 3. Run tests:
-   - `pnpm test`
-4. Type-check:
-   - `pnpm typecheck`
-5. Build bundles only (no installer):
-   - `pnpm build`
-6. Build platform executable package:
-   - Current host platform: `pnpm build:exe`
-   - Windows package from this repo: `pnpm build:win`
-   - By default, these packaging commands skip icon regeneration.
-   - To regenerate icon assets before packaging, run `pnpm build:exe:icon` for the host platform or `pnpm build:win:icon` for Windows.
-   - These wrapper commands always rebuild the Electron bundle before packaging so the installer does not ship stale `out/` code.
-   - Do not use raw `pnpm exec electron-builder ...` as the normal workflow in this repo unless you have already rebuilt the bundle on purpose.
-   - Output artifacts are written to `dist/`
-   - Host platform targets:
-     - Windows: `*.exe` (NSIS)
-     - macOS: `*.dmg`
-     - Linux: `*.AppImage`
+
+   ```bash
+   pnpm test
+   ```
+
+4. Run type checks:
+
+   ```bash
+   pnpm typecheck
+   ```
+
+5. Preview the production renderer locally:
+
+   ```bash
+   pnpm preview
+   ```
+
+## Build And Package
+
+### Build the app bundle
+
+Build the production Electron/Vite output without creating an installer:
+
+```bash
+pnpm build
+```
+
+This command runs inside Docker on Linux hosts and writes the compiled app output to `out/`.
+
+### Build a Linux AppImage
+
+```bash
+pnpm build:appImage
+```
+
+To regenerate icons first:
+
+```bash
+pnpm build:appImage:icon
+```
+
+### Build a Windows installer from Linux
+
+```bash
+pnpm build:win
+```
+
+To regenerate icons first:
+
+```bash
+pnpm build:win:icon
+```
+
+### Build behavior notes
+
+- Docker is build-only. The generated `.AppImage` and `.exe` run natively after packaging.
+- Host Wine is not required for the supported Windows packaging flow.
+- Dockerized builds are currently supported on Linux hosts only.
+- Packaging commands always rebuild the app bundle first so installers do not ship stale `out/` code.
+- The wrapper performs host-side cleanup before entering Docker so stale local Electron processes do not interfere with packaging.
+- Persistent Docker build caches live under `~/.cache/workshop-manager/docker-build`.
+- Output artifacts are written to `dist/`.
+- Avoid using raw `pnpm exec electron-builder ...` as the normal workflow unless you intentionally rebuilt the bundle yourself first.
+
+## Windows Runtime
+
+The Windows package is built on Linux, but it is meant to be run on Windows.
+
+Typical flow:
+
+1. Run `pnpm build:win`
+2. Find the generated installer in `dist/`
+3. Copy it to a Windows machine or VM
+4. Install and run it there
 
 ## Changing The App Icon
 
-- Put your replacement icon at `resources/img/app-icon.png`.
-- This file is the single source of truth for the app icon used by the renderer and packaged builds.
-- After replacing it, run `pnpm sync:icon` to copy/sync the generated icon assets used by the app during development.
-- When building an executable, run `pnpm build:exe:icon` for the host platform or `pnpm build:win:icon` for Windows if you want packaging icons regenerated first.
-- If you are starting from a file in another folder such as `res/`, move or copy it to `resources/img/app-icon.png`.
+Use `resources/img/app-icon.png` as the source icon.
 
-## Notes
+- This file is the single source of truth for the app icon used by both the app and packaged builds.
+- Run `pnpm sync:icon` after replacing it so the generated icon assets stay in sync.
+- If you want packaging icons regenerated during packaging, use `pnpm build:appImage:icon` or `pnpm build:win:icon`.
 
-- Username persistence is supported when selected; password is kept in memory only.
-- V1 intentionally excludes Workshop stats dashboard and `workshop_download_item`.
-- Linux and Windows are the target runtime platforms.
+## Project Layout
+
+- `src/electron`: Electron main process and preload bridge
+- `src/backend`: SteamCMD services, persistence stores, and Workshop-related backend logic
+- `src/shared`: IPC contracts and shared domain types
+- `src/frontend`: Vue renderer application
+- `scripts`: local tooling for cleanup, icon sync, packaging, and Docker build orchestration
+- `docker`: Docker image used for reproducible packaging builds
+- `test`: unit and integration tests
+
+## Data And Security Notes
+
+- Username/session preferences can be persisted when enabled
+- Passwords are not stored as plain local config values
+- Steam Web API keys are stored through Electron secure storage when available
+- Run logs are stored locally so failed SteamCMD runs can be inspected later
+
+## Current Scope
+
+- Linux and Windows are the primary runtime targets
+- V1 intentionally excludes a Workshop stats dashboard
+- V1 intentionally excludes `workshop_download_item`

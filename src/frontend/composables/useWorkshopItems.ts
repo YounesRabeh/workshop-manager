@@ -24,6 +24,8 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
   const workshopVisibilityFilter = ref<WorkshopVisibilityFilter>('all')
   const workshopItems = ref<WorkshopItemSummary[]>([])
   const selectedWorkshopItemId = ref('')
+  const workshopListMessage = ref('')
+  const hasWorkshopItemsError = ref(false)
 
   const selectedWorkshopItem = computed(() =>
     workshopItems.value.find((item) => item.publishedFileId === selectedWorkshopItemId.value)
@@ -73,14 +75,19 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     try {
       const items = await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value || undefined })
       workshopItems.value = items
+      hasWorkshopItemsError.value = false
       if (items.length === 0) {
-        options.setStatusMessage('No workshop items found for this account/filter.')
+        workshopListMessage.value = 'No workshop items found for this account/filter.'
+        options.setStatusMessage(workshopListMessage.value)
         return
       }
+      workshopListMessage.value = ''
       options.setStatusMessage(`Loaded ${items.length} workshop item(s).`)
     } catch (error) {
       const parsed = options.normalizeError(error)
-      options.setStatusMessage(`Workshop list failed (${parsed.code}): ${parsed.message}`)
+      hasWorkshopItemsError.value = true
+      workshopListMessage.value = `Workshop list failed (${parsed.code}): ${parsed.message}`
+      options.setStatusMessage(workshopListMessage.value)
     }
   }
 
@@ -129,24 +136,30 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     try {
       const items = await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value || undefined })
       workshopItems.value = items
+      hasWorkshopItemsError.value = false
 
       if (currentSelectedId) {
         const refreshedItem = items.find((item) => item.publishedFileId === currentSelectedId)
         if (refreshedItem) {
           selectWorkshopItem(refreshedItem)
+          workshopListMessage.value = ''
           options.setStatusMessage('Workshop item refreshed.')
           return
         }
       }
 
       if (items.length === 0) {
-        options.setStatusMessage('No workshop items found for this account/filter.')
+        workshopListMessage.value = 'No workshop items found for this account/filter.'
+        options.setStatusMessage(workshopListMessage.value)
         return
       }
+      workshopListMessage.value = ''
       options.setStatusMessage(`Loaded ${items.length} workshop item(s).`)
     } catch (error) {
       const parsed = options.normalizeError(error)
-      options.setStatusMessage(`Workshop refresh failed (${parsed.code}): ${parsed.message}`)
+      hasWorkshopItemsError.value = true
+      workshopListMessage.value = `Workshop refresh failed (${parsed.code}): ${parsed.message}`
+      options.setStatusMessage(workshopListMessage.value)
     }
   }
 
@@ -155,6 +168,8 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     workshopVisibilityFilter,
     workshopItems,
     selectedWorkshopItemId,
+    workshopListMessage,
+    hasWorkshopItemsError,
     selectedWorkshopItem,
     filteredWorkshopItems,
     onChangeAppId,

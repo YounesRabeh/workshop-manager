@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  NATIVE_BUNDLE_SCRIPT,
+  SKIP_KILL_INSTANCE_FLAG,
   buildStepsForPlatform,
   getElectronBuilderArgsForPlatform,
   getPackagingTargetForPlatform,
@@ -56,7 +58,7 @@ describe('build-executable script helpers', () => {
       'Package executable artifacts'
     ])
     expect(steps[0]).toMatchObject({ command: 'pnpm', args: ['kill:instance'] })
-    expect(steps[1]).toMatchObject({ command: 'pnpm', args: ['build:bundle'] })
+    expect(steps[1]).toMatchObject({ command: 'pnpm', args: [NATIVE_BUNDLE_SCRIPT] })
     expect(steps[2]).toMatchObject({
       command: process.execPath,
       args: expect.arrayContaining(['--linux', 'AppImage', '--publish', 'never'])
@@ -72,7 +74,7 @@ describe('build-executable script helpers', () => {
       'Package executable artifacts'
     ])
     expect(steps[0]).toMatchObject({ command: 'pnpm', args: ['kill:instance'] })
-    expect(steps[1]).toMatchObject({ command: 'pnpm', args: ['build:bundle'] })
+    expect(steps[1]).toMatchObject({ command: 'pnpm', args: [NATIVE_BUNDLE_SCRIPT] })
     expect(steps[2]).toMatchObject({
       command: process.execPath,
       args: expect.arrayContaining(['--win', 'nsis', '--publish', 'never'])
@@ -94,20 +96,38 @@ describe('build-executable script helpers', () => {
   it('parses generate icon and explicit target platform flags from argv', () => {
     expect(parseBuildExecutableOptions([])).toEqual({
       generateIcon: false,
+      skipKillInstance: false,
       targetPlatform: undefined
     })
     expect(parseBuildExecutableOptions(['--generate-icon'])).toEqual({
       generateIcon: true,
+      skipKillInstance: false,
       targetPlatform: undefined
     })
     expect(parseBuildExecutableOptions(['--win'])).toEqual({
       generateIcon: false,
+      skipKillInstance: false,
       targetPlatform: 'win32'
     })
     expect(parseBuildExecutableOptions(['--platform=linux', '--generate-icon'])).toEqual({
       generateIcon: true,
+      skipKillInstance: false,
       targetPlatform: 'linux'
     })
+  })
+
+  it('skips host kill step when the internal skip flag is present', () => {
+    expect(parseBuildExecutableOptions([SKIP_KILL_INSTANCE_FLAG])).toEqual({
+      generateIcon: false,
+      skipKillInstance: true,
+      targetPlatform: undefined
+    })
+
+    const steps = buildStepsForPlatform('linux', { skipKillInstance: true })
+    expect(steps.map((s) => s.label)).toEqual([
+      'Build app bundles',
+      'Package executable artifacts'
+    ])
   })
 
   it('rejects conflicting target platform flags', () => {

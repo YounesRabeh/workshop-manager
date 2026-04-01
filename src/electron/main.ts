@@ -535,14 +535,24 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.getMyWorkshopItems, async (_event, payload: { appId?: string }) => {
     try {
+      const encryptedKey = await profileStore.getWebApiKeyEncrypted()
       const storedWebApiEnabled = await profileStore.getWebApiEnabled()
       const resolvedKey = await resolveSavedWebApiKey()
       const allowWebApi = storedWebApiEnabled && resolvedKey.hasUsableKey
+      const webApiAccess =
+        allowWebApi
+          ? 'active'
+          : encryptedKey?.trim()
+            ? 'configured_unavailable'
+            : 'disabled'
       if (storedWebApiEnabled !== allowWebApi) {
         await profileStore.setWebApiEnabled(allowWebApi)
       }
 
-      return await runtimeService.getMyWorkshopItems(payload.appId, allowWebApi ? resolvedKey.key : undefined, allowWebApi)
+      return await runtimeService.getMyWorkshopItems(payload.appId, allowWebApi ? resolvedKey.key : undefined, {
+        allowWebApi,
+        webApiAccess
+      })
     } catch (error) {
       throw toIpcError(error)
     }

@@ -1,0 +1,8 @@
+.git
+node_modules
+.pnpm-store
+dist
+out
+coverage
+*.tsbuildinfo
+pnpm-debug.log*

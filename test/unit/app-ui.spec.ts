@@ -92,6 +92,14 @@ describe('App UI validation gates', () => {
           !(button.attributes('class') ?? '').includes('w-full')
       )
 
+  const openUpdateTab = async (wrapper: ReturnType<typeof mount>) => {
+    const updateTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Update')
+    expect(updateTab).toBeDefined()
+    expect(updateTab?.attributes('disabled')).toBeUndefined()
+    await updateTab?.trigger('click')
+    await flushPromises()
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     ;(window as unknown as { workshop: typeof workshop }).workshop = workshop
@@ -108,10 +116,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
     expect(updateButton?.attributes('disabled')).toBeDefined()
@@ -125,6 +130,27 @@ describe('App UI validation gates', () => {
     expect(createButton?.attributes('disabled')).toBeDefined()
   })
 
+  it('shows workshop fetch failures in the signed-in shell instead of the generic empty state', async () => {
+    workshop.getMyWorkshopItems.mockRejectedValueOnce(
+      new Error(
+        '[auth] Signed in to Steam, but account identity could not be resolved on this platform. Workshop loading cannot continue until Steam ID resolution succeeds.'
+      )
+    )
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Workshop list failed (auth): Signed in to Steam, but account identity could not be resolved on this platform.')
+    expect(wrapper.text()).not.toContain('No workshop items found for the current filters.')
+  })
+
   it('keeps readiness layout tweaks: top row App ID + Title, separator visible, and no Published File ID in update', async () => {
     const wrapper = mount(App)
     await flushPromises()
@@ -136,10 +162,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
     expect(updateButton).toBeDefined()
@@ -609,10 +632,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const hiddenVisibilityButton = wrapper
       .findAll('button')
@@ -843,10 +863,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const pickContentFolderButton = wrapper
       .findAll('button')
@@ -882,10 +899,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
     expect(updateButton).toBeDefined()
@@ -930,10 +944,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
     expect(updateButton).toBeDefined()
@@ -960,10 +971,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const titleInput = wrapper
       .findAll('input')
@@ -988,10 +996,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const updateButton = findPrimaryActionButton(wrapper, 'Update Item')
     expect(updateButton).toBeDefined()
@@ -1026,10 +1031,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const titleInput = wrapper
       .findAll('input')
@@ -1076,10 +1078,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const pickContentFolderButton = wrapper
       .findAll('button')
@@ -1127,10 +1126,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const pickContentFolderButton = wrapper
       .findAll('button')
@@ -1167,10 +1163,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const pickContentFolderButton = wrapper
       .findAll('button')
@@ -1202,10 +1195,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const modButton = wrapper.findAll('button').find((button) => button.text().includes('Test Item'))
-    expect(modButton).toBeDefined()
-    await modButton?.trigger('click')
-    await flushPromises()
+    await openUpdateTab(wrapper)
 
     const hiddenVisibilityButton = wrapper
       .findAll('button')

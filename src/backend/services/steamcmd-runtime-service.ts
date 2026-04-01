@@ -25,8 +25,10 @@ import {
   normalizeWorkshopItems,
   mergeWorkshopItems,
   buildWorkshopArgs,
+  isValidSteamId64,
   parsePublishedFileId,
   parseSteamId64,
+  steamId64FromAccountId,
   isSteamGuardMobileTimeout,
   stripAnsi
 } from './steam-output-parser'
@@ -37,7 +39,11 @@ import {
   type SteamCmdPlatformProfile
 } from './steamcmd-platform-profile'
 import { WorkshopFetchService } from './workshop-fetch-service'
+import {
+  SteamIdentityResolver
+} from './steam-identity-resolver'
 import { WorkshopCommandService } from './workshop-command-service'
+import type { WorkshopWebApiAccessState } from './workshop-fetch-service'
 
 interface LoginState {
   username: string
@@ -63,13 +69,16 @@ export {
   buildWorkshopArgs,
   extractWorkshopFileIdsFromHtml,
   isBenignSteamLatencyWarning,
+  isValidSteamId64,
   isWorkshopSuccessLine,
   isSteamGuardPrompt,
   mergeWorkshopItems,
   normalizeWorkshopItems,
   parseSteamLoginFailure,
   parseWorkshopRunFailure,
-  resolveLoginTimeoutMs
+  parseSteamId64,
+  resolveLoginTimeoutMs,
+  steamId64FromAccountId
 }
 
 export class SteamCmdRuntimeService extends EventEmitter {
@@ -78,6 +87,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
   private readonly processSession: SteamCmdProcessSession
   private readonly workshopFetchService: WorkshopFetchService
   private readonly workshopCommandService: WorkshopCommandService
+  private readonly steamIdentityResolver: SteamIdentityResolver
   private readonly platformBehavior: SteamCmdPlatformBehavior
 
   constructor(
@@ -98,6 +108,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
         this.lastAuthenticatedState = null
       }
     }, platformProfile)
+    this.steamIdentityResolver = new SteamIdentityResolver(platformProfile)
     this.workshopFetchService = new WorkshopFetchService({
       getLoginState: () => this.loginState
     })
@@ -120,6 +131,41 @@ export class SteamCmdRuntimeService extends EventEmitter {
       emitRunEvents: false,
       persistLogs: false
     })
+  }
+
+  private async resolveLoginSteamId64(runId: string, username: string, lines: string[]): Promise<string | undefined> {
+    const parsedSteamId64 = parseSteamId64(lines)
+    if (parsedSteamId64) {
+      return parsedSteamId64
+    }
+
+    await this.runLogStore.appendLine(
+      runId,
+      `[RUN_META] no valid steamId64 detected in ${this.platformBehavior.profile} login output`
+    )
+
+    if (this.platformBehavior.identityResolution !== 'steamcmd_output_then_custom_profile') {
+      return undefined
+    }
+
+    await this.runLogStore.appendLine(
+      runId,
+      '[RUN_META] attempting Steam account identity resolution via custom profile XML'
+    )
+    const resolvedSteamId64 = await this.steamIdentityResolver.resolveFromCustomProfile(username)
+    if (resolvedSteamId64) {
+      await this.runLogStore.appendLine(
+        runId,
+        `[RUN_META] resolved steamId64 via custom profile XML: ${resolvedSteamId64}`
+      )
+      return resolvedSteamId64
+    }
+
+    await this.runLogStore.appendLine(
+      runId,
+      '[RUN_META] custom profile XML identity resolution did not return a valid steamId64'
+    )
+    return undefined
   }
 
   async login(username: string, password: string, useStoredAuth = false): Promise<{ sessionId: string }> {
@@ -207,7 +253,8 @@ export class SteamCmdRuntimeService extends EventEmitter {
       throw new AppError(failure.code, failure.message)
     }
 
-    this.loginState = { username: normalizedUsername, steamId64: parseSteamId64(result.lines) }
+    const resolvedSteamId64 = await this.resolveLoginSteamId64(runId, normalizedUsername, result.lines)
+    this.loginState = { username: normalizedUsername, steamId64: resolvedSteamId64 }
     this.lastAuthenticatedState = {
       username: this.loginState.username,
       steamId64: this.loginState.steamId64
@@ -332,8 +379,15 @@ export class SteamCmdRuntimeService extends EventEmitter {
     return await this.workshopFetchService.getCurrentProfile()
   }
 
-  async getMyWorkshopItems(appId?: string, savedWebApiKey?: string, allowWebApi = true): Promise<WorkshopItemSummary[]> {
-    return await this.workshopFetchService.getMyWorkshopItems(appId, savedWebApiKey, allowWebApi)
+  async getMyWorkshopItems(
+    appId?: string,
+    savedWebApiKey?: string,
+    options: {
+      allowWebApi?: boolean
+      webApiAccess?: WorkshopWebApiAccessState
+    } = {}
+  ): Promise<WorkshopItemSummary[]> {
+    return await this.workshopFetchService.getMyWorkshopItems(appId, savedWebApiKey, options)
   }
 
   submitSteamGuardCode(sessionId: string, code: string): void {

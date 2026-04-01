@@ -3,13 +3,16 @@ import {
   buildWorkshopArgs,
   extractWorkshopFileIdsFromHtml,
   isBenignSteamLatencyWarning,
+  isValidSteamId64,
   isWorkshopSuccessLine,
   isSteamGuardPrompt,
   mergeWorkshopItems,
   normalizeWorkshopItems,
   parseWorkshopRunFailure,
   parseSteamLoginFailure,
-  resolveLoginTimeoutMs
+  parseSteamId64,
+  resolveLoginTimeoutMs,
+  steamId64FromAccountId
 } from '../../src/backend/services/steamcmd-runtime-service'
 
 describe('steamcmd runtime helpers', () => {
@@ -73,6 +76,12 @@ describe('steamcmd runtime helpers', () => {
   it('uses a longer timeout for full logins than stored-session reuse', () => {
     expect(resolveLoginTimeoutMs(false)).toBe(30_000)
     expect(resolveLoginTimeoutMs(true)).toBe(10_000)
+  })
+
+  it('rejects placeholder Steam account ids when deriving steamId64', () => {
+    expect(steamId64FromAccountId('0')).toBeUndefined()
+    expect(parseSteamId64(["Logging in user 'alice' [U:1:0] to Steam Public..."])).toBeUndefined()
+    expect(isValidSteamId64('76561197960265728')).toBe(false)
   })
 
   it('merges workshop items by id and keeps latest data', () => {

@@ -10,11 +10,13 @@ export interface PackagingTarget {
 
 export interface BuildExecutableOptions {
   generateIcon?: boolean
+  skipKillInstance?: boolean
   targetPlatform?: 'win32' | 'darwin' | 'linux'
 }
 
 export interface ParsedBuildExecutableOptions {
   generateIcon: boolean
+  skipKillInstance: boolean
   targetPlatform?: 'win32' | 'darwin' | 'linux'
 }
 
@@ -24,6 +26,11 @@ export interface BuildStep {
   args: string[]
   env?: Record<string, string>
 }
+
+/** Internal native bundle script used to avoid recursive docker invocation. */
+export const NATIVE_BUNDLE_SCRIPT: 'build:bundle:native'
+/** Internal flag used when host cleanup already ran outside Docker. */
+export const SKIP_KILL_INSTANCE_FLAG: '--skip-kill-instance'
 
 /** Resolves the correct pnpm executable for the requested platform. */
 export function resolvePnpmCommand(platform?: string): string

@@ -43,6 +43,24 @@ describe('WorkshopFetchService', () => {
     } as Partial<AppError>)
   })
 
+  it('throws explicit auth error when login succeeded but steam identity is unresolved', async () => {
+    const service = new WorkshopFetchService({
+      getLoginState: () => ({
+        username: 'Alice'
+      })
+    })
+
+    await expect(
+      service.getMyWorkshopItems(undefined, undefined, {
+        allowWebApi: false,
+        webApiAccess: 'configured_unavailable'
+      })
+    ).rejects.toMatchObject({
+      code: 'auth',
+      message: expect.stringContaining('account identity could not be resolved')
+    } as Partial<AppError>)
+  })
+
   it('returns empty workshop list when community page has no item ids', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
@@ -56,7 +74,7 @@ describe('WorkshopFetchService', () => {
       })
     })
 
-    const items = await service.getMyWorkshopItems(undefined, undefined, false)
+    const items = await service.getMyWorkshopItems(undefined, undefined, { allowWebApi: false })
     expect(items).toEqual([])
   })
 })

@@ -12,7 +12,6 @@ import CreatePublishSection from './components/publish/sections/CreatePublishSec
 import LoginSection from './components/LoginSection.vue'
 import LogsSection from './components/LogsSection.vue'
 import UpdatePublishSection from './components/publish/sections/UpdatePublishSection.vue'
-import WorkshopItemsSection from './components/WorkshopItemsSection.vue'
 import {
   applyDraft,
   cloneDraft,
@@ -31,8 +30,7 @@ import { formatSizeLabel } from './utils/size-format'
 import type {
   FlowStep,
   PublishChecklistItem,
-  StagedContentFile,
-  WorkshopVisibilityFilter
+  StagedContentFile
 } from './types/ui'
 
 const flowStep = ref<FlowStep>('mods')
@@ -65,7 +63,7 @@ const authFlow = useAuthFlow({
   },
   onSignedIn: async () => {
     flowStep.value = 'mods'
-    await Promise.all([workshopStore.loadWorkshopItems(), authFlow.refreshCurrentProfile()])
+    await Promise.all([loadWorkshopItems(), authFlow.refreshCurrentProfile()])
   },
   onSignedOut: () => {
     publishProgress.reset()
@@ -191,7 +189,6 @@ const workshopItems = workshopStore.workshopItems
 const selectedWorkshopItemId = workshopStore.selectedWorkshopItemId
 
 const selectedWorkshopItem = workshopStore.selectedWorkshopItem
-const filteredWorkshopItems = workshopStore.filteredWorkshopItems
 const canAccessUpdate = computed(() => canAccessMods.value && selectedWorkshopItemId.value.trim().length > 0)
 const createRequirements = computed(() => evaluateCreateRequirements(createDraft))
 const updateRequirements = computed(() => evaluateUpdateRequirements(updateDraft))
@@ -237,6 +234,12 @@ const hasPendingUpdateChanges = computed(() => {
     publishedFileIdChanged
   )
 })
+
+const signedInStatusClass = computed(() =>
+  /(failed|error|required|cannot|unavailable)/i.test(statusMessage.value)
+    ? 'border-rose-200 bg-rose-50 text-rose-700'
+    : 'border-[#2c4b63] bg-[linear-gradient(180deg,rgba(27,45,63,0.94)_0%,rgba(16,30,43,0.94)_100%)] text-slate-100'
+)
 
 const publishActions = usePublishActions({
   loginState,
@@ -354,23 +357,22 @@ function setContentFolderSelectionError(mode: 'create' | 'update', contentFolder
   })
 }
 
-function onChangeAppId(value: string): void {
-  workshopStore.onChangeAppId(value)
-}
-
-function onChangeWorkshopVisibilityFilter(value: WorkshopVisibilityFilter): void {
-  workshopStore.onChangeWorkshopVisibilityFilter(value)
-}
-
 async function loadWorkshopItems(): Promise<void> {
   await workshopStore.loadWorkshopItems()
+  const selectedId = selectedWorkshopItemId.value.trim()
+  const hasCurrentSelection =
+    selectedId.length > 0 &&
+    workshopItems.value.some((item) => item.publishedFileId === selectedId)
+
+  if (!hasCurrentSelection && workshopItems.value.length > 0) {
+    hydrateSelectedWorkshopItem(workshopItems.value[0], { navigateToUpdate: false })
+  }
 }
 
-async function resetAppIdFilter(): Promise<void> {
-  await workshopStore.resetAppIdFilter()
-}
-
-function hydrateSelectedWorkshopItem(item: WorkshopItemSummary): void {
+function hydrateSelectedWorkshopItem(
+  item: WorkshopItemSummary,
+  options: { navigateToUpdate?: boolean } = {}
+): void {
   selectedWorkshopItemId.value = item.publishedFileId
   const cached = updateDraftCache.value[item.publishedFileId]
   const visibility = item.visibility ?? 0
@@ -390,7 +392,9 @@ function hydrateSelectedWorkshopItem(item: WorkshopItemSummary): void {
 
   setVisibilityFromSelection(visibility)
   statusMessage.value = `Loaded workshop item: ${item.title}`
-  flowStep.value = 'update'
+  if (options.navigateToUpdate !== false) {
+    flowStep.value = 'update'
+  }
 }
 
 function selectWorkshopItem(item: WorkshopItemSummary): void {
@@ -554,6 +558,16 @@ watch(
         />
 
         <section
+          v-if="statusMessage"
+          class="mt-5 rounded-xl border px-4 py-3 text-sm shadow-sm"
+          :class="signedInStatusClass"
+          role="status"
+          aria-live="polite"
+        >
+          {{ statusMessage }}
+        </section>
+
+        <section
           v-if="publishProgressVisible"
           class="my-5 rounded-xl border border-[#2c4b63] bg-[linear-gradient(180deg,rgba(27,45,63,0.94)_0%,rgba(16,30,43,0.94)_100%)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(102,192,244,0.22)]"
           role="status"
@@ -576,20 +590,6 @@ watch(
             {{ publishProgressLastLine }}
           </p>
         </section>
-
-        <WorkshopItemsSection
-          v-show="flowStep === 'mods'"
-          :app-id="workshopFilterAppId"
-          :workshop-items="filteredWorkshopItems"
-          :all-items-count="workshopItems.length"
-          :visibility-filter="workshopVisibilityFilter"
-          :selected-workshop-item-id="selectedWorkshopItemId"
-          @change-app-id="onChangeAppId"
-          @change-visibility-filter="onChangeWorkshopVisibilityFilter"
-          @reset-filter="resetAppIdFilter"
-          @refresh="loadWorkshopItems"
-          @select-item="selectWorkshopItem"
-        />
 
         <UpdatePublishSection
           v-if="flowStep === 'update'"

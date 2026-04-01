@@ -551,6 +551,95 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     )
   })
 
+  it('resolves the Windows steamId64 from custom profile XML when SteamCMD only reports [U:1:0]', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-identity-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+      if (args.join(' ') === '+login alice secret +quit') {
+        return createOneShotFakeChild({
+          lines: [
+            "Logging in user 'alice' [U:1:0] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        })
+      }
+
+      if (args.join(' ') === '+login alice') {
+        return createInteractiveFakeChild(
+          {},
+          {
+            startupResponse: {
+              lines: [
+                "Logging in user 'alice' [U:1:42] to Steam Public...",
+                'Waiting for user info...OK',
+                'Steam>'
+              ]
+            }
+          }
+        )
+      }
+
+      throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+    })
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+
+      if (url === 'https://steamcommunity.com/id/alice/?xml=1') {
+        return new Response('<profile><steamID64>76561198000000042</steamID64></profile>', {
+          status: 200,
+          headers: { 'content-type': 'application/xml' }
+        })
+      }
+
+      if (url.includes('IPublishedFileService/GetUserFiles')) {
+        const parsed = new URL(url)
+        expect(parsed.searchParams.get('steamid')).toBe('76561198000000042')
+
+        return jsonResponse({
+          response: {
+            publishedfiledetails: [
+              {
+                publishedfileid: '100',
+                title: 'Resolved item',
+                consumer_appid: '480',
+                visibility: 0,
+                time_updated: 10
+              }
+            ]
+          }
+        })
+      }
+
+      if (url.includes('/myworkshopfiles/')) {
+        return new Response('<html><body>No items here</body></html>', { status: 200 })
+      }
+
+      throw new Error(`Unexpected fetch url: ${url}`)
+    })
+
+    const runtime = new SteamCmdRuntimeService(
+      async () => 'C:\\steamcmd\\steamcmd.exe',
+      store,
+      join(root, 'runtime'),
+      'windows'
+    )
+    await runtime.login('alice', 'secret')
+
+    const items = await runtime.getMyWorkshopItems(undefined, 'api-key', {
+      allowWebApi: true,
+      webApiAccess: 'active'
+    })
+
+    expect(items).toHaveLength(1)
+    expect(items[0]?.publishedFileId).toBe('100')
+    expect(fetchSpy).toHaveBeenCalledWith('https://steamcommunity.com/id/alice/?xml=1')
+
+    const persisted = await store.list()
+    expect(persisted[0]?.lines.join('\n')).toContain('resolved steamId64 via custom profile XML')
+  })
+
   it('fails update early when selected content folder has no files', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-empty-folder-'))
     const store = new RunLogStore(join(root, 'runs'))
@@ -721,7 +810,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     })
 
     try {
-      const items = await runtime.getMyWorkshopItems(undefined, 'dev-key', true)
+      const items = await runtime.getMyWorkshopItems(undefined, 'dev-key', { allowWebApi: true })
 
       expect(items).toHaveLength(5)
       expect(items.map((item) => item.publishedFileId)).toEqual(['100', '200', '300', '400', '500'])
