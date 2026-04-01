@@ -15,6 +15,7 @@ export const IPC_CHANNELS = {
   updateVisibility: 'workshop:updateVisibility',
   getProfiles: 'workshop:getProfiles',
   getAdvancedSettings: 'workshop:getAdvancedSettings',
+  getInstallLog: 'workshop:getInstallLog',
   saveAdvancedSettings: 'workshop:saveAdvancedSettings',
   saveProfile: 'workshop:saveProfile',
   deleteProfile: 'workshop:deleteProfile',

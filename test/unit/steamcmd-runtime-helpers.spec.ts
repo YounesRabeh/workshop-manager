@@ -8,7 +8,8 @@ import {
   mergeWorkshopItems,
   normalizeWorkshopItems,
   parseWorkshopRunFailure,
-  parseSteamLoginFailure
+  parseSteamLoginFailure,
+  resolveLoginTimeoutMs
 } from '../../src/backend/services/steamcmd-runtime-service'
 
 describe('steamcmd runtime helpers', () => {
@@ -67,6 +68,11 @@ describe('steamcmd runtime helpers', () => {
       code: 'auth',
       message: 'Saved Steam session is not available. Enter password to sign in again.'
     })
+  })
+
+  it('uses a longer timeout for full logins than stored-session reuse', () => {
+    expect(resolveLoginTimeoutMs(false)).toBe(30_000)
+    expect(resolveLoginTimeoutMs(true)).toBe(10_000)
   })
 
   it('merges workshop items by id and keeps latest data', () => {

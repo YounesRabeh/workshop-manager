@@ -100,6 +100,7 @@ const {
   authIssue,
   isSteamCmdDetected,
   isAdvancedOptionsOpen,
+  installLogPath,
   loginForm,
   advancedSettings,
   accountDisplayName,
@@ -115,6 +116,7 @@ const {
   toggleAdvancedOptions,
   setSteamGuardCode,
   ensureSteamCmdInstalled,
+  openInstallLog,
   refreshRememberedLoginState,
   loadAdvancedSettings,
   pickSteamCmdManualPath,
@@ -497,6 +499,7 @@ watch(
         :is-advanced-options-open="isAdvancedOptionsOpen"
         :advanced-settings="advancedSettings"
         :is-web-api-key-peek="isWebApiKeyPeek"
+        :install-log-path="installLogPath"
         @submit-login="login"
         @set-password-peek="setPasswordPeek"
         @submit-guard-code="submitSteamGuardCode"
@@ -508,6 +511,7 @@ watch(
         @set-web-api-key-peek="setWebApiKeyPeek"
         @save-advanced-settings="saveAdvancedSettings"
         @clear-web-api-key="clearSavedWebApiKey"
+        @open-install-log="openInstallLog"
         @clear-stored-session="clearStoredSession"
         @quit-app="quitApp"
       />

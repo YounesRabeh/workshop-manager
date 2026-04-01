@@ -38,6 +38,9 @@ export type RunPhase = 'login' | 'upload' | 'update' | 'visibility'
 interface ActiveInteractiveRun {
   runId: string
   phase: RunPhase
+  command: string
+  commandDispatched: boolean
+  waitForPromptBeforeDispatch: boolean
   lines: string[]
   emitOutputEvents: boolean
   timeout: ReturnType<typeof setTimeout>
@@ -61,10 +64,19 @@ function formatRunMeta(message: string): string {
   return `[RUN_META] ${message}`
 }
 
+function usesWindowsConsoleLineEndings(): boolean {
+  return process.platform === 'win32'
+}
+
+function isSteamPromptLine(line: string): boolean {
+  return /steam>\s*$/i.test(line)
+}
+
 export class SteamCmdProcessSession {
   private activeRuns = new Map<string, ChildProcessWithoutNullStreams>()
   private pendingSteamGuard = new Map<string, GuardPrompt>()
   private persistentProcess: ChildProcessWithoutNullStreams | null = null
+  private persistentPromptReady = false
   private activeInteractiveRun: ActiveInteractiveRun | null = null
   private commandQueue: Promise<void> = Promise.resolve()
   private stdoutBuffer = ''
@@ -93,6 +105,19 @@ export class SteamCmdProcessSession {
     return next
   }
 
+  private writeInteractiveInput(value: string): void {
+    this.persistentPromptReady = false
+    this.persistentProcess?.stdin.write(`${value}${usesWindowsConsoleLineEndings() ? '\r\n' : '\n'}`)
+  }
+
+  private dispatchCommandIfReady(activeRun: ActiveInteractiveRun): void {
+    if (this.activeInteractiveRun !== activeRun || activeRun.commandDispatched) {
+      return
+    }
+    activeRun.commandDispatched = true
+    this.writeInteractiveInput(activeRun.command)
+  }
+
   private async ensurePersistentProcess(executablePath?: string): Promise<ChildProcessWithoutNullStreams> {
     if (this.persistentProcess) {
       return this.persistentProcess
@@ -101,6 +126,7 @@ export class SteamCmdProcessSession {
     const resolvedExecutablePath = executablePath ?? (await this.deps.steamCmdExecutablePath())
     const child = spawn(resolvedExecutablePath, [], { cwd: this.deps.runtimeDir, stdio: 'pipe' })
     this.persistentProcess = child
+    this.persistentPromptReady = false
     this.stdoutBuffer = ''
     this.stderrBuffer = ''
 
@@ -139,6 +165,7 @@ export class SteamCmdProcessSession {
       }
 
       this.persistentProcess = null
+      this.persistentPromptReady = false
       this.deps.onSessionInvalidated()
     })
 
@@ -170,6 +197,14 @@ export class SteamCmdProcessSession {
   }
 
   private routeLineToActiveRun(line: string, type: 'stdout' | 'stderr'): void {
+    const normalizedLine = stripAnsi(line).trim()
+    if (!normalizedLine) {
+      return
+    }
+    if (isSteamPromptLine(normalizedLine)) {
+      this.persistentPromptReady = true
+    }
+
     const activeRun = this.activeInteractiveRun
     if (!activeRun) {
       return
@@ -177,9 +212,8 @@ export class SteamCmdProcessSession {
 
     activeRun.lineQueue = activeRun.lineQueue
       .then(async () => {
-        const normalizedLine = stripAnsi(line).trim()
-        if (!normalizedLine) {
-          return
+        if (activeRun.waitForPromptBeforeDispatch && !activeRun.commandDispatched && isSteamPromptLine(normalizedLine)) {
+          this.dispatchCommandIfReady(activeRun)
         }
 
         if (activeRun.phase === 'login' && isSteamGuardMobilePrompt(normalizedLine) && !activeRun.guardMobilePromptSent) {
@@ -215,7 +249,7 @@ export class SteamCmdProcessSession {
 
           try {
             const guardCode = await guardPromise
-            this.persistentProcess?.stdin.write(`${guardCode}\n`)
+            this.writeInteractiveInput(guardCode)
           } catch (error) {
             this.failActiveRun(
               activeRun,
@@ -379,6 +413,10 @@ export class SteamCmdProcessSession {
 
     return await this.enqueueCommand(async () => {
       const executablePath = await this.deps.steamCmdExecutablePath()
+      const waitForPromptBeforeDispatch =
+        phase === 'login' &&
+        this.persistentProcess === null &&
+        usesWindowsConsoleLineEndings()
       await mkdir(this.deps.runtimeDir, { recursive: true })
       await this.deps.runLogStore.create(runId)
       this.deps.emitRunEvent({ runId, ts: Date.now(), type: 'run_started', phase })
@@ -408,6 +446,9 @@ export class SteamCmdProcessSession {
         const activeRun: ActiveInteractiveRun = {
           runId,
           phase,
+          command,
+          commandDispatched: false,
+          waitForPromptBeforeDispatch,
           lines: [],
           emitOutputEvents: options.emitOutputEvents === true,
           timeout,
@@ -422,7 +463,11 @@ export class SteamCmdProcessSession {
         this.activeInteractiveRun = activeRun
         if (this.persistentProcess) {
           this.activeRuns.set(runId, this.persistentProcess)
-          this.persistentProcess.stdin.write(`${command}\n`)
+          if (!waitForPromptBeforeDispatch) {
+            this.dispatchCommandIfReady(activeRun)
+          } else if (this.persistentPromptReady) {
+            this.dispatchCommandIfReady(activeRun)
+          }
         } else {
           this.failActiveRun(activeRun, new AppError('command_failed', 'SteamCMD process is not available'))
         }
@@ -449,7 +494,7 @@ export class SteamCmdProcessSession {
 
   sendLogoutCommand(): void {
     if (this.persistentProcess) {
-      this.persistentProcess.stdin.write('logout\n')
+      this.writeInteractiveInput('logout')
     }
   }
 }

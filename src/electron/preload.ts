@@ -6,6 +6,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AdvancedSettings,
   ContentFolderFileEntry,
+  InstallLogSnapshot,
   InstallStatus,
   LoginInput,
   ModProfile,
@@ -38,6 +39,7 @@ export interface WorkshopApi {
     hasStoredAuth?: boolean
   }>
   getAdvancedSettings: () => Promise<AdvancedSettings>
+  getInstallLog: () => Promise<InstallLogSnapshot>
   saveAdvancedSettings: (payload: SaveAdvancedSettingsInput) => Promise<AdvancedSettings>
   saveProfile: (payload: { profile: ModProfile }) => Promise<ModProfile>
   deleteProfile: (payload: { profileId: string }) => Promise<{ ok: true }>
@@ -69,6 +71,7 @@ const api: WorkshopApi = {
   updateVisibility: (payload) => ipcRenderer.invoke(IPC_CHANNELS.updateVisibility, payload),
   getProfiles: () => ipcRenderer.invoke(IPC_CHANNELS.getProfiles),
   getAdvancedSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getAdvancedSettings),
+  getInstallLog: () => ipcRenderer.invoke(IPC_CHANNELS.getInstallLog),
   saveAdvancedSettings: (payload) => ipcRenderer.invoke(IPC_CHANNELS.saveAdvancedSettings, payload),
   saveProfile: (payload) => ipcRenderer.invoke(IPC_CHANNELS.saveProfile, payload),
   deleteProfile: (payload) => ipcRenderer.invoke(IPC_CHANNELS.deleteProfile, payload),

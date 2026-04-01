@@ -26,7 +26,32 @@ interface InteractiveScenario {
   logout?: InteractiveResponse
 }
 
+interface InteractiveChildOptions {
+  emitInitialPrompt?: boolean
+  requireReadyPromptBeforeCommands?: boolean
+}
+
 function createInteractiveFakeChild(scenario: InteractiveScenario): EventEmitter & {
+  stdout: PassThrough
+  stderr: PassThrough
+  stdin: PassThrough
+  commands: string[]
+  kill: () => void
+}
+function createInteractiveFakeChild(
+  scenario: InteractiveScenario,
+  options: InteractiveChildOptions
+): EventEmitter & {
+  stdout: PassThrough
+  stderr: PassThrough
+  stdin: PassThrough
+  commands: string[]
+  kill: () => void
+}
+function createInteractiveFakeChild(
+  scenario: InteractiveScenario,
+  options: InteractiveChildOptions = {}
+): EventEmitter & {
   stdout: PassThrough
   stderr: PassThrough
   stdin: PassThrough
@@ -47,6 +72,7 @@ function createInteractiveFakeChild(scenario: InteractiveScenario): EventEmitter
   emitter.commands = []
   let stdinBuffer = ''
   let closed = false
+  let readyForCommands = options.requireReadyPromptBeforeCommands !== true
 
   const emitLines = (response: InteractiveResponse | undefined) => {
     if (!response || closed) {
@@ -73,6 +99,9 @@ function createInteractiveFakeChild(scenario: InteractiveScenario): EventEmitter
       if (!command) {
         continue
       }
+      if (!readyForCommands) {
+        continue
+      }
       emitter.commands.push(command)
       if (command.startsWith('login ')) {
         emitLines(scenario.login)
@@ -94,6 +123,16 @@ function createInteractiveFakeChild(scenario: InteractiveScenario): EventEmitter
     }
     closed = true
     emitter.emit('close', 0)
+  }
+
+  if (options.emitInitialPrompt) {
+    queueMicrotask(() => {
+      if (closed) {
+        return
+      }
+      emitter.stdout.write('Steam>')
+      readyForCommands = true
+    })
   }
 
   return emitter
@@ -298,6 +337,60 @@ describe('SteamCmdRuntimeService lifecycle', () => {
 
     expect(persisted?.lines.join('\n')).toContain('restored active SteamCMD session without re-running login command')
     expect(childRef?.commands.filter((command) => command.startsWith('login '))).toHaveLength(1)
+  })
+
+  it('waits for the Steam prompt before dispatching fresh Windows login commands', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-'))
+    const store = new RunLogStore(join(root, 'runs'))
+    const originalPlatform = process.platform
+
+    Object.defineProperty(process, 'platform', {
+      value: 'win32',
+      configurable: true
+    })
+
+    try {
+      let childRef:
+        | (EventEmitter & {
+            stdout: PassThrough
+            stderr: PassThrough
+            stdin: PassThrough
+            commands: string[]
+            kill: () => void
+          })
+        | undefined
+
+      ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        childRef = createInteractiveFakeChild(
+          {
+            login: {
+              lines: [
+                "Logging in user 'alice' [U:1:42] to Steam Public...",
+                'Waiting for confirmation on your Steam Guard Mobile Authenticator...',
+                'Waiting for user info...OK'
+              ]
+            }
+          },
+          {
+            emitInitialPrompt: true,
+            requireReadyPromptBeforeCommands: true
+          }
+        )
+        return childRef
+      })
+
+      const runtime = new SteamCmdRuntimeService(async () => 'C:\\steamcmd\\steamcmd.exe', store, join(root, 'runtime'))
+      await runtime.login('alice', 'secret')
+
+      expect(childRef?.commands).toContain('login alice secret')
+      const persisted = await store.list()
+      expect(persisted[0]?.lines.join('\n')).toContain('Waiting for confirmation on your Steam Guard Mobile Authenticator...')
+    } finally {
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true
+      })
+    }
   })
 
   it('fails update early when selected content folder has no files', async () => {
