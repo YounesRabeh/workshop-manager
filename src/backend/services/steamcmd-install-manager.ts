@@ -4,7 +4,7 @@
  *  and performs OS-aware download/extraction when SteamCMD is missing.
  */
 import { constants, createWriteStream } from 'node:fs'
-import { access, mkdir, rm, stat } from 'node:fs/promises'
+import { access, mkdir, readdir, rm, stat } from 'node:fs/promises'
 import type { IncomingMessage } from 'node:http'
 import { get } from 'node:https'
 import { join } from 'node:path'
@@ -54,6 +54,61 @@ async function isUsableExecutable(path: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+function expectedExecutableName(platform: NodeJS.Platform): string {
+  return platform === 'win32' ? 'steamcmd.exe' : 'steamcmd.sh'
+}
+
+async function findExecutableInDir(
+  rootDir: string,
+  fileName: string,
+  maxDepth: number
+): Promise<string | undefined> {
+  const normalizedTarget = fileName.toLowerCase()
+
+  async function walk(currentDir: string, depth: number): Promise<string | undefined> {
+    let entries
+    try {
+      entries = await readdir(currentDir, { withFileTypes: true, encoding: 'utf8' })
+    } catch {
+      return undefined
+    }
+
+    for (const entry of entries) {
+      if (!entry.isFile()) {
+        continue
+      }
+
+      if (entry.name.toLowerCase() !== normalizedTarget) {
+        continue
+      }
+
+      const candidatePath = join(currentDir, entry.name)
+      if (await isUsableExecutable(candidatePath)) {
+        return candidatePath
+      }
+    }
+
+    if (depth >= maxDepth) {
+      return undefined
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) {
+        continue
+      }
+
+      const nested = await walk(join(currentDir, entry.name), depth + 1)
+      if (nested) {
+        return nested
+      }
+    }
+
+    return undefined
+  }
+
+  return await walk(rootDir, 0)
 }
 
 async function run(command: string, args: string[], cwd: string): Promise<void> {
@@ -147,6 +202,15 @@ export class SteamCmdInstallManager {
       : join(this.installDir, 'steamcmd.sh')
   }
 
+  private async resolveAutoExecutablePath(): Promise<string | undefined> {
+    const defaultPath = this.defaultExecutablePath
+    if (await isUsableExecutable(defaultPath)) {
+      return defaultPath
+    }
+
+    return await findExecutableInDir(this.installDir, expectedExecutableName(process.platform), 2)
+  }
+
   setManualExecutablePath(path: string | null | undefined): void {
     const normalizedPath = path?.trim()
     this.manualExecutablePath = normalizedPath && normalizedPath.length > 0 ? normalizedPath : null
@@ -161,8 +225,8 @@ export class SteamCmdInstallManager {
       }
     }
 
-    const executablePath = this.defaultExecutablePath
-    if (await isUsableExecutable(executablePath)) {
+    const executablePath = await this.resolveAutoExecutablePath()
+    if (executablePath) {
       return {
         installed: true,
         executablePath,
@@ -172,7 +236,7 @@ export class SteamCmdInstallManager {
 
     return {
       installed: false,
-      executablePath,
+      executablePath: this.defaultExecutablePath,
       source: 'missing'
     }
   }

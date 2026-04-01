@@ -78,4 +78,44 @@ describe('SteamCmdInstallManager PowerShell extraction', () => {
       expect(invokedCommand).toContain("o''connor")
     })
   })
+
+  it('accepts nested steamcmd.exe after Windows extraction completes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'steamcmd-install-'))
+
+    getMock.mockImplementation((_url: string, callback: (response: PassThrough & { statusCode?: number }) => void) => {
+      const request = new EventEmitter()
+      const response = new PassThrough() as PassThrough & { statusCode?: number }
+      response.statusCode = 200
+
+      queueMicrotask(() => {
+        callback(response)
+        response.end('archive-bytes')
+      })
+
+      return request
+    })
+
+    spawnMock.mockImplementation((command: string) => {
+      const child = new EventEmitter()
+
+      queueMicrotask(async () => {
+        if (command === 'powershell') {
+          await mkdir(join(root, 'steamcmd', 'portable'), { recursive: true })
+          await writeFile(join(root, 'steamcmd', 'portable', 'steamcmd.exe'), 'steamcmd', 'utf8')
+        }
+        child.emit('close', 0)
+      })
+
+      return child
+    })
+
+    await withPlatform('win32', async () => {
+      const manager = new SteamCmdInstallManager(root)
+      const status = await manager.ensureInstalled()
+
+      expect(status.installed).toBe(true)
+      expect(status.source).toBe('auto')
+      expect(status.executablePath).toBe(join(root, 'steamcmd', 'portable', 'steamcmd.exe'))
+    })
+  })
 })
