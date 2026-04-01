@@ -20,16 +20,6 @@ vi.mock('node:https', () => ({
 
 const { SteamCmdInstallManager } = await import('../../src/backend/services/steamcmd-install-manager')
 
-async function withPlatform<T>(platform: NodeJS.Platform, run: () => Promise<T> | T): Promise<T> {
-  const originalPlatform = process.platform
-  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
-  try {
-    return await run()
-  } finally {
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
-  }
-}
-
 describe('SteamCmdInstallManager download failures', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -59,13 +49,11 @@ describe('SteamCmdInstallManager download failures', () => {
       return request
     })
 
-    await withPlatform('linux', async () => {
-      const manager = new SteamCmdInstallManager(root)
+    const manager = new SteamCmdInstallManager(root, 'linux')
 
-      await expect(manager.ensureInstalled()).rejects.toMatchObject({
-        code: 'install',
-        message: 'SteamCMD download failed: disk full'
-      })
+    await expect(manager.ensureInstalled()).rejects.toMatchObject({
+      code: 'install',
+      message: 'SteamCMD download failed: disk full'
     })
   })
 })

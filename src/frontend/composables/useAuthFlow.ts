@@ -286,9 +286,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
   async function refreshRememberedLoginState(): Promise<void> {
     const payload = await window.workshop.getProfiles()
-    if (payload.rememberedUsername) {
-      loginForm.username = payload.rememberedUsername
-    }
+    const rememberedUsername = payload.rememberedUsername?.trim() ?? ''
+    loginForm.username = rememberedUsername
+    loginForm.rememberUsername = rememberedUsername.length > 0
     const hasStoredAuth = payload.hasStoredAuth === true
     loginForm.rememberAuth = payload.rememberAuth === true && hasStoredAuth
     hasPersistedStoredSession.value = hasStoredAuth

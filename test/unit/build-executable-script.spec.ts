@@ -3,6 +3,7 @@ import {
   buildStepsForPlatform,
   getElectronBuilderArgsForPlatform,
   getPackagingTargetForPlatform,
+  normalizeBuildTargetPlatform,
   parseBuildExecutableOptions,
   resolvePnpmCommand
 } from '../../scripts/build-executable.mjs'
@@ -25,13 +26,20 @@ describe('build-executable script helpers', () => {
 
   it('builds electron-builder args with publish disabled', () => {
     expect(getElectronBuilderArgsForPlatform('linux')).toEqual([
-      'exec',
-      'electron-builder',
       '--linux',
       'AppImage',
       '--publish',
       'never'
     ])
+  })
+
+  it('normalizes supported target platforms and rejects unsupported ones', () => {
+    expect(normalizeBuildTargetPlatform('win32')).toBe('win32')
+    expect(normalizeBuildTargetPlatform('darwin')).toBe('darwin')
+    expect(normalizeBuildTargetPlatform('linux')).toBe('linux')
+    expect(() => normalizeBuildTargetPlatform('freebsd')).toThrow(
+      'Unsupported target platform for executable packaging: freebsd'
+    )
   })
 
   it('uses pnpm.cmd on windows and pnpm on unix-like systems', () => {
@@ -50,9 +58,26 @@ describe('build-executable script helpers', () => {
     expect(steps[0]).toMatchObject({ command: 'pnpm', args: ['kill:instance'] })
     expect(steps[1]).toMatchObject({ command: 'pnpm', args: ['build:bundle'] })
     expect(steps[2]).toMatchObject({
-      command: 'pnpm',
-      args: ['exec', 'electron-builder', '--linux', 'AppImage', '--publish', 'never']
+      command: process.execPath,
+      args: expect.arrayContaining(['--linux', 'AppImage', '--publish', 'never'])
     })
+    expect(steps[2].args[0]).toMatch(/electron-builder[\\/]cli\.js$/)
+  })
+
+  it('builds windows packaging steps from a linux host with a fresh bundle first', () => {
+    const steps = buildStepsForPlatform('linux', { targetPlatform: 'win32' })
+    expect(steps.map((s) => s.label)).toEqual([
+      'Kill old app instance',
+      'Build app bundles',
+      'Package executable artifacts'
+    ])
+    expect(steps[0]).toMatchObject({ command: 'pnpm', args: ['kill:instance'] })
+    expect(steps[1]).toMatchObject({ command: 'pnpm', args: ['build:bundle'] })
+    expect(steps[2]).toMatchObject({
+      command: process.execPath,
+      args: expect.arrayContaining(['--win', 'nsis', '--publish', 'never'])
+    })
+    expect(steps[2].args[0]).toMatch(/electron-builder[\\/]cli\.js$/)
   })
 
   it('includes icon sync step only when generateIcon is enabled', () => {
@@ -66,8 +91,28 @@ describe('build-executable script helpers', () => {
     expect(steps[1]).toMatchObject({ command: 'pnpm', args: ['sync:icon'] })
   })
 
-  it('parses generate icon flag from argv', () => {
-    expect(parseBuildExecutableOptions([])).toEqual({ generateIcon: false })
-    expect(parseBuildExecutableOptions(['--generate-icon'])).toEqual({ generateIcon: true })
+  it('parses generate icon and explicit target platform flags from argv', () => {
+    expect(parseBuildExecutableOptions([])).toEqual({
+      generateIcon: false,
+      targetPlatform: undefined
+    })
+    expect(parseBuildExecutableOptions(['--generate-icon'])).toEqual({
+      generateIcon: true,
+      targetPlatform: undefined
+    })
+    expect(parseBuildExecutableOptions(['--win'])).toEqual({
+      generateIcon: false,
+      targetPlatform: 'win32'
+    })
+    expect(parseBuildExecutableOptions(['--platform=linux', '--generate-icon'])).toEqual({
+      generateIcon: true,
+      targetPlatform: 'linux'
+    })
+  })
+
+  it('rejects conflicting target platform flags', () => {
+    expect(() => parseBuildExecutableOptions(['--win', '--linux'])).toThrow(
+      'Conflicting target platforms requested: win32, linux'
+    )
   })
 })

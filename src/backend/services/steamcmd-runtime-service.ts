@@ -31,6 +31,11 @@ import {
   stripAnsi
 } from './steam-output-parser'
 import { SteamCmdProcessSession } from './steamcmd-process-session'
+import {
+  getSteamCmdPlatformBehavior,
+  type SteamCmdPlatformBehavior,
+  type SteamCmdPlatformProfile
+} from './steamcmd-platform-profile'
 import { WorkshopFetchService } from './workshop-fetch-service'
 import { WorkshopCommandService } from './workshop-command-service'
 
@@ -73,13 +78,16 @@ export class SteamCmdRuntimeService extends EventEmitter {
   private readonly processSession: SteamCmdProcessSession
   private readonly workshopFetchService: WorkshopFetchService
   private readonly workshopCommandService: WorkshopCommandService
+  private readonly platformBehavior: SteamCmdPlatformBehavior
 
   constructor(
     private readonly steamCmdExecutablePath: () => Promise<string>,
     private readonly runLogStore: RunLogStore,
-    private readonly runtimeDir: string
+    private readonly runtimeDir: string,
+    platformProfile: SteamCmdPlatformProfile
   ) {
     super()
+    this.platformBehavior = getSteamCmdPlatformBehavior(platformProfile)
     this.processSession = new SteamCmdProcessSession({
       steamCmdExecutablePath: this.steamCmdExecutablePath,
       runLogStore: this.runLogStore,
@@ -89,7 +97,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
         this.loginState = null
         this.lastAuthenticatedState = null
       }
-    })
+    }, platformProfile)
     this.workshopFetchService = new WorkshopFetchService({
       getLoginState: () => this.loginState
     })
@@ -98,6 +106,20 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
   private emitRunEvent(event: RunEvent): void {
     this.emit('run-event', event)
+  }
+
+  private async ensurePersistentWorkshopSession(username: string): Promise<void> {
+    if (this.platformBehavior.persistentSessionStartup !== 'startup_args' || this.processSession.hasPersistentProcess()) {
+      return
+    }
+
+    await this.processSession.runPersistentStartup(createRunId(), ['+login', username], {
+      phase: 'login',
+      timeoutMs: resolveLoginTimeoutMs(true),
+      emitOutputEvents: false,
+      emitRunEvents: false,
+      persistLogs: false
+    })
   }
 
   async login(username: string, password: string, useStoredAuth = false): Promise<{ sessionId: string }> {
@@ -134,11 +156,17 @@ export class SteamCmdRuntimeService extends EventEmitter {
       return { sessionId: runId }
     }
 
-    const result = await this.processSession.run(runId, args, {
-      phase: 'login',
-      timeoutMs,
-      emitOutputEvents: true
-    })
+    const result = this.platformBehavior.loginExecution === 'one_shot'
+      ? await this.processSession.runOneShot(runId, args, {
+          phase: 'login',
+          timeoutMs,
+          emitOutputEvents: true
+        })
+      : await this.processSession.run(runId, args, {
+          phase: 'login',
+          timeoutMs,
+          emitOutputEvents: true
+        })
     const parsedFailure = parseSteamLoginFailure(result.lines)
 
     if (result.exitCode !== 0 || parsedFailure) {
@@ -183,6 +211,13 @@ export class SteamCmdRuntimeService extends EventEmitter {
     this.lastAuthenticatedState = {
       username: this.loginState.username,
       steamId64: this.loginState.steamId64
+    }
+    if (this.platformBehavior.persistentSessionStartup === 'startup_args') {
+      try {
+        await this.ensurePersistentWorkshopSession(normalizedUsername)
+      } catch {
+        // Keep the successful login result. Upload/update will retry this bootstrap if needed.
+      }
     }
     this.emitRunEvent({ runId, ts: Date.now(), type: 'run_finished', phase: 'login' })
     await this.runLogStore.finalize(runId, {
@@ -238,7 +273,9 @@ export class SteamCmdRuntimeService extends EventEmitter {
     return await new Promise<boolean>((resolve) => {
       const child = spawn(executablePath, args, {
         cwd: this.runtimeDir,
-        stdio: 'pipe'
+        stdio: 'pipe',
+        shell: this.platformBehavior.useShellHost,
+        windowsHide: this.platformBehavior.hideWindowsConsole
       })
 
       let stdout = ''
@@ -310,6 +347,18 @@ export class SteamCmdRuntimeService extends EventEmitter {
   async upload(draft: UploadDraft, mode: 'upload' | 'update' | 'visibility'): Promise<RunResult> {
     if (!this.loginState) {
       throw new AppError('auth', 'You must login before uploading or updating mods')
+    }
+    if (this.platformBehavior.persistentSessionStartup === 'startup_args') {
+      try {
+        await this.ensurePersistentWorkshopSession(this.loginState.username)
+      } catch (error) {
+        throw new AppError(
+          'auth',
+          error instanceof Error
+            ? `Steam session is not ready for workshop commands. ${error.message}`
+            : 'Steam session is not ready for workshop commands. Sign in again and retry.'
+        )
+      }
     }
 
     const prepared = await this.workshopCommandService.prepare(this.loginState.username, draft, mode)

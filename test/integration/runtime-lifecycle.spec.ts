@@ -29,6 +29,8 @@ interface InteractiveScenario {
 interface InteractiveChildOptions {
   emitInitialPrompt?: boolean
   requireReadyPromptBeforeCommands?: boolean
+  ignoredLoginDispatches?: number
+  startupResponse?: InteractiveResponse
 }
 
 function createInteractiveFakeChild(scenario: InteractiveScenario): EventEmitter & {
@@ -73,6 +75,7 @@ function createInteractiveFakeChild(
   let stdinBuffer = ''
   let closed = false
   let readyForCommands = options.requireReadyPromptBeforeCommands !== true
+  let ignoredLoginDispatches = options.ignoredLoginDispatches ?? 0
 
   const emitLines = (response: InteractiveResponse | undefined) => {
     if (!response || closed) {
@@ -104,6 +107,10 @@ function createInteractiveFakeChild(
       }
       emitter.commands.push(command)
       if (command.startsWith('login ')) {
+        if (ignoredLoginDispatches > 0) {
+          ignoredLoginDispatches -= 1
+          continue
+        }
         emitLines(scenario.login)
         continue
       }
@@ -133,6 +140,67 @@ function createInteractiveFakeChild(
       emitter.stdout.write('Steam>')
       readyForCommands = true
     })
+  }
+
+  if (options.startupResponse) {
+    emitLines(options.startupResponse)
+  }
+
+  return emitter
+}
+
+function createOneShotFakeChild(response: InteractiveResponse): EventEmitter & {
+  stdout: PassThrough
+  stderr: PassThrough
+  stdin: PassThrough
+  commands: string[]
+  kill: () => void
+} {
+  const emitter = new EventEmitter() as EventEmitter & {
+    stdout: PassThrough
+    stderr: PassThrough
+    stdin: PassThrough
+    commands: string[]
+    kill: () => void
+  }
+
+  emitter.stdout = new PassThrough()
+  emitter.stderr = new PassThrough()
+  emitter.stdin = new PassThrough()
+  emitter.commands = []
+  let closed = false
+  let stdinBuffer = ''
+
+  emitter.stdin.on('data', (chunk: Buffer) => {
+    stdinBuffer += chunk.toString('utf8')
+    const commands = stdinBuffer.split(/\r?\n/)
+    stdinBuffer = commands.pop() ?? ''
+
+    for (const rawCommand of commands) {
+      const command = rawCommand.trim()
+      if (command) {
+        emitter.commands.push(command)
+      }
+    }
+  })
+
+  queueMicrotask(() => {
+    if (closed) {
+      return
+    }
+    for (const line of response.lines) {
+      emitter.stdout.write(`${line}\n`)
+    }
+    closed = true
+    emitter.emit('close', response.closeCode ?? 0)
+  })
+
+  emitter.kill = () => {
+    if (closed) {
+      return
+    }
+    closed = true
+    emitter.emit('close', 0)
   }
 
   return emitter
@@ -168,7 +236,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       })
     )
 
-    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
     await runtime.login('alice', 'secret')
 
     const result = await runtime.upload(
@@ -218,7 +286,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       })
     )
 
-    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
     await runtime.login('alice', 'secret')
 
     const result = await runtime.upload(
@@ -262,7 +330,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       })
     )
 
-    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
     await runtime.login('alice', 'secret')
 
     await expect(
@@ -297,7 +365,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       })
     )
 
-    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, runtimeDir)
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, runtimeDir, 'linux')
     await runtime.login('alice', 'secret')
 
     await expect(access(runtimeDir)).resolves.toBeUndefined()
@@ -328,7 +396,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       return childRef
     })
 
-    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
     await runtime.login('alice', 'secret')
     runtime.logout()
 
@@ -339,58 +407,142 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(childRef?.commands.filter((command) => command.startsWith('login '))).toHaveLength(1)
   })
 
-  it('waits for the Steam prompt before dispatching fresh Windows login commands', async () => {
+  it('uses a one-shot Windows login before restoring a persistent workshop session', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-'))
     const store = new RunLogStore(join(root, 'runs'))
-    const originalPlatform = process.platform
+    let childRef:
+      | (EventEmitter & {
+          stdout: PassThrough
+          stderr: PassThrough
+          stdin: PassThrough
+          commands: string[]
+          kill: () => void
+        })
+      | undefined
 
-    Object.defineProperty(process, 'platform', {
-      value: 'win32',
-      configurable: true
-    })
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+      if (args.join(' ') === '+login alice secret +quit') {
+        return createOneShotFakeChild({
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for confirmation on your Steam Guard Mobile Authenticator...',
+            'Waiting for user info...OK'
+          ]
+        })
+      }
 
-    try {
-      let childRef:
-        | (EventEmitter & {
-            stdout: PassThrough
-            stderr: PassThrough
-            stdin: PassThrough
-            commands: string[]
-            kill: () => void
-          })
-        | undefined
-
-      ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      if (args.join(' ') === '+login alice') {
         childRef = createInteractiveFakeChild(
+          {},
           {
-            login: {
+            startupResponse: {
               lines: [
                 "Logging in user 'alice' [U:1:42] to Steam Public...",
-                'Waiting for confirmation on your Steam Guard Mobile Authenticator...',
-                'Waiting for user info...OK'
+                'Waiting for user info...OK',
+                'Steam>'
               ]
             }
-          },
-          {
-            emitInitialPrompt: true,
-            requireReadyPromptBeforeCommands: true
           }
         )
         return childRef
-      })
+      }
 
-      const runtime = new SteamCmdRuntimeService(async () => 'C:\\steamcmd\\steamcmd.exe', store, join(root, 'runtime'))
-      await runtime.login('alice', 'secret')
+      throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+    })
 
-      expect(childRef?.commands).toContain('login alice secret')
-      const persisted = await store.list()
-      expect(persisted[0]?.lines.join('\n')).toContain('Waiting for confirmation on your Steam Guard Mobile Authenticator...')
-    } finally {
-      Object.defineProperty(process, 'platform', {
-        value: originalPlatform,
-        configurable: true
-      })
-    }
+    const runtime = new SteamCmdRuntimeService(
+      async () => 'C:\\steamcmd\\steamcmd.exe',
+      store,
+      join(root, 'runtime'),
+      'windows'
+    )
+    await runtime.login('alice', 'secret')
+
+    expect(spawn).toHaveBeenNthCalledWith(
+      1,
+      'C:\\steamcmd\\steamcmd.exe',
+      ['+login', 'alice', 'secret', '+quit'],
+      expect.objectContaining({ shell: true, windowsHide: true })
+    )
+    expect(spawn).toHaveBeenNthCalledWith(
+      2,
+      'C:\\steamcmd\\steamcmd.exe',
+      ['+login', 'alice'],
+      expect.objectContaining({ shell: true, windowsHide: true })
+    )
+    expect(childRef?.commands).toHaveLength(0)
+    const persisted = await store.list()
+    expect(persisted[0]?.lines.join('\n')).toContain('Waiting for confirmation on your Steam Guard Mobile Authenticator...')
+  })
+
+  it('reuses the restored Windows persistent session for workshop commands', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-workshop-'))
+    const store = new RunLogStore(join(root, 'runs'))
+    let childRef:
+      | (EventEmitter & {
+          stdout: PassThrough
+          stderr: PassThrough
+          stdin: PassThrough
+          commands: string[]
+          kill: () => void
+        })
+      | undefined
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+      if (args.join(' ') === '+login alice secret +quit') {
+        return createOneShotFakeChild({
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for confirmation on your Steam Guard Mobile Authenticator...',
+            'Waiting for user info...OK'
+          ]
+        })
+      }
+
+      if (args.join(' ') === '+login alice') {
+        childRef = createInteractiveFakeChild(
+          {
+            workshopBuild: {
+              lines: ['Published File Id: 777', 'Success.']
+            }
+          },
+          {
+            startupResponse: {
+              lines: [
+                "Logging in user 'alice' [U:1:42] to Steam Public...",
+                'Waiting for user info...OK',
+                'Steam>'
+              ]
+            }
+          }
+        )
+        return childRef
+      }
+
+      throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+    })
+
+    const runtime = new SteamCmdRuntimeService(
+      async () => 'C:\\steamcmd\\steamcmd.exe',
+      store,
+      join(root, 'runtime'),
+      'windows'
+    )
+    await runtime.login('alice', 'secret')
+
+    const result = await runtime.upload(
+      {
+        appId: '480',
+        contentFolder: '/mods',
+        previewFile: '/mods/preview.png',
+        title: 'My Mod'
+      },
+      'upload'
+    )
+
+    expect(result.success).toBe(true)
+    expect(spawn).toHaveBeenCalledTimes(2)
+    expect(childRef?.commands.some((command) => command.startsWith('workshop_build_item '))).toBe(true)
   })
 
   it('fails update early when selected content folder has no files', async () => {
@@ -409,7 +561,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       })
     )
 
-    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
     await runtime.login('alice', 'secret')
 
     await expect(
@@ -441,7 +593,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       })
     )
 
-    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'))
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
     await runtime.login('alice', 'secret')
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {

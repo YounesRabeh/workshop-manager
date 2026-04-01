@@ -1,7 +1,7 @@
 /**
  * Overview: Keeps app icon assets in sync across the renderer, packaging targets,
  *  and Linux launcher integrations.
- * Responsibility: Treats `resources/app-icon.png` as the single source of truth,
+ * Responsibility: Treats `resources/img/app-icon.png` as the single source of truth,
  *  derives platform-specific icon formats, and refreshes desktop launcher metadata.
  */
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
@@ -13,10 +13,11 @@ import { spawnSync } from 'node:child_process'
 
 const thisDir = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(thisDir, '..')
-const sourceIconPath = resolve(projectRoot, 'resources/app-icon.png')
-const normalizedIconPath = resolve(projectRoot, 'resources/app-icon.normalized.png')
-const sourceIcoPath = resolve(projectRoot, 'resources/app-icon.ico')
-const sourceIcnsPath = resolve(projectRoot, 'resources/app-icon.icns')
+const iconDir = resolve(projectRoot, 'resources/img')
+const sourceIconPath = resolve(iconDir, 'app-icon.png')
+const normalizedIconPath = resolve(iconDir, 'app-icon.normalized.png')
+const sourceIcoPath = resolve(iconDir, 'app-icon.ico')
+const sourceIcnsPath = resolve(iconDir, 'app-icon.icns')
 const targetIconPaths = [
   resolve(projectRoot, 'src/renderer/public/app-icon.png'),
   resolve(projectRoot, 'src/frontend/public/app-icon.png')
@@ -312,7 +313,7 @@ async function syncIcon() {
 
   await writeFile(
     resolve(projectRoot, 'resources/.icon-source'),
-    'Single source of truth: resources/app-icon.png\n',
+    'Single source of truth: resources/img/app-icon.png\n',
     'utf8'
   )
 }

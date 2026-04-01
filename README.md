@@ -38,9 +38,12 @@ Cross-platform desktop app for Steam Workshop publish/update workflows, built wi
 5. Build bundles only (no installer):
    - `pnpm build`
 6. Build platform executable package:
-   - `pnpm build:exe`
-   - By default, this skips icon regeneration.
-   - To regenerate icon assets before packaging, run `pnpm build:exe:icon` (or `pnpm build:exe -- --generate-icon`).
+   - Current host platform: `pnpm build:exe`
+   - Windows package from this repo: `pnpm build:win`
+   - By default, these packaging commands skip icon regeneration.
+   - To regenerate icon assets before packaging, run `pnpm build:exe:icon` for the host platform or `pnpm build:win:icon` for Windows.
+   - These wrapper commands always rebuild the Electron bundle before packaging so the installer does not ship stale `out/` code.
+   - Do not use raw `pnpm exec electron-builder ...` as the normal workflow in this repo unless you have already rebuilt the bundle on purpose.
    - Output artifacts are written to `dist/`
    - Host platform targets:
      - Windows: `*.exe` (NSIS)
@@ -49,11 +52,11 @@ Cross-platform desktop app for Steam Workshop publish/update workflows, built wi
 
 ## Changing The App Icon
 
-- Put your replacement icon at `resources/app-icon.png`.
+- Put your replacement icon at `resources/img/app-icon.png`.
 - This file is the single source of truth for the app icon used by the renderer and packaged builds.
 - After replacing it, run `pnpm sync:icon` to copy/sync the generated icon assets used by the app during development.
-- When building an executable, run `pnpm build:exe:icon` if you want the Windows/macOS packaging icons regenerated first.
-- If you are starting from a file in another folder such as `res/`, move or copy it to `resources/app-icon.png`.
+- When building an executable, run `pnpm build:exe:icon` for the host platform or `pnpm build:win:icon` for Windows if you want packaging icons regenerated first.
+- If you are starting from a file in another folder such as `res/`, move or copy it to `resources/img/app-icon.png`.
 
 ## Notes
 

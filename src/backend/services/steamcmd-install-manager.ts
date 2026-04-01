@@ -12,20 +12,10 @@ import { spawn } from 'node:child_process'
 import extractZip from 'extract-zip'
 import type { InstallLogSnapshot, InstallStatus } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
-
-const STEAMCMD_URLS: Record<NodeJS.Platform, string | undefined> = {
-  win32: 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip',
-  linux: 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz',
-  darwin: undefined,
-  aix: undefined,
-  android: undefined,
-  cygwin: undefined,
-  freebsd: undefined,
-  haiku: undefined,
-  netbsd: undefined,
-  openbsd: undefined,
-  sunos: undefined
-}
+import {
+  getSteamCmdPlatformBehavior,
+  type SteamCmdPlatformProfile
+} from './steamcmd-platform-profile'
 
 function toInstallError(prefix: string, error: unknown): AppError {
   if (error instanceof AppError) {
@@ -36,14 +26,14 @@ function toInstallError(prefix: string, error: unknown): AppError {
   return new AppError('install', `${prefix}: ${message}`)
 }
 
-async function isUsableExecutable(path: string): Promise<boolean> {
+async function isUsableExecutable(path: string, requiresExecutableBit: boolean): Promise<boolean> {
   try {
     const entry = await stat(path)
     if (!entry.isFile()) {
       return false
     }
 
-    if (process.platform !== 'win32') {
+    if (requiresExecutableBit) {
       await access(path, constants.X_OK)
     }
 
@@ -51,10 +41,6 @@ async function isUsableExecutable(path: string): Promise<boolean> {
   } catch {
     return false
   }
-}
-
-function expectedExecutableName(platform: NodeJS.Platform): string {
-  return platform === 'win32' ? 'steamcmd.exe' : 'steamcmd.sh'
 }
 
 function formatInstallLogLine(message: string): string {
@@ -71,7 +57,8 @@ function describeUnknownError(error: unknown): string {
 async function findExecutableInDir(
   rootDir: string,
   fileName: string,
-  maxDepth: number
+  maxDepth: number,
+  requiresExecutableBit: boolean
 ): Promise<string | undefined> {
   const normalizedTarget = fileName.toLowerCase()
 
@@ -93,7 +80,7 @@ async function findExecutableInDir(
       }
 
       const candidatePath = join(currentDir, entry.name)
-      if (await isUsableExecutable(candidatePath)) {
+      if (await isUsableExecutable(candidatePath, requiresExecutableBit)) {
         return candidatePath
       }
     }
@@ -240,7 +227,14 @@ export class SteamCmdInstallManager {
   private manualExecutablePath: string | null = null
   private logWriteChain: Promise<void> = Promise.resolve()
 
-  constructor(private readonly rootDir: string) {}
+  constructor(
+    private readonly rootDir: string,
+    private readonly platformProfile: SteamCmdPlatformProfile
+  ) {}
+
+  private get platformBehavior() {
+    return getSteamCmdPlatformBehavior(this.platformProfile)
+  }
 
   private get installDir(): string {
     return join(this.rootDir, 'steamcmd')
@@ -251,18 +245,21 @@ export class SteamCmdInstallManager {
   }
 
   get defaultExecutablePath(): string {
-    return process.platform === 'win32'
-      ? join(this.installDir, 'steamcmd.exe')
-      : join(this.installDir, 'steamcmd.sh')
+    return join(this.installDir, this.platformBehavior.expectedExecutableName)
   }
 
   private async resolveAutoExecutablePath(): Promise<string | undefined> {
     const defaultPath = this.defaultExecutablePath
-    if (await isUsableExecutable(defaultPath)) {
+    if (await isUsableExecutable(defaultPath, this.platformBehavior.requiresExecutableBit)) {
       return defaultPath
     }
 
-    return await findExecutableInDir(this.installDir, expectedExecutableName(process.platform), 2)
+    return await findExecutableInDir(
+      this.installDir,
+      this.platformBehavior.expectedExecutableName,
+      2,
+      this.platformBehavior.requiresExecutableBit
+    )
   }
 
   private async withLogLock<T>(operation: () => Promise<T>): Promise<T> {
@@ -291,7 +288,8 @@ export class SteamCmdInstallManager {
   private async startInstallLog(): Promise<void> {
     const lines = [
       formatInstallLogLine('SteamCMD install attempt started'),
-      formatInstallLogLine(`platform=${process.platform}`),
+      formatInstallLogLine(`runtimePlatform=${process.platform}`),
+      formatInstallLogLine(`profile=${this.platformProfile}`),
       formatInstallLogLine(`rootDir=${this.rootDir}`),
       formatInstallLogLine(`installDir=${this.installDir}`),
       formatInstallLogLine(`defaultExecutablePath=${this.defaultExecutablePath}`),
@@ -336,7 +334,10 @@ export class SteamCmdInstallManager {
   }
 
   async getStatus(): Promise<InstallStatus> {
-    if (this.manualExecutablePath && (await isUsableExecutable(this.manualExecutablePath))) {
+    if (
+      this.manualExecutablePath &&
+      (await isUsableExecutable(this.manualExecutablePath, this.platformBehavior.requiresExecutableBit))
+    ) {
       return {
         installed: true,
         executablePath: this.manualExecutablePath,
@@ -377,22 +378,17 @@ export class SteamCmdInstallManager {
     await this.startInstallLog()
 
     try {
-      const downloadUrl = STEAMCMD_URLS[process.platform]
-      if (!downloadUrl) {
-        await this.appendInstallLog('Auto-install is unavailable for this operating system')
-        throw new AppError('install', 'SteamCMD auto-install is unavailable for this OS. Provide manual path.')
-      }
-
+      const downloadUrl = this.platformBehavior.downloadUrl
       await mkdir(this.installDir, { recursive: true })
       await this.logInstallDirectorySnapshot('Install directory before download')
 
-      const archivePath = join(this.installDir, process.platform === 'win32' ? 'steamcmd.zip' : 'steamcmd.tar.gz')
+      const archivePath = join(this.installDir, this.platformBehavior.archiveFileName)
       await this.appendInstallLog(`Downloading SteamCMD from ${downloadUrl}`)
       await this.appendInstallLog(`Archive target path=${archivePath}`)
       await download(downloadUrl, archivePath)
       await this.appendInstallLog('Download completed successfully')
 
-      if (process.platform === 'win32') {
+      if (this.platformBehavior.archiveKind === 'zip') {
         await this.appendInstallLog(`Extracting ZIP archive in-process to ${this.installDir}`)
         try {
           await extractZip(archivePath, { dir: this.installDir })

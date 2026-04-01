@@ -182,4 +182,22 @@ describe('useAuthFlow composable', () => {
     expect(workshop.getInstallLog).toHaveBeenCalledTimes(1)
     expect(flow.installLogPath.value).toBe('/tmp/steamcmd-install.log')
   })
+
+  it('hydrates remembered username state from profiles payload', async () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.loginForm.username = 'temp-user'
+    flow.loginForm.rememberUsername = false
+
+    await flow.refreshRememberedLoginState()
+
+    expect(flow.loginForm.username).toBe('alice')
+    expect(flow.loginForm.rememberUsername).toBe(true)
+    expect(flow.loginForm.rememberAuth).toBe(false)
+  })
 })

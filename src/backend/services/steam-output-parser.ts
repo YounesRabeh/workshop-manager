@@ -362,6 +362,14 @@ export function isLoginSuccessLine(line: string): boolean {
   )
 }
 
+export function isLoginProgressLine(line: string): boolean {
+  return (
+    /logging in user|waiting for user info|waiting for confirmation|steam guard|two-factor|auth(?:entication)?\s*code|login failure|failed to log on|cached credentials not found|no cached credentials|logged in ok|login complete|successfully logged/i.test(
+      line
+    )
+  )
+}
+
 export function escapeInteractiveArg(value: string): string {
   if (value.length === 0) {
     return '""'

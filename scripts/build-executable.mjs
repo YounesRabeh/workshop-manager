@@ -4,8 +4,11 @@
  *  assembles the ordered build steps, and runs them when invoked as a CLI.
  */
 import { spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+
+const require = createRequire(import.meta.url)
 
 /**
  * Uses the Windows shim when packaging on win32 and the plain binary elsewhere.
@@ -32,24 +35,65 @@ export function getPackagingTargetForPlatform(platform) {
 
 export function getElectronBuilderArgsForPlatform(platform) {
   const mapping = getPackagingTargetForPlatform(platform)
-  return ['exec', 'electron-builder', mapping.platformArg, mapping.target, '--publish', 'never']
+  return [mapping.platformArg, mapping.target, '--publish', 'never']
+}
+
+function resolveElectronBuilderCliEntry() {
+  return require.resolve('electron-builder/cli.js')
+}
+
+export function normalizeBuildTargetPlatform(platform) {
+  if (platform === 'win32' || platform === 'darwin' || platform === 'linux') {
+    return platform
+  }
+  throw new Error(`Unsupported target platform for executable packaging: ${platform}`)
 }
 
 /**
- * Only `--generate-icon` is supported today; everything else is ignored on purpose.
+ * Parses the supported packaging flags while intentionally ignoring unrelated extras.
  */
 export function parseBuildExecutableOptions(argv = []) {
   const normalized = Array.isArray(argv) ? argv : []
+  const requestedTargets = new Set()
+
+  for (const arg of normalized) {
+    if (arg === '--win') {
+      requestedTargets.add('win32')
+      continue
+    }
+    if (arg === '--mac') {
+      requestedTargets.add('darwin')
+      continue
+    }
+    if (arg === '--linux') {
+      requestedTargets.add('linux')
+      continue
+    }
+    if (arg.startsWith('--platform=')) {
+      requestedTargets.add(normalizeBuildTargetPlatform(arg.slice('--platform='.length)))
+    }
+  }
+
+  if (requestedTargets.size > 1) {
+    throw new Error(
+      `Conflicting target platforms requested: ${[...requestedTargets].join(', ')}`
+    )
+  }
+
   return {
-    generateIcon: normalized.includes('--generate-icon')
+    generateIcon: normalized.includes('--generate-icon'),
+    targetPlatform: requestedTargets.size === 1 ? [...requestedTargets][0] : undefined
   }
 }
 
 /**
- * Builds the exact sequence used by `pnpm build:exe`, including optional icon sync.
+ * Builds the exact sequence used by the executable packaging scripts, including optional icon sync.
  */
 export function buildStepsForPlatform(platform, options = {}) {
   const pnpmCommand = resolvePnpmCommand(platform)
+  const targetPlatform = options.targetPlatform
+    ? normalizeBuildTargetPlatform(options.targetPlatform)
+    : platform
   const steps = [
     {
       label: 'Kill old app instance',
@@ -63,8 +107,8 @@ export function buildStepsForPlatform(platform, options = {}) {
     },
     {
       label: 'Package executable artifacts',
-      command: pnpmCommand,
-      args: getElectronBuilderArgsForPlatform(platform)
+      command: process.execPath,
+      args: [resolveElectronBuilderCliEntry(), ...getElectronBuilderArgsForPlatform(targetPlatform)]
     }
   ]
 
@@ -78,10 +122,13 @@ export function buildStepsForPlatform(platform, options = {}) {
 
   return steps
 }
-
 function runStep(step) {
   console.log(`\n[build:exe] ${step.label}`)
-  const result = spawnSync(step.command, step.args, { stdio: 'inherit', shell: false })
+  const result = spawnSync(step.command, step.args, {
+    stdio: 'inherit',
+    shell: false,
+    env: step.env ?? process.env
+  })
   if (result.status !== 0) {
     throw new Error(`[build:exe] Step failed: ${step.label}`)
   }

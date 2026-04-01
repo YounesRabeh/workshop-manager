@@ -21,6 +21,7 @@ import { AppError } from '@backend/utils/errors'
 import { ProfileStore } from '@backend/stores/profile-store'
 import { RunLogStore } from '@backend/stores/run-log-store'
 import { SteamCmdInstallManager } from '@backend/services/steamcmd-install-manager'
+import { resolveSteamCmdPlatformProfile } from '@backend/services/steamcmd-platform-profile'
 import { SteamCmdRuntimeService } from '@backend/services/steamcmd-runtime-service'
 import { getAppPaths } from '@backend/services/path-provider'
 import { listContentFolderFiles } from '@backend/services/content-folder-scanner'
@@ -87,16 +88,11 @@ async function migrateLegacyUserData(stableUserDataPath: string): Promise<void> 
     join(appDataPath, 'Workshop Manager'),
     join(appDataPath, 'steam-workshop-mod-manager')
   ].filter((candidate) => candidate !== stableUserDataPath)
-  let migratedAny = false
   for (const legacyPath of legacyCandidates) {
     if (!(await pathExists(legacyPath))) {
       continue
     }
     await copyMissingTree(legacyPath, stableUserDataPath)
-    migratedAny = true
-  }
-  if (migratedAny) {
-    console.log('[startup] Checked and merged legacy app data into stable userData path')
   }
 }
 
@@ -116,6 +112,10 @@ function resolveWindowIconPath(): string | undefined {
       ? ['app-icon.ico', 'app-icon.normalized.png', 'app-icon.png']
       : ['app-icon.normalized.png', 'app-icon.png', 'app-icon.icns']
   const candidateDirs = new Set<string>()
+  candidateDirs.add(join(process.cwd(), 'resources', 'img'))
+  candidateDirs.add(join(app.getAppPath(), 'resources', 'img'))
+  candidateDirs.add(join(__dirname, '../resources', 'img'))
+  candidateDirs.add(join(__dirname, '../../resources', 'img'))
   candidateDirs.add(join(process.cwd(), 'resources'))
   candidateDirs.add(join(app.getAppPath(), 'resources'))
   candidateDirs.add(join(__dirname, '../resources'))
@@ -243,10 +243,11 @@ app.whenReady().then(async () => {
 
   const paths = getAppPaths()
   await mkdir(paths.dataDir, { recursive: true })
+  const steamCmdPlatformProfile = resolveSteamCmdPlatformProfile()
 
   const profileStore = new ProfileStore(paths.profilesPath)
   const runLogStore = new RunLogStore(paths.runLogsDir)
-  const installManager = new SteamCmdInstallManager(paths.dataDir)
+  const installManager = new SteamCmdInstallManager(paths.dataDir, steamCmdPlatformProfile)
   installManager.setManualExecutablePath(await profileStore.getSteamCmdManualPath())
   const runtimeService = new SteamCmdRuntimeService(
     async () => {
@@ -257,7 +258,8 @@ app.whenReady().then(async () => {
       return status.executablePath
     },
     runLogStore,
-    paths.runtimeDir
+    paths.runtimeDir,
+    steamCmdPlatformProfile
   )
 
   const resolveSavedWebApiKey = async (): Promise<{
@@ -337,10 +339,14 @@ app.whenReady().then(async () => {
   ipcMain.handle(IPC_CHANNELS.login, async (_event, payload: LoginInput) => {
     try {
       const useStoredAuth = payload.useStoredAuth === true
-      const state = await runtimeService.login(payload.username, payload.password, useStoredAuth)
-      // Stored session needs username next launch, so keep username when rememberAuth is enabled.
       const rememberAuth = payload.rememberAuth === true
       const rememberUsername = payload.rememberUsername === true || rememberAuth
+      await profileStore.setRememberedLoginState({
+        rememberedUsername: rememberUsername ? payload.username : undefined,
+        rememberAuth
+      })
+      const state = await runtimeService.login(payload.username, payload.password, useStoredAuth)
+      // Stored session needs username next launch, so keep username when rememberAuth is enabled.
       await profileStore.setRememberedLoginState({
         rememberedUsername: rememberUsername ? payload.username : undefined,
         rememberAuth

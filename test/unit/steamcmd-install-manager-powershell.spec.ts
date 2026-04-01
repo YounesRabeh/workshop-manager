@@ -20,16 +20,6 @@ vi.mock('extract-zip', () => ({
 
 const { SteamCmdInstallManager } = await import('../../src/backend/services/steamcmd-install-manager')
 
-async function withPlatform<T>(platform: NodeJS.Platform, run: () => Promise<T> | T): Promise<T> {
-  const originalPlatform = process.platform
-  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
-  try {
-    return await run()
-  } finally {
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
-  }
-}
-
 describe('SteamCmdInstallManager Windows ZIP extraction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -57,19 +47,18 @@ describe('SteamCmdInstallManager Windows ZIP extraction', () => {
       await writeFile(join(options.dir, 'steamcmd.exe'), 'steamcmd', 'utf8')
     })
 
-    await withPlatform('win32', async () => {
-      const manager = new SteamCmdInstallManager(root)
-      const status = await manager.ensureInstalled()
-      const installLog = await manager.getInstallLog()
+    const manager = new SteamCmdInstallManager(root, 'windows')
+    const status = await manager.ensureInstalled()
+    const installLog = await manager.getInstallLog()
 
-      expect(status.installed).toBe(true)
-      expect(status.source).toBe('auto')
-      expect(extractZipMock).toHaveBeenCalledTimes(1)
-      expect(installLog.exists).toBe(true)
-      expect(installLog.content).toContain('SteamCMD install attempt started')
-      expect(installLog.content).toContain('Extracting ZIP archive in-process')
-      expect(installLog.content).toContain('SteamCMD install completed successfully')
-    })
+    expect(status.installed).toBe(true)
+    expect(status.source).toBe('auto')
+    expect(extractZipMock).toHaveBeenCalledTimes(1)
+    expect(installLog.exists).toBe(true)
+    expect(installLog.content).toContain('SteamCMD install attempt started')
+    expect(installLog.content).toContain('profile=windows')
+    expect(installLog.content).toContain('Extracting ZIP archive in-process')
+    expect(installLog.content).toContain('SteamCMD install completed successfully')
   })
 
   it('accepts nested steamcmd.exe after Windows extraction completes', async () => {
@@ -93,13 +82,11 @@ describe('SteamCmdInstallManager Windows ZIP extraction', () => {
       await writeFile(join(options.dir, 'portable', 'steamcmd.exe'), 'steamcmd', 'utf8')
     })
 
-    await withPlatform('win32', async () => {
-      const manager = new SteamCmdInstallManager(root)
-      const status = await manager.ensureInstalled()
+    const manager = new SteamCmdInstallManager(root, 'windows')
+    const status = await manager.ensureInstalled()
 
-      expect(status.installed).toBe(true)
-      expect(status.source).toBe('auto')
-      expect(status.executablePath).toBe(join(root, 'steamcmd', 'portable', 'steamcmd.exe'))
-    })
+    expect(status.installed).toBe(true)
+    expect(status.source).toBe('auto')
+    expect(status.executablePath).toBe(join(root, 'steamcmd', 'portable', 'steamcmd.exe'))
   })
 })
