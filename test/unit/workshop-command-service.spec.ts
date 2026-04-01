@@ -18,7 +18,7 @@ describe('WorkshopCommandService', () => {
   it('prepares upload command and writes a VDF file', async () => {
     const runtimeDir = await mkdtemp(join(tmpdir(), 'wm-command-'))
     try {
-      const service = new WorkshopCommandService(runtimeDir)
+      const service = new WorkshopCommandService(runtimeDir, 'linux')
       const command = await service.prepare(
         'alice',
         {
@@ -34,6 +34,7 @@ describe('WorkshopCommandService', () => {
 
       expect(command.runId).toMatch(/^\d+-[0-9a-f]+$/)
       expect(command.args.join(' ')).toContain('workshop_build_item')
+      expect(command.execution).toBe('interactive')
 
       const files = await readdir(runtimeDir)
       expect(files.some((file) => file.endsWith('.vdf'))).toBe(true)
@@ -46,7 +47,7 @@ describe('WorkshopCommandService', () => {
     vi.mocked(listContentFolderFiles).mockResolvedValueOnce([])
     const runtimeDir = await mkdtemp(join(tmpdir(), 'wm-command-'))
     try {
-      const service = new WorkshopCommandService(runtimeDir)
+      const service = new WorkshopCommandService(runtimeDir, 'linux')
 
       await expect(
         service.prepare(
@@ -64,6 +65,32 @@ describe('WorkshopCommandService', () => {
       ).rejects.toMatchObject({
         code: 'validation'
       } as Partial<AppError>)
+    } finally {
+      await rm(runtimeDir, { recursive: true, force: true })
+    }
+  })
+
+  it('marks Windows workshop commands for one-shot execution', async () => {
+    const runtimeDir = await mkdtemp(join(tmpdir(), 'wm-command-'))
+    try {
+      const service = new WorkshopCommandService(runtimeDir, 'windows')
+      const command = await service.prepare(
+        'alice',
+        {
+          appId: '480',
+          publishedFileId: '',
+          contentFolder: '/mods',
+          previewFile: '',
+          title: 'Test Upload',
+          changenote: ''
+        },
+        'upload'
+      )
+
+      expect(command.execution).toBe('one_shot')
+      expect(command.args.slice(0, 2)).toEqual(['+login', 'alice'])
+      expect(command.args).toContain('+workshop_build_item')
+      expect(command.args.at(-1)).toBe('+quit')
     } finally {
       await rm(runtimeDir, { recursive: true, force: true })
     }

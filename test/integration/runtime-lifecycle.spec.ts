@@ -501,11 +501,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
 
       if (args.join(' ') === '+login alice') {
         childRef = createInteractiveFakeChild(
-          {
-            workshopBuild: {
-              lines: ['Published File Id: 777', 'Success.']
-            }
-          },
+          {},
           {
             startupResponse: {
               lines: [
@@ -517,6 +513,12 @@ describe('SteamCmdRuntimeService lifecycle', () => {
           }
         )
         return childRef
+      }
+
+      if (args.includes('+workshop_build_item')) {
+        return createOneShotFakeChild({
+          lines: ['Published File Id: 777', 'Success.']
+        })
       }
 
       throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
@@ -541,8 +543,12 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     )
 
     expect(result.success).toBe(true)
-    expect(spawn).toHaveBeenCalledTimes(2)
-    expect(childRef?.commands.some((command) => command.startsWith('workshop_build_item '))).toBe(true)
+    expect(spawn).toHaveBeenCalledTimes(3)
+    expect(childRef?.commands).toHaveLength(0)
+    const uploadArgs = vi.mocked(spawn).mock.calls[2]?.[1]
+    expect(uploadArgs).toEqual(
+      expect.arrayContaining(['+login', 'alice', '+workshop_build_item', '+quit'])
+    )
   })
 
   it('fails update early when selected content folder has no files', async () => {
