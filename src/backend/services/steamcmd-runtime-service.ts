@@ -101,7 +101,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     this.workshopFetchService = new WorkshopFetchService({
       getLoginState: () => this.loginState
     })
-    this.workshopCommandService = new WorkshopCommandService(this.runtimeDir)
+    this.workshopCommandService = new WorkshopCommandService(this.runtimeDir, platformProfile)
   }
 
   private emitRunEvent(event: RunEvent): void {
@@ -348,7 +348,11 @@ export class SteamCmdRuntimeService extends EventEmitter {
     if (!this.loginState) {
       throw new AppError('auth', 'You must login before uploading or updating mods')
     }
-    if (this.platformBehavior.persistentSessionStartup === 'startup_args') {
+    const prepared = await this.workshopCommandService.prepare(this.loginState.username, draft, mode)
+    if (
+      prepared.execution === 'interactive' &&
+      this.platformBehavior.persistentSessionStartup === 'startup_args'
+    ) {
       try {
         await this.ensurePersistentWorkshopSession(this.loginState.username)
       } catch (error) {
@@ -361,16 +365,22 @@ export class SteamCmdRuntimeService extends EventEmitter {
       }
     }
 
-    const prepared = await this.workshopCommandService.prepare(this.loginState.username, draft, mode)
     this.emitRunEvent({ runId: prepared.runId, ts: Date.now(), type: 'phase_changed', phase: mode })
 
     let commandResult: { lines: string[]; exitCode: number }
     try {
-      commandResult = await this.processSession.run(prepared.runId, prepared.args, {
-        phase: mode,
-        timeoutMs: 60_000,
-        emitOutputEvents: true
-      })
+      commandResult =
+        prepared.execution === 'one_shot'
+          ? await this.processSession.runOneShot(prepared.runId, prepared.args, {
+              phase: mode,
+              timeoutMs: 60_000,
+              emitOutputEvents: true
+            })
+          : await this.processSession.run(prepared.runId, prepared.args, {
+              phase: mode,
+              timeoutMs: 60_000,
+              emitOutputEvents: true
+            })
     } catch (error) {
       const runError =
         error instanceof AppError ? error : new AppError('command_failed', errorMessage(error))

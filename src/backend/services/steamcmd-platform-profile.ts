@@ -16,6 +16,7 @@ export interface SteamCmdPlatformBehavior {
   hideWindowsConsole: boolean
   interactiveLineEnding: '\n' | '\r\n'
   loginExecution: 'interactive' | 'one_shot'
+  workshopExecution: 'interactive' | 'one_shot'
   persistentSessionStartup: 'empty_process' | 'startup_args'
   waitForPromptBeforeInteractiveLogin: boolean
   enableInteractiveLoginRetry: boolean
@@ -34,6 +35,7 @@ const STEAMCMD_PLATFORM_BEHAVIORS: Record<SteamCmdPlatformProfile, SteamCmdPlatf
     hideWindowsConsole: false,
     interactiveLineEnding: '\n',
     loginExecution: 'interactive',
+    workshopExecution: 'interactive',
     persistentSessionStartup: 'empty_process',
     waitForPromptBeforeInteractiveLogin: false,
     enableInteractiveLoginRetry: false,
@@ -50,6 +52,7 @@ const STEAMCMD_PLATFORM_BEHAVIORS: Record<SteamCmdPlatformProfile, SteamCmdPlatf
     hideWindowsConsole: true,
     interactiveLineEnding: '\r\n',
     loginExecution: 'one_shot',
+    workshopExecution: 'one_shot',
     persistentSessionStartup: 'startup_args',
     waitForPromptBeforeInteractiveLogin: true,
     enableInteractiveLoginRetry: true,
@@ -70,4 +73,3 @@ export function resolveSteamCmdPlatformProfile(platform: NodeJS.Platform = proce
 export function getSteamCmdPlatformBehavior(profile: SteamCmdPlatformProfile): SteamCmdPlatformBehavior {
   return STEAMCMD_PLATFORM_BEHAVIORS[profile]
 }
-
