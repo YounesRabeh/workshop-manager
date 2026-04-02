@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
+const root = resolve(fileURLToPath(new URL('../../../../', import.meta.url)))
 
 describe('frontend publish structure', () => {
   it('keeps publish feature grouped under components/publish subfolders', () => {

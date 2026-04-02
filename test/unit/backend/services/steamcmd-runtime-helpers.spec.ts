@@ -13,7 +13,7 @@ import {
   parseSteamId64,
   resolveLoginTimeoutMs,
   steamId64FromAccountId
-} from '../../src/backend/services/steamcmd-runtime-service'
+} from '@backend/services/steamcmd-runtime-service'
 
 describe('steamcmd runtime helpers', () => {
   it('builds workshop upload args in expected order', () => {

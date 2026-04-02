@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateDraft } from '../../src/backend/utils/validation'
+import { validateDraft } from '@backend/utils/validation'
 
 describe('validateDraft', () => {
   it('rejects create when appId/contentFolder/title are missing', () => {

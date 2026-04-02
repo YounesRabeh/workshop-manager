@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { useAuthFlow } from '../../src/frontend/composables/useAuthFlow'
+import { useAuthFlow } from '@frontend/composables/useAuthFlow'
 
 describe('useAuthFlow composable', () => {
   const workshop = {

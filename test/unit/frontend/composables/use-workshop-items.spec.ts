@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { useWorkshopItems } from '../../src/frontend/composables/useWorkshopItems'
+import { useWorkshopItems } from '@frontend/composables/useWorkshopItems'
 
 describe('useWorkshopItems composable', () => {
   const workshop = {

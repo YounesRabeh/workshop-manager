@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPowershellKillScript, isTargetProcessForProject } from '../../scripts/kill-old-instance.mjs'
+import { buildPowershellKillScript, isTargetProcessForProject } from '../../../../scripts/kill-old-instance.mjs'
 
 describe('kill-old-instance script helpers', () => {
   const projectRoot = '/home/yuyu/Desktop/DEV/Steam Projects/Mod Manager'

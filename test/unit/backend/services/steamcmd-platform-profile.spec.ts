@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getSteamCmdPlatformBehavior,
   resolveSteamCmdPlatformProfile
-} from '../../src/backend/services/steamcmd-platform-profile'
+} from '@backend/services/steamcmd-platform-profile'
 
 describe('steamcmd platform profile', () => {
   it('maps supported runtime platforms to internal SteamCMD profiles', () => {

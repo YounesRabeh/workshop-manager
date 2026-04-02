@@ -2,7 +2,7 @@ import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { RunLogStore } from '../../src/backend/stores/run-log-store'
+import { RunLogStore } from '@backend/stores/run-log-store'
 
 describe('RunLogStore batching', () => {
   it('preserves line order with batched writes', async () => {

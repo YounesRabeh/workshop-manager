@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SKIP_KILL_INSTANCE_FLAG } from '../../scripts/build-executable.mjs'
+import { SKIP_KILL_INSTANCE_FLAG } from '../../../../scripts/build-executable.mjs'
 import {
   CONTAINER_COREPACK_HOME,
   CONTAINER_ELECTRON_BUILDER_CACHE_DIR,
@@ -20,7 +20,7 @@ import {
   ensureCommandSucceeded,
   resolveHostIds,
   runDockerizedBuild
-} from '../../scripts/run-build-in-docker.mjs'
+} from '../../../../scripts/run-build-in-docker.mjs'
 
 describe('run-build-in-docker script helpers', () => {
   it('adds the internal skip-kill flag only for containerized packaging runs', () => {
