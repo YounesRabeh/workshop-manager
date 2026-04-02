@@ -18,6 +18,7 @@ import {
   createDockerRunArgs,
   createHostPreflightSteps,
   ensureCommandSucceeded,
+  resolveHostIds,
   runDockerizedBuild
 } from '../../scripts/run-build-in-docker.mjs'
 
@@ -66,6 +67,7 @@ describe('run-build-in-docker script helpers', () => {
       imageTag: 'mod-manager:test',
       uid: 1000,
       gid: 1001,
+      hostPlatform: 'linux',
       mountPaths,
       scriptName: 'build:exe:native',
       forwardedArgs: ['--win']
@@ -120,6 +122,16 @@ describe('run-build-in-docker script helpers', () => {
       {
         label: 'Kill old host app instance',
         command: 'pnpm',
+        args: ['kill:instance']
+      }
+    ])
+  })
+
+  it('uses the Windows pnpm shim for dockerized preflight steps on win32 hosts', () => {
+    expect(createHostPreflightSteps('build:exe:native', 'win32')).toEqual([
+      {
+        label: 'Kill old host app instance',
+        command: 'pnpm.cmd',
         args: ['kill:instance']
       }
     ])
@@ -199,6 +211,7 @@ describe('run-build-in-docker script helpers', () => {
           imageTag: identity.imageTag,
           uid: 1000,
           gid: 1000,
+          hostPlatform: 'linux',
           mountPaths,
           scriptName: 'build:exe:native',
           forwardedArgs: ['--win', '--generate-icon']
@@ -229,9 +242,33 @@ describe('run-build-in-docker script helpers', () => {
     ).toThrow('Docker daemon is unavailable. Start Docker and retry the build.')
   })
 
-  it('rejects non-linux docker build hosts', () => {
+  it('accepts linux and windows docker build hosts but rejects unsupported hosts', () => {
+    expect(() => assertSupportedDockerBuildHost('linux')).not.toThrow()
+    expect(() => assertSupportedDockerBuildHost('win32')).not.toThrow()
     expect(() => assertSupportedDockerBuildHost('darwin')).toThrow(
-      'Dockerized builds are currently supported on Linux hosts only. Current host: darwin'
+      'Dockerized builds are currently supported on Linux and Windows hosts only. Current host: darwin'
     )
+  })
+
+  it('omits linux-only docker run flags on win32 hosts', () => {
+    const projectDir = '/workspace/Mod Manager'
+    const mountPaths = createDockerMountPaths(projectDir, '/var/cache/workshop-manager')
+    const args = createDockerRunArgs({
+      projectDir,
+      imageTag: 'mod-manager:test',
+      hostPlatform: 'win32',
+      mountPaths,
+      scriptName: 'build:exe:native',
+      forwardedArgs: ['--linux']
+    })
+
+    expect(args).toContain('run')
+    expect(args).not.toContain('--user')
+    expect(args).not.toContain('--security-opt')
+    expect(args).toContain(`${projectDir}:${CONTAINER_PROJECT_DIR}`)
+  })
+
+  it('returns empty host ids on win32 docker hosts', () => {
+    expect(resolveHostIds('win32')).toEqual({})
   })
 })

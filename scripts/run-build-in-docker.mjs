@@ -27,11 +27,12 @@ export const CONTAINER_PNPM_STORE_DIR = '/pnpm/store'
 export const CONTAINER_COREPACK_HOME = '/pnpm/corepack'
 export const CONTAINER_ELECTRON_CACHE_DIR = '/home/builder/.cache/electron'
 export const CONTAINER_ELECTRON_BUILDER_CACHE_DIR = '/home/builder/.cache/electron-builder'
+export const SUPPORTED_DOCKER_BUILD_HOSTS = ['linux', 'win32']
 
 export function assertSupportedDockerBuildHost(platform = process.platform) {
-  if (platform !== 'linux') {
+  if (!SUPPORTED_DOCKER_BUILD_HOSTS.includes(platform)) {
     throw new Error(
-      `Dockerized builds are currently supported on Linux hosts only. Current host: ${platform}`
+      `Dockerized builds are currently supported on Linux and Windows hosts only. Current host: ${platform}`
     )
   }
 }
@@ -164,21 +165,28 @@ export function createDockerRunArgs({
   imageTag,
   uid,
   gid,
+  hostPlatform = process.platform,
   mountPaths,
   scriptName,
   forwardedArgs = []
 }) {
   const resolvedProjectDir = resolve(projectDir)
-
-  return [
+  const args = [
     'run',
     '--rm',
-    '--user',
-    `${uid}:${gid}`,
     '--workdir',
-    CONTAINER_PROJECT_DIR,
-    '--security-opt',
-    'label=disable',
+    CONTAINER_PROJECT_DIR
+  ]
+
+  if (typeof uid === 'number' && typeof gid === 'number') {
+    args.push('--user', `${uid}:${gid}`)
+  }
+
+  if (hostPlatform === 'linux') {
+    args.push('--security-opt', 'label=disable')
+  }
+
+  args.push(
     '--env',
     `HOME=${CONTAINER_HOME_DIR}`,
     '--env',
@@ -213,7 +221,9 @@ export function createDockerRunArgs({
     '/bin/bash',
     '-lc',
     createContainerShellCommand(scriptName, forwardedArgs)
-  ]
+  )
+
+  return args
 }
 
 export function formatCommandFailure(commandName, action, result) {
@@ -287,8 +297,12 @@ export function runStreamingCommand(commandName, args, options = {}, deps = {}) 
 export function resolveHostIds(platform = process.platform) {
   assertSupportedDockerBuildHost(platform)
 
+  if (platform === 'win32') {
+    return {}
+  }
+
   if (typeof process.getuid !== 'function' || typeof process.getgid !== 'function') {
-    throw new Error('Dockerized builds require POSIX uid/gid support on the host.')
+    throw new Error('Dockerized builds require POSIX uid/gid support on Linux hosts.')
   }
 
   return {
@@ -346,6 +360,7 @@ export async function runDockerizedBuild(options, deps = {}) {
       imageTag: identity.imageTag,
       uid: hostIds.uid,
       gid: hostIds.gid,
+      hostPlatform: platform,
       mountPaths,
       scriptName,
       forwardedArgs

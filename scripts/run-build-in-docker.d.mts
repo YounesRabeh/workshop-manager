@@ -9,6 +9,7 @@ export const CONTAINER_PNPM_STORE_DIR: '/pnpm/store'
 export const CONTAINER_COREPACK_HOME: '/pnpm/corepack'
 export const CONTAINER_ELECTRON_CACHE_DIR: '/home/builder/.cache/electron'
 export const CONTAINER_ELECTRON_BUILDER_CACHE_DIR: '/home/builder/.cache/electron-builder'
+export const SUPPORTED_DOCKER_BUILD_HOSTS: readonly ['linux', 'win32']
 
 export interface DockerBuildIdentity {
   projectSlug: string
@@ -53,7 +54,7 @@ export interface RunDockerizedBuildOptions {
   forwardedArgs?: string[]
   platform?: string
   hostCacheRoot?: string
-  hostIds?: { uid: number; gid: number }
+  hostIds?: { uid?: number; gid?: number }
 }
 
 export interface RunDockerizedBuildDeps {
@@ -105,8 +106,9 @@ export function createContainerShellCommand(scriptName: string, forwardedArgs?: 
 export function createDockerRunArgs(input: {
   projectDir: string
   imageTag: string
-  uid: number
-  gid: number
+  uid?: number
+  gid?: number
+  hostPlatform?: string
   mountPaths: DockerMountPaths
   scriptName: string
   forwardedArgs?: string[]
@@ -133,10 +135,7 @@ export function runStreamingCommand(
   options?: CommandOptions,
   deps?: RunDockerizedBuildDeps
 ): Promise<CommandResult>
-export function resolveHostIds(platform?: string): {
-  uid: number
-  gid: number
-}
+export function resolveHostIds(platform?: string): { uid?: number; gid?: number }
 export function runDockerizedBuild(
   options: RunDockerizedBuildOptions,
   deps?: RunDockerizedBuildDeps
