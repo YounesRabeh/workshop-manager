@@ -5,6 +5,10 @@
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { UploadDraft, WorkshopItemSummary } from '@shared/contracts'
+import {
+  visibilityLabel,
+  type PublishVisibility
+} from '../components/publish/model/visibility'
 import type { UploadDraftState } from '../types/ui'
 
 interface ApiFailure {
@@ -36,25 +40,12 @@ interface UsePublishActionsOptions {
   updateDraft: UploadDraftState
   createRequirements: ComputedRef<RequirementsResult>
   updateRequirements: ComputedRef<RequirementsResult>
-  hasPendingUpdateChanges: ComputedRef<boolean>
+  hasPendingUpdateChanges: () => boolean
   updateDraftCache: Ref<Record<string, UploadDraftState>>
   normalizeError: (error: unknown) => ApiFailure
   setStatusMessage: (message: string) => void
   showToast: (toast: ToastInput) => void
   onSelectWorkshopItem: (item: WorkshopItemSummary) => void
-}
-
-function visibilityLabel(value: 0 | 1 | 2 | 3): string {
-  if (value === 0) {
-    return 'Public'
-  }
-  if (value === 1) {
-    return 'Friends-only'
-  }
-  if (value === 2) {
-    return 'Hidden'
-  }
-  return 'Unlisted'
 }
 
 function actionFailureTitle(operation: 'upload' | 'update' | 'visibility'): string {
@@ -164,7 +155,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
       options.loginState.value === 'signed_in' &&
       options.selectedWorkshopItemId.value.trim().length > 0 &&
       options.updateRequirements.value.valid &&
-      options.hasPendingUpdateChanges.value
+      options.hasPendingUpdateChanges()
     )
   }
 
@@ -176,7 +167,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     ) {
       return 'Update blocked: title, app ID, and published file ID are required.'
     }
-    if (!options.hasPendingUpdateChanges.value) {
+    if (!options.hasPendingUpdateChanges()) {
       return 'Update blocked: no changes detected. Modify title/content/preview/release notes first.'
     }
     return 'Update blocked: requirements not met.'
@@ -341,15 +332,23 @@ export function usePublishActions(options: UsePublishActionsOptions) {
           ? { ...item, visibility: targetVisibility }
           : item
       )
-      options.setStatusMessage(`Visibility updated to ${visibilityLabel(targetVisibility)}.`)
+      options.setStatusMessage(`Visibility updated to ${visibilityLabel(targetVisibility as PublishVisibility)}.`)
       options.showToast({
         tone: 'success',
         title: 'Visibility Updated',
-        detail: `Changed to ${visibilityLabel(targetVisibility)}.`
+        detail: `Changed to ${visibilityLabel(targetVisibility as PublishVisibility)}.`
       })
     } catch (error) {
       handleActionFailure('visibility', error)
     }
+  }
+
+  function resetPublishActionState(): void {
+    committedVisibility.value = 0
+    pendingVisibility.value = 0
+    createVisibility.value = 2
+    isUpdateConfirmOpen.value = false
+    isCreateConfirmOpen.value = false
   }
 
   return {
@@ -372,6 +371,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     openUpdateConfirmation,
     closeUpdateConfirmation,
     confirmUpdateItem,
-    updateVisibilityOnly
+    updateVisibilityOnly,
+    resetPublishActionState
   }
 }

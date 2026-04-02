@@ -4,19 +4,18 @@
    publish/update flows, run-log UX, and shared app-level state/composable coordination.
 -->
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import type { RunEvent, WorkshopItemSummary } from '@shared/contracts'
 import { evaluateCreateRequirements, evaluateUpdateRequirements } from '@shared/workshop-requirements'
 import AppTopBar from './components/AppTopBar.vue'
+import AboutDialog from './components/dialogs/AboutDialog.vue'
+import ActionConfirmDialog from './components/dialogs/ActionConfirmDialog.vue'
 import CreatePublishSection from './components/publish/sections/CreatePublishSection.vue'
 import LoginSection from './components/LoginSection.vue'
 import LogsSection from './components/LogsSection.vue'
 import UpdatePublishSection from './components/publish/sections/UpdatePublishSection.vue'
 import WorkshopItemsSection from './components/WorkshopItemsSection.vue'
 import {
-  applyDraft,
-  cloneDraft,
-  createEmptyDraft,
   loadContentFolderFiles,
   useDrafts
 } from './composables/useDrafts'
@@ -24,6 +23,7 @@ import { useAuthFlow } from './composables/useAuthFlow'
 import { useAppBootstrap } from './composables/useAppBootstrap'
 import { usePublishActions } from './composables/usePublishActions'
 import { useUiShell } from './composables/useUiShell'
+import { useUpdateDraftCoordinator } from './composables/useUpdateDraftCoordinator'
 import { useWorkshopItems } from './composables/useWorkshopItems'
 import './styles/themes/app.theme.css'
 import './components/publish/styles/publish-section.shared.css'
@@ -53,39 +53,22 @@ const {
   clearCreatePreviewFile,
   clearUpdatePreviewFile,
   getDraftForMode,
+  resetDraftsState,
   setDraftField,
   setStagedFilesForMode,
   clearWorkspaceForMode
 } = useDrafts()
+
+let showTimeoutLogsHandler: () => Promise<void> = async () => undefined
+let hideTimeoutLogsHandler: () => void = () => undefined
+let signedInHandler: () => Promise<void> = async () => undefined
+let signedOutHandler: () => void = () => undefined
+
 const authFlow = useAuthFlow({
-  onShowTimeoutLogs: async () => {
-    await uiShell.showTimeoutLogs()
-  },
-  onHideTimeoutLogs: () => {
-    uiShell.showLoginLogs.value = false
-  },
-  onSignedIn: async () => {
-    flowStep.value = 'mods'
-    await Promise.all([loadWorkshopItems(), authFlow.refreshCurrentProfile()])
-  },
-  onSignedOut: () => {
-    publishProgress.reset()
-    selectedWorkshopItemId.value = ''
-    publishActions.committedVisibility.value = 0
-    publishActions.pendingVisibility.value = 0
-    publishActions.createVisibility.value = 2
-    workshopItems.value = []
-    workshopFilterAppId.value = ''
-    workshopVisibilityFilter.value = 'all'
-    applyDraft(createDraft, createEmptyDraft())
-    applyDraft(updateDraft, createEmptyDraft())
-    createStagedContentFiles.value = []
-    updateStagedContentFiles.value = []
-    updateDraftCache.value = {}
-    flowStep.value = 'mods'
-    publishActions.isUpdateConfirmOpen.value = false
-    publishActions.isCreateConfirmOpen.value = false
-  }
+  onShowTimeoutLogs: async () => showTimeoutLogsHandler(),
+  onHideTimeoutLogs: () => hideTimeoutLogsHandler(),
+  onSignedIn: async () => signedInHandler(),
+  onSignedOut: () => signedOutHandler()
 })
 
 const {
@@ -200,6 +183,7 @@ const filteredWorkshopItems = workshopStore.filteredWorkshopItems
 const onChangeAppId = workshopStore.onChangeAppId
 const onChangeWorkshopVisibilityFilter = workshopStore.onChangeWorkshopVisibilityFilter
 const selectedWorkshopItem = workshopStore.selectedWorkshopItem
+const resetWorkshopState = workshopStore.resetWorkshopState
 const canAccessUpdate = computed(() => canAccessMods.value && selectedWorkshopItem.value !== undefined)
 const createRequirements = computed(() => evaluateCreateRequirements(createDraft))
 const updateRequirements = computed(() => evaluateUpdateRequirements(updateDraft))
@@ -222,48 +206,8 @@ const shouldShowWorkshopItemsEmptyState = computed(() => {
 
   return workshopListMessage.value.trim().length > 0 || workshopItems.value.length > 0
 })
-
-function normalizeComparableTitle(value: string | undefined): string {
-  if (typeof value !== 'string') {
-    return ''
-  }
-  return value.replace(/\s+/g, ' ').trim().toLocaleLowerCase()
-}
-
-const hasMeaningfulUpdateTitleChange = computed(() => {
-  const selectedTitle = normalizeComparableTitle(selectedWorkshopItem.value?.title)
-  const draftTitle = normalizeComparableTitle(updateDraft.title)
-  if (!selectedTitle || !draftTitle) {
-    return false
-  }
-  return selectedTitle !== draftTitle
-})
-
-const hasPendingUpdateChanges = computed(() => {
-  const selectedItem = selectedWorkshopItem.value
-  if (!selectedItem) {
-    return false
-  }
-
-  const contentFolderChanged = updateDraft.contentFolder.trim().length > 0
-  const previewChanged = updateDraft.previewFile.trim().length > 0
-  const releaseNotesChanged = updateDraft.releaseNotes.trim().length > 0
-  const titleChanged = hasMeaningfulUpdateTitleChange.value
-
-  const appIdChanged =
-    updateDraft.appId.trim() !== (selectedItem.appId?.trim() ?? '')
-  const publishedFileIdChanged =
-    updateDraft.publishedFileId.trim() !== selectedItem.publishedFileId.trim()
-
-  return (
-    contentFolderChanged ||
-    previewChanged ||
-    releaseNotesChanged ||
-    titleChanged ||
-    appIdChanged ||
-    publishedFileIdChanged
-  )
-})
+let hasPendingUpdateChangesHandler: () => boolean = () => false
+let setVisibilityFromSelectionHandler: (value: 0 | 1 | 2 | 3) => void = () => undefined
 
 const publishActions = usePublishActions({
   loginState,
@@ -275,7 +219,7 @@ const publishActions = usePublishActions({
   updateDraft,
   createRequirements,
   updateRequirements,
-  hasPendingUpdateChanges,
+  hasPendingUpdateChanges: () => hasPendingUpdateChangesHandler(),
   updateDraftCache,
   normalizeError,
   setStatusMessage: (message) => {
@@ -294,7 +238,6 @@ const {
   isUpdateConfirmOpen,
   isCreateConfirmOpen,
   canChangeVisibility,
-  visibilityLabel,
   setPendingVisibility,
   setCreateVisibility,
   setVisibilityFromSelection,
@@ -306,8 +249,31 @@ const {
   openUpdateConfirmation,
   closeUpdateConfirmation,
   confirmUpdateItem,
-  updateVisibilityOnly
+  updateVisibilityOnly,
+  resetPublishActionState
 } = publishActions
+
+const updateFlowCoordinator = useUpdateDraftCoordinator({
+  flowStep,
+  selectedWorkshopItemId,
+  selectedWorkshopItem,
+  workshopItems,
+  updateDraft,
+  updateDraftCache,
+  isHydratingUpdateDraft,
+  setVisibilityFromSelection: (value) => setVisibilityFromSelectionHandler(value),
+  setStatusMessage: (message) => {
+    statusMessage.value = message
+  }
+})
+const {
+  hasMeaningfulUpdateTitleChange,
+  hasPendingUpdateChanges,
+  hydrateSelectedWorkshopItem,
+  reconcileWorkshopSelection
+} = updateFlowCoordinator
+hasPendingUpdateChangesHandler = () => hasPendingUpdateChanges.value
+setVisibilityFromSelectionHandler = setVisibilityFromSelection
 
 const updateChecklist = computed<PublishChecklistItem[]>(() => {
   return [
@@ -332,6 +298,24 @@ const publishProgressVisible = publishProgress.visible
 const publishProgressPercent = publishProgress.percent
 const publishProgressLabel = publishProgress.label
 const publishProgressTitle = publishProgress.title
+
+showTimeoutLogsHandler = async () => {
+  await uiShell.showTimeoutLogs()
+}
+hideTimeoutLogsHandler = () => {
+  uiShell.showLoginLogs.value = false
+}
+signedInHandler = async () => {
+  flowStep.value = 'mods'
+  await Promise.all([loadWorkshopItems(), authFlow.refreshCurrentProfile()])
+}
+signedOutHandler = () => {
+  publishProgress.reset()
+  resetPublishActionState()
+  resetWorkshopState()
+  resetDraftsState()
+  flowStep.value = 'mods'
+}
 
 function handleRunEvent(event: RunEvent): void {
   handleAuthRunEvent(event)
@@ -382,34 +366,7 @@ async function loadWorkshopItems(): Promise<void> {
 
 async function resetWorkshopAppIdFilter(): Promise<void> {
   await workshopStore.resetAppIdFilter()
-}
-
-function hydrateSelectedWorkshopItem(
-  item: WorkshopItemSummary,
-  options: { navigateToUpdate?: boolean } = {}
-): void {
-  selectedWorkshopItemId.value = item.publishedFileId
-  const cached = updateDraftCache.value[item.publishedFileId]
-  const visibility = item.visibility ?? 0
-
-  isHydratingUpdateDraft.value = true
-  if (cached) {
-    applyDraft(updateDraft, cached)
-  } else {
-    applyDraft(updateDraft, {
-      ...createEmptyDraft(),
-      appId: item.appId ?? '',
-      publishedFileId: item.publishedFileId,
-      title: item.title
-    })
-  }
-  isHydratingUpdateDraft.value = false
-
-  setVisibilityFromSelection(visibility)
-  statusMessage.value = `Loaded workshop item: ${item.title}`
-  if (options.navigateToUpdate !== false) {
-    flowStep.value = 'update'
-  }
+  reconcileWorkshopSelection()
 }
 
 function selectWorkshopItem(item: WorkshopItemSummary): void {
@@ -469,41 +426,6 @@ async function pickUpdatePreviewFile(): Promise<void> {
   const path = await window.workshop.pickFile()
   if (path) {
     updateDraft.previewFile = path
-  }
-}
-
-watch(
-  updateDraft,
-  () => {
-    if (isHydratingUpdateDraft.value) {
-      return
-    }
-    const itemId = selectedWorkshopItemId.value.trim()
-    if (!itemId) {
-      return
-    }
-    updateDraftCache.value[itemId] = cloneDraft(updateDraft)
-  },
-  { deep: true }
-)
-
-function reconcileWorkshopSelection(): void {
-  const selectedId = selectedWorkshopItemId.value.trim()
-  const hasCurrentSelection =
-    selectedId.length > 0 &&
-    workshopItems.value.some((item) => item.publishedFileId === selectedId)
-
-  if (hasCurrentSelection) {
-    return
-  }
-
-  if (workshopItems.value.length > 0) {
-    hydrateSelectedWorkshopItem(workshopItems.value[0], { navigateToUpdate: false })
-    return
-  }
-
-  if (flowStep.value === 'update') {
-    flowStep.value = 'mods'
   }
 }
 </script>
@@ -682,80 +604,29 @@ function reconcileWorkshopSelection(): void {
           @upload="openCreateConfirmation"
         />
 
-        <div
-          v-if="isUpdateConfirmOpen"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
-          @click.self="closeUpdateConfirmation"
-        >
-          <article class="w-full max-w-md rounded-xl border border-[#2a475e] bg-[#162534] p-5 shadow-2xl">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Confirm Update</p>
-            <h2 class="mt-1 text-xl font-bold text-slate-100">Update Workshop Item?</h2>
-            <p class="mt-2 text-sm text-slate-300">
-              You are about to update:
-              <span class="font-semibold text-slate-100">{{ selectedWorkshopItem?.title || updateDraft.title || 'Selected item' }}</span>
-            </p>
-            <p class="mt-2 text-xs text-slate-400">This will push your current draft metadata/content to Steam Workshop.</p>
-            <div class="mt-4 flex justify-end gap-2">
-              <button class="steam-btn-muted rounded px-3 py-1.5 text-xs font-semibold" @click="closeUpdateConfirmation">
-                Cancel
-              </button>
-              <button
-                class="rounded border border-[#78c2f7] bg-[#2c7fb2] px-3 py-1.5 text-xs font-semibold text-slate-100"
-                @click="confirmUpdateItem"
-              >
-                Update Item
-              </button>
-            </div>
-          </article>
-        </div>
+        <ActionConfirmDialog
+          :open="isUpdateConfirmOpen"
+          kicker="Confirm Update"
+          title="Update Workshop Item?"
+          :subject="selectedWorkshopItem?.title || updateDraft.title || 'Selected item'"
+          description="This will push your current draft metadata/content to Steam Workshop."
+          confirm-label="Update Item"
+          @close="closeUpdateConfirmation"
+          @confirm="confirmUpdateItem"
+        />
 
-        <div
-          v-if="isCreateConfirmOpen"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
-          @click.self="closeCreateConfirmation"
-        >
-          <article class="w-full max-w-md rounded-xl border border-[#2a475e] bg-[#162534] p-5 shadow-2xl">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Confirm Create</p>
-            <h2 class="mt-1 text-xl font-bold text-slate-100">Create Workshop Item?</h2>
-            <p class="mt-2 text-sm text-slate-300">
-              You are about to create:
-              <span class="font-semibold text-slate-100">{{ createDraft.title || 'New item' }}</span>
-            </p>
-            <p class="mt-2 text-xs text-slate-400">This will upload a new workshop item with your current create draft settings.</p>
-            <div class="mt-4 flex justify-end gap-2">
-              <button class="steam-btn-muted rounded px-3 py-1.5 text-xs font-semibold" @click="closeCreateConfirmation">
-                Cancel
-              </button>
-              <button
-                class="rounded border border-[#78c2f7] bg-[#2c7fb2] px-3 py-1.5 text-xs font-semibold text-slate-100"
-                @click="confirmCreateItem"
-              >
-                Create Item
-              </button>
-            </div>
-          </article>
-        </div>
+        <ActionConfirmDialog
+          :open="isCreateConfirmOpen"
+          kicker="Confirm Create"
+          title="Create Workshop Item?"
+          :subject="createDraft.title || 'New item'"
+          description="This will upload a new workshop item with your current create draft settings."
+          confirm-label="Create Item"
+          @close="closeCreateConfirmation"
+          @confirm="confirmCreateItem"
+        />
 
-        <div
-          v-if="isAboutOpen"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
-          @click.self="closeAboutModal"
-        >
-          <article class="w-full max-w-md rounded-xl border border-[#2a475e] bg-[#162534] p-5 shadow-2xl">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">About</p>
-            <h2 class="mt-1 text-xl font-bold text-slate-100">Workshop Manager</h2>
-            <p class="mt-2 text-sm text-slate-300">
-              Developer utility for Steam Workshop uploads and updates.
-            </p>
-            <p class="mt-2 text-xs text-slate-400">
-              Version: <span class="font-semibold text-slate-200">v{{ appVersion || 'dev' }}</span>
-            </p>
-            <p class="mt-3 text-xs text-slate-400">* Not an official Steam product.</p>
-            <div class="mt-4 flex justify-end">
-              <button class="steam-btn-muted rounded px-3 py-1.5 text-xs font-semibold" @click="closeAboutModal">Close</button>
-            </div>
-          </article>
-        </div>
+        <AboutDialog :open="isAboutOpen" :app-version="appVersion" @close="closeAboutModal" />
       </div>
     </template>
   </main>

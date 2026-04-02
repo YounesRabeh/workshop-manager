@@ -45,7 +45,6 @@ describe('usePublishActions composable', () => {
     })
     const createRequirements = computed(() => ({ valid: true, appId: true, contentFolder: true, title: true }))
     const updateRequirements = computed(() => ({ valid: true, appId: true, publishedFileId: true, title: true }))
-    const hasPendingUpdateChanges = computed(() => options?.hasPendingUpdateChanges ?? true)
     const updateDraftCache = ref<Record<string, typeof updateDraft>>({})
     const statuses: string[] = []
     const toasts: Array<{ title: string; tone: string }> = []
@@ -60,7 +59,7 @@ describe('usePublishActions composable', () => {
       updateDraft,
       createRequirements,
       updateRequirements,
-      hasPendingUpdateChanges,
+      hasPendingUpdateChanges: () => options?.hasPendingUpdateChanges ?? true,
       updateDraftCache,
       normalizeError: (error) => ({ code: 'command_failed', message: error instanceof Error ? error.message : 'error' }),
       setStatusMessage: (message) => {

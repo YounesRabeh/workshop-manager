@@ -177,6 +177,15 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     }
   }
 
+  function resetWorkshopState(): void {
+    workshopFilterAppId.value = ''
+    workshopVisibilityFilter.value = 'all'
+    workshopItems.value = []
+    selectedWorkshopItemId.value = ''
+    workshopListMessage.value = ''
+    hasWorkshopItemsError.value = false
+  }
+
   return {
     workshopFilterAppId,
     workshopVisibilityFilter,
@@ -192,6 +201,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     loadWorkshopItems,
     resetAppIdFilter,
     openSelectedWorkshopItem,
-    refreshSelectedWorkshopItem
+    refreshSelectedWorkshopItem,
+    resetWorkshopState
   }
 }

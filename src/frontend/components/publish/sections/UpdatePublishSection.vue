@@ -44,7 +44,7 @@ const emit = defineEmits<{
   (e: 'update-visibility-only'): void
 }>()
 
-const sectionTitle = 'Update Selected Workshop Item'
+const sectionTitle = 'Update Workshop Item'
 const readinessTitle = 'Update Readiness'
 const selectedItemDisplay = computed(() => props.selectedWorkshopItem?.title || props.selectedWorkshopItem?.publishedFileId || 'No item selected')
 const selectedItemPreviewUrl = computed(() => props.selectedWorkshopItem?.previewUrl || '')

@@ -244,6 +244,14 @@ export function useDrafts() {
     setStagedFilesForMode(mode, [])
   }
 
+  function resetDraftsState(): void {
+    applyDraft(createDraft, createEmptyDraft())
+    applyDraft(updateDraft, createEmptyDraft())
+    updateDraftCache.value = {}
+    createStagedContentFiles.value = []
+    updateStagedContentFiles.value = []
+  }
+
   return {
     createDraft,
     updateDraft,
@@ -261,6 +269,7 @@ export function useDrafts() {
     getStagedFilesForMode,
     setDraftField,
     setStagedFilesForMode,
-    clearWorkspaceForMode
+    clearWorkspaceForMode,
+    resetDraftsState
   }
 }
