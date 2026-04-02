@@ -6,9 +6,6 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 > `pnpm dev`, `pnpm preview`, `pnpm test`, and `pnpm typecheck` run natively on the host.
 > All `pnpm build*` and `pnpm release` packaging commands run through Docker on Linux or Windows.
 
-> [!TIP]
-> The public scripts are cross-platform now: Linux and Windows hosts use the same `pnpm` commands for local dev, preview, testing, and packaging.
-
 ## Screenshots
 
 | Screenshot 1 | Screenshot 2 |
@@ -24,6 +21,10 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 - Changes Workshop item visibility
 - Persists profiles, settings, and run logs locally
 - Keeps the Electron boundary locked down with `nodeIntegration: false`, `contextIsolation: true`, and a preload bridge
+
+> [!IMPORTANT]
+> Authentication currently supports Steam Guard flows only.
+> Email-based Steam authentication is not implemented yet.
 
 ## Requirements
 
