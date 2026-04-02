@@ -16,6 +16,7 @@ import type {
   UploadInput,
   VisibilityUpdateInput
 } from '@shared/contracts'
+import { normalizeSteamCmdTimeoutSettings } from '@shared/runtime-settings'
 import { AppError } from '@backend/utils/errors'
 import { ProfileStore } from '@backend/stores/profile-store'
 import { RunLogStore } from '@backend/stores/run-log-store'
@@ -101,6 +102,7 @@ app.whenReady().then(async () => {
     paths.runtimeDir,
     steamCmdPlatformProfile
   )
+  runtimeService.setTimeoutSettings(await profileStore.getTimeoutSettings())
 
   const resolveSavedWebApiKey = async (): Promise<{
     key?: string
@@ -142,6 +144,7 @@ app.whenReady().then(async () => {
     const resolvedKey = await resolveSavedWebApiKey()
     const steamCmdManualPath = await profileStore.getSteamCmdManualPath()
     const steamCmdStatus = await installManager.getStatus()
+    const timeoutSettings = await profileStore.getTimeoutSettings()
     const effectiveWebApiEnabled = storedWebApiEnabled && resolvedKey.hasUsableKey
     if (storedWebApiEnabled !== effectiveWebApiEnabled) {
       await profileStore.setWebApiEnabled(effectiveWebApiEnabled)
@@ -153,7 +156,8 @@ app.whenReady().then(async () => {
       secureStorageAvailable: resolvedKey.secureStorageAvailable,
       steamCmdManualPath,
       steamCmdInstalled: steamCmdStatus.installed,
-      steamCmdSource: steamCmdStatus.source
+      steamCmdSource: steamCmdStatus.source,
+      timeouts: timeoutSettings
     }
   }
 
@@ -263,6 +267,11 @@ app.whenReady().then(async () => {
     const previousSteamCmdManualPathValue = previousSteamCmdManualPath?.trim() ?? ''
     let nextEncryptedWebApiKey = await profileStore.getWebApiKeyEncrypted()
     let nextSteamCmdManualPath = previousSteamCmdManualPath
+    const currentTimeoutSettings = await profileStore.getTimeoutSettings()
+    const nextTimeoutSettings = normalizeSteamCmdTimeoutSettings({
+      ...currentTimeoutSettings,
+      ...payload.timeouts
+    })
 
     if (payload.clearWebApiKey === true) {
       nextEncryptedWebApiKey = undefined
@@ -294,8 +303,10 @@ app.whenReady().then(async () => {
     await profileStore.setAdvancedSettingsState({
       webApiEnabled: nextWebApiEnabled,
       webApiKeyEncrypted: nextEncryptedWebApiKey,
-      steamCmdManualPath: nextSteamCmdManualPath
+      steamCmdManualPath: nextSteamCmdManualPath,
+      timeoutSettings: nextTimeoutSettings
     })
+    runtimeService.setTimeoutSettings(nextTimeoutSettings)
 
     return await getAdvancedSettings()
   })

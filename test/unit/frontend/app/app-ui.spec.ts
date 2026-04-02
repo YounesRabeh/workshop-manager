@@ -27,20 +27,40 @@ const workshop = {
     secureStorageAvailable: true,
     steamCmdManualPath: undefined,
     steamCmdInstalled: true,
-    steamCmdSource: 'auto'
+    steamCmdSource: 'auto',
+    timeouts: {
+      loginTimeoutMs: 30_000,
+      storedSessionTimeoutMs: 10_000,
+      workshopTimeoutMs: 60_000
+    }
   })),
   getInstallLog: vi.fn(async () => ({
     path: '/tmp/steamcmd-install.log',
     content: '[install] example log',
     exists: true
   })),
-  saveAdvancedSettings: vi.fn(async (payload: { webApiEnabled: boolean; webApiKey?: string; clearWebApiKey?: boolean; steamCmdManualPath?: string }) => ({
+  saveAdvancedSettings: vi.fn(async (payload: {
+    webApiEnabled: boolean
+    webApiKey?: string
+    clearWebApiKey?: boolean
+    steamCmdManualPath?: string
+    timeouts?: {
+      loginTimeoutMs?: number
+      storedSessionTimeoutMs?: number
+      workshopTimeoutMs?: number
+    }
+  }) => ({
     webApiEnabled: payload.webApiEnabled,
     hasWebApiKey: Boolean(payload.webApiKey && payload.webApiKey.trim().length > 0 && !payload.clearWebApiKey),
     secureStorageAvailable: true,
     steamCmdManualPath: payload.steamCmdManualPath?.trim() || undefined,
     steamCmdInstalled: true,
-    steamCmdSource: payload.steamCmdManualPath?.trim() ? 'manual' : 'auto'
+    steamCmdSource: payload.steamCmdManualPath?.trim() ? 'manual' : 'auto',
+    timeouts: {
+      loginTimeoutMs: payload.timeouts?.loginTimeoutMs ?? 30_000,
+      storedSessionTimeoutMs: payload.timeouts?.storedSessionTimeoutMs ?? 10_000,
+      workshopTimeoutMs: payload.timeouts?.workshopTimeoutMs ?? 60_000
+    }
   })),
   getCurrentProfile: vi.fn(async () => ({
     steamId64: '76561197960265729',
@@ -275,6 +295,33 @@ describe('App UI validation gates', () => {
     await quitButton?.trigger('click')
     await flushPromises()
 
+    expect(workshop.quitApp).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears saved session before quitting after keep-signed-in is unticked', async () => {
+    workshop.getProfiles.mockResolvedValueOnce({
+      profiles: [],
+      rememberedUsername: 'alice',
+      rememberAuth: true,
+      hasStoredAuth: true
+    })
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    expect(checkboxes.length).toBeGreaterThanOrEqual(2)
+    await checkboxes[1].setValue(false)
+    await flushPromises()
+
+    const quitButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Quit')
+    expect(quitButton).toBeDefined()
+    await quitButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.clearStoredSession).toHaveBeenCalledTimes(1)
     expect(workshop.quitApp).toHaveBeenCalledTimes(1)
   })
 
@@ -538,7 +585,12 @@ describe('App UI validation gates', () => {
       secureStorageAvailable: true,
       steamCmdManualPath: undefined,
       steamCmdInstalled: true,
-      steamCmdSource: 'auto'
+      steamCmdSource: 'auto',
+      timeouts: {
+        loginTimeoutMs: 30_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
     })
 
     const wrapper = mount(App)
@@ -578,6 +630,51 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).toContain('Version: v0.1.0')
   })
 
+  it('opens the signed-in settings dialog and saves timeout settings', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const settingsButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Settings')
+    expect(settingsButton).toBeDefined()
+    await settingsButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Application Settings')
+
+    const timeoutInputs = wrapper.findAll('input[type="number"]')
+    expect(timeoutInputs).toHaveLength(3)
+    await timeoutInputs[0].setValue('45000')
+    await timeoutInputs[1].setValue('15000')
+    await timeoutInputs[2].setValue('120000')
+
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Save Settings'))
+    expect(saveButton).toBeDefined()
+    await saveButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
+      webApiEnabled: false,
+      webApiKey: undefined,
+      steamCmdManualPath: '',
+      timeouts: {
+        loginTimeoutMs: 45_000,
+        storedSessionTimeoutMs: 15_000,
+        workshopTimeoutMs: 120_000
+      }
+    })
+  })
+
   it('saves advanced web api settings from login panel', async () => {
     const wrapper = mount(App)
     await flushPromises()
@@ -603,7 +700,12 @@ describe('App UI validation gates', () => {
     expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
       webApiEnabled: true,
       webApiKey: 'dev-key-123',
-      steamCmdManualPath: ''
+      steamCmdManualPath: '',
+      timeouts: {
+        loginTimeoutMs: 30_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
     })
   })
 
@@ -628,7 +730,12 @@ describe('App UI validation gates', () => {
     expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
       webApiEnabled: false,
       webApiKey: undefined,
-      steamCmdManualPath: ''
+      steamCmdManualPath: '',
+      timeouts: {
+        loginTimeoutMs: 30_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
     })
   })
 
@@ -639,7 +746,12 @@ describe('App UI validation gates', () => {
       secureStorageAvailable: true,
       steamCmdManualPath: undefined,
       steamCmdInstalled: true,
-      steamCmdSource: 'auto'
+      steamCmdSource: 'auto',
+      timeouts: {
+        loginTimeoutMs: 30_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
     })
 
     const wrapper = mount(App)
@@ -698,7 +810,12 @@ describe('App UI validation gates', () => {
     expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
       webApiEnabled: false,
       webApiKey: undefined,
-      steamCmdManualPath: '/tools/steamcmd.sh'
+      steamCmdManualPath: '/tools/steamcmd.sh',
+      timeouts: {
+        loginTimeoutMs: 30_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
     })
   })
 
@@ -709,7 +826,12 @@ describe('App UI validation gates', () => {
       secureStorageAvailable: false,
       steamCmdManualPath: undefined,
       steamCmdInstalled: true,
-      steamCmdSource: 'auto'
+      steamCmdSource: 'auto',
+      timeouts: {
+        loginTimeoutMs: 30_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
     })
     workshop.saveAdvancedSettings.mockResolvedValueOnce({
       webApiEnabled: false,
@@ -717,7 +839,12 @@ describe('App UI validation gates', () => {
       secureStorageAvailable: false,
       steamCmdManualPath: '/tools/steamcmd.sh',
       steamCmdInstalled: true,
-      steamCmdSource: 'manual'
+      steamCmdSource: 'manual',
+      timeouts: {
+        loginTimeoutMs: 30_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
     })
 
     const wrapper = mount(App)
@@ -748,7 +875,12 @@ describe('App UI validation gates', () => {
     expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
       webApiEnabled: false,
       webApiKey: undefined,
-      steamCmdManualPath: '/tools/steamcmd.sh'
+      steamCmdManualPath: '/tools/steamcmd.sh',
+      timeouts: {
+        loginTimeoutMs: 30_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
     })
   })
 

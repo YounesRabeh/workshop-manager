@@ -14,6 +14,11 @@ import type {
   UploadDraft,
   WorkshopItemSummary
 } from '@shared/contracts'
+import {
+  DEFAULT_STEAMCMD_TIMEOUT_SETTINGS,
+  normalizeSteamCmdTimeoutSettings,
+  type SteamCmdTimeoutSettings
+} from '@shared/runtime-settings'
 import { AppError, isRunCancelledError } from '@backend/utils/errors'
 import { RunLogStore } from '@backend/stores/run-log-store'
 import {
@@ -55,8 +60,11 @@ function createRunId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
 }
 
-function resolveLoginTimeoutMs(useStoredAuth: boolean): number {
-  return useStoredAuth ? 10_000 : 30_000
+function resolveLoginTimeoutMs(
+  useStoredAuth: boolean,
+  settings: SteamCmdTimeoutSettings = DEFAULT_STEAMCMD_TIMEOUT_SETTINGS
+): number {
+  return useStoredAuth ? settings.storedSessionTimeoutMs : settings.loginTimeoutMs
 }
 
 function errorMessage(error: unknown): string {
@@ -90,6 +98,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
   private readonly workshopCommandService: WorkshopCommandService
   private readonly steamIdentityResolver: SteamIdentityResolver
   private readonly platformBehavior: SteamCmdPlatformBehavior
+  private timeoutSettings = DEFAULT_STEAMCMD_TIMEOUT_SETTINGS
 
   constructor(
     private readonly steamCmdExecutablePath: () => Promise<string>,
@@ -113,6 +122,10 @@ export class SteamCmdRuntimeService extends EventEmitter {
       getLoginState: () => this.loginState
     })
     this.workshopCommandService = new WorkshopCommandService(this.runtimeDir, platformProfile)
+  }
+
+  setTimeoutSettings(settings: SteamCmdTimeoutSettings): void {
+    this.timeoutSettings = normalizeSteamCmdTimeoutSettings(settings)
   }
 
   private emitRunEvent(event: RunEvent): void {
@@ -198,7 +211,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
     const runId = createRunId()
     const args = this.processSession.buildLoginArgs(normalizedUsername, password, useStoredAuth)
-    const timeoutMs = resolveLoginTimeoutMs(useStoredAuth)
+    const timeoutMs = resolveLoginTimeoutMs(useStoredAuth, this.timeoutSettings)
 
     if (
       useStoredAuth &&
@@ -450,12 +463,12 @@ export class SteamCmdRuntimeService extends EventEmitter {
         prepared.execution === 'one_shot'
           ? await this.processSession.runOneShot(prepared.runId, prepared.args, {
               phase: mode,
-              timeoutMs: 60_000,
+              timeoutMs: this.timeoutSettings.workshopTimeoutMs,
               emitOutputEvents: true
             })
           : await this.processSession.run(prepared.runId, prepared.args, {
               phase: mode,
-              timeoutMs: 60_000,
+              timeoutMs: this.timeoutSettings.workshopTimeoutMs,
               emitOutputEvents: true
             })
     } catch (error) {
@@ -484,7 +497,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
       if (runError.code === 'timeout' && mode === 'upload') {
         throw new AppError(
           'timeout',
-          'Steam upload timed out after 60s. Steam may still finish creating the item in the background. Refresh My Workshop Items to confirm.'
+          `Steam upload timed out after ${Math.round(this.timeoutSettings.workshopTimeoutMs / 1000)}s. Steam may still finish creating the item in the background. Refresh My Workshop Items to confirm.`
         )
       }
 

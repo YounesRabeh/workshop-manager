@@ -1,3 +1,5 @@
+import type { SteamCmdTimeoutSettings } from './runtime-settings'
+
 /**
  * Overview: Declares shared TypeScript contracts used across Electron main, preload, and renderer layers.
  * Responsibility: Defines canonical data models, IPC payload/result shapes, and error/run/install typing for end-to-end consistency.
@@ -109,6 +111,7 @@ export interface AdvancedSettings {
   steamCmdManualPath?: string
   steamCmdInstalled: boolean
   steamCmdSource: InstallSource
+  timeouts: SteamCmdTimeoutSettings
 }
 
 export interface SaveAdvancedSettingsInput {
@@ -116,6 +119,7 @@ export interface SaveAdvancedSettingsInput {
   webApiKey?: string
   clearWebApiKey?: boolean
   steamCmdManualPath?: string
+  timeouts?: Partial<SteamCmdTimeoutSettings>
 }
 
 export interface SteamGuardInput {

@@ -279,6 +279,11 @@
   justify-content: start;
 }
 
+.advanced-timeout-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
 .advanced-input {
   width: 100%;
   min-width: 0;
@@ -354,6 +359,10 @@
   .advanced-key-row {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
+  }
+
+  .advanced-timeout-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

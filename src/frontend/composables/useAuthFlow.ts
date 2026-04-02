@@ -106,6 +106,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     advancedSettings,
     setWebApiKey,
     setSteamCmdManualPath,
+    setLoginTimeoutMs,
+    setStoredSessionTimeoutMs,
+    setWorkshopTimeoutMs,
     toggleAdvancedOptions,
     ensureSteamCmdInstalled,
     openInstallLog,
@@ -451,6 +454,13 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   }
 
   async function quitApp(): Promise<void> {
+    if (!loginForm.rememberAuth && hasPersistedStoredSession.value) {
+      await clearStoredSession()
+      if (hasPersistedStoredSession.value) {
+        return
+      }
+    }
+
     try {
       await window.workshop.quitApp()
     } catch {
@@ -608,6 +618,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     setWebApiKeyPeek,
     setWebApiKey,
     setSteamCmdManualPath,
+    setLoginTimeoutMs,
+    setStoredSessionTimeoutMs,
+    setWorkshopTimeoutMs,
     toggleAdvancedOptions,
     setSteamGuardCode,
     ensureSteamCmdInstalled,

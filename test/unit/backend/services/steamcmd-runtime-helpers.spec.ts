@@ -88,6 +88,13 @@ describe('steamcmd runtime helpers', () => {
   it('uses a longer timeout for full logins than stored-session reuse', () => {
     expect(resolveLoginTimeoutMs(false)).toBe(30_000)
     expect(resolveLoginTimeoutMs(true)).toBe(10_000)
+    expect(
+      resolveLoginTimeoutMs(true, {
+        loginTimeoutMs: 45_000,
+        storedSessionTimeoutMs: 12_000,
+        workshopTimeoutMs: 90_000
+      })
+    ).toBe(12_000)
   })
 
   it('rejects placeholder Steam account ids when deriving steamId64', () => {

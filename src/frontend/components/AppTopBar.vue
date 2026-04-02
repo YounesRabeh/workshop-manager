@@ -22,6 +22,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'navigate', step: FlowStep): void
+  (e: 'open-settings'): void
   (e: 'open-about'): void
   (e: 'toggle-fullscreen'): void
   (e: 'sign-out'): void
@@ -57,6 +58,7 @@ const avatarSrc = computed(() => props.profileImageUrl?.trim() || profilePlaceho
       </div>
 
       <div class="toolbar-actions flex items-center gap-2.5">
+        <button class="toolbar-btn rounded px-3.5 py-2 text-sm font-semibold" @click="emit('open-settings')">Settings</button>
         <button class="toolbar-btn rounded px-3.5 py-2 text-sm font-semibold" @click="emit('open-about')">About</button>
         <button class="toolbar-btn rounded px-3.5 py-2 text-sm font-semibold" @click="emit('toggle-fullscreen')">
           {{ isFullscreen ? 'Windowed' : 'Fullscreen' }}

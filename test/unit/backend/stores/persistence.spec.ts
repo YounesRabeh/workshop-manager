@@ -22,6 +22,11 @@ describe('profile and run-log persistence', () => {
     await store.setWebApiEnabled(true)
     await store.setWebApiKeyEncrypted('encrypted-key')
     await store.setSteamCmdManualPath('/tools/steamcmd.sh')
+    await store.setTimeoutSettings({
+      loginTimeoutMs: 45_000,
+      storedSessionTimeoutMs: 15_000,
+      workshopTimeoutMs: 90_000
+    })
 
     const profiles = await store.getProfiles()
     expect(profiles).toHaveLength(1)
@@ -30,6 +35,11 @@ describe('profile and run-log persistence', () => {
     expect(await store.getWebApiEnabled()).toBe(true)
     expect(await store.getWebApiKeyEncrypted()).toBe('encrypted-key')
     expect(await store.getSteamCmdManualPath()).toBe('/tools/steamcmd.sh')
+    expect(await store.getTimeoutSettings()).toEqual({
+      loginTimeoutMs: 45_000,
+      storedSessionTimeoutMs: 15_000,
+      workshopTimeoutMs: 90_000
+    })
   })
 
   it('backs up malformed profile data and recreates a clean database', async () => {
@@ -68,7 +78,12 @@ describe('profile and run-log persistence', () => {
       store.setAdvancedSettingsState({
         webApiEnabled: true,
         webApiKeyEncrypted: 'encrypted-key',
-        steamCmdManualPath: '/tools/steamcmd.sh'
+        steamCmdManualPath: '/tools/steamcmd.sh',
+        timeoutSettings: {
+          loginTimeoutMs: 45_000,
+          storedSessionTimeoutMs: 15_000,
+          workshopTimeoutMs: 90_000
+        }
       })
     ])
 
@@ -78,6 +93,11 @@ describe('profile and run-log persistence', () => {
     expect(await store.getWebApiEnabled()).toBe(true)
     expect(await store.getWebApiKeyEncrypted()).toBe('encrypted-key')
     expect(await store.getSteamCmdManualPath()).toBe('/tools/steamcmd.sh')
+    expect(await store.getTimeoutSettings()).toEqual({
+      loginTimeoutMs: 45_000,
+      storedSessionTimeoutMs: 15_000,
+      workshopTimeoutMs: 90_000
+    })
   })
 
   it('stores steamcmd output in a single session file and overwrites it on next run', async () => {

@@ -31,7 +31,12 @@ describe('useAuthFlow composable', () => {
       secureStorageAvailable: true,
       steamCmdManualPath: undefined,
       steamCmdInstalled: true,
-      steamCmdSource: 'auto'
+      steamCmdSource: 'auto',
+      timeouts: {
+        loginTimeoutMs: 30_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
     })),
     saveAdvancedSettings: vi.fn(async () => ({
       webApiEnabled: false,
@@ -39,7 +44,12 @@ describe('useAuthFlow composable', () => {
       secureStorageAvailable: true,
       steamCmdManualPath: undefined,
       steamCmdInstalled: true,
-      steamCmdSource: 'auto'
+      steamCmdSource: 'auto',
+      timeouts: {
+        loginTimeoutMs: 30_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
     })),
     getCurrentProfile: vi.fn(async () => ({
       steamId64: '7656119',
@@ -171,6 +181,43 @@ describe('useAuthFlow composable', () => {
     expect(flow.loginForm.password).toBe('')
     expect(flow.loginForm.rememberAuth).toBe(false)
     expect(flow.hasPersistedStoredSession.value).toBe(false)
+  })
+
+  it('clears stored session before quitting when keep-signed-in is disabled', async () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.loginForm.rememberAuth = false
+    flow.hasPersistedStoredSession.value = true
+
+    await flow.quitApp()
+
+    expect(workshop.clearStoredSession).toHaveBeenCalledTimes(1)
+    expect(workshop.quitApp).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not quit when stored-session cleanup fails', async () => {
+    workshop.clearStoredSession.mockRejectedValueOnce(new Error('[command_failed] Could not clear stored session'))
+
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.loginForm.rememberAuth = false
+    flow.hasPersistedStoredSession.value = true
+
+    await flow.quitApp()
+
+    expect(workshop.clearStoredSession).toHaveBeenCalledTimes(1)
+    expect(workshop.quitApp).not.toHaveBeenCalled()
+    expect(flow.statusMessage.value).toContain('Clear session failed')
   })
 
   it('signs out and triggers callbacks', async () => {

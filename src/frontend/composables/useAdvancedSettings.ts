@@ -4,6 +4,10 @@
  */
 import { reactive, ref } from 'vue'
 import type { AdvancedSettings } from '@shared/contracts'
+import {
+  STEAMCMD_TIMEOUT_LIMITS,
+  type SteamCmdTimeoutSettings
+} from '@shared/runtime-settings'
 import type { AdvancedSettingsState } from '../types/ui'
 
 interface ApiFailure {
@@ -29,6 +33,9 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     steamCmdManualPath: '',
     steamCmdInstalled: false,
     steamCmdSource: 'missing',
+    loginTimeoutMs: '',
+    storedSessionTimeoutMs: '',
+    workshopTimeoutMs: '',
     isSaving: false,
     statusMessage: ''
   })
@@ -39,6 +46,18 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
 
   function setSteamCmdManualPath(value: string): void {
     advancedSettings.steamCmdManualPath = value
+  }
+
+  function setLoginTimeoutMs(value: string): void {
+    advancedSettings.loginTimeoutMs = value
+  }
+
+  function setStoredSessionTimeoutMs(value: string): void {
+    advancedSettings.storedSessionTimeoutMs = value
+  }
+
+  function setWorkshopTimeoutMs(value: string): void {
+    advancedSettings.workshopTimeoutMs = value
   }
 
   function toggleAdvancedOptions(): void {
@@ -52,6 +71,63 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     advancedSettings.steamCmdManualPath = payload.steamCmdManualPath ?? ''
     advancedSettings.steamCmdInstalled = payload.steamCmdInstalled === true
     advancedSettings.steamCmdSource = payload.steamCmdSource
+    advancedSettings.loginTimeoutMs = String(payload.timeouts.loginTimeoutMs)
+    advancedSettings.storedSessionTimeoutMs = String(payload.timeouts.storedSessionTimeoutMs)
+    advancedSettings.workshopTimeoutMs = String(payload.timeouts.workshopTimeoutMs)
+  }
+
+  function parseTimeoutValue(fieldLabel: string, rawValue: string, min: number, max: number): number | null {
+    const normalized = rawValue.trim()
+    if (!/^\d+$/.test(normalized)) {
+      advancedSettings.statusMessage = `${fieldLabel} must be a whole number of milliseconds.`
+      return null
+    }
+
+    const parsed = Number(normalized)
+    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+      advancedSettings.statusMessage = `${fieldLabel} must be between ${min} and ${max} ms.`
+      return null
+    }
+
+    return parsed
+  }
+
+  function parseTimeoutSettings(): SteamCmdTimeoutSettings | null {
+    const loginTimeoutMs = parseTimeoutValue(
+      'Login timeout',
+      advancedSettings.loginTimeoutMs,
+      STEAMCMD_TIMEOUT_LIMITS.loginTimeoutMs.min,
+      STEAMCMD_TIMEOUT_LIMITS.loginTimeoutMs.max
+    )
+    if (loginTimeoutMs === null) {
+      return null
+    }
+
+    const storedSessionTimeoutMs = parseTimeoutValue(
+      'Saved session timeout',
+      advancedSettings.storedSessionTimeoutMs,
+      STEAMCMD_TIMEOUT_LIMITS.storedSessionTimeoutMs.min,
+      STEAMCMD_TIMEOUT_LIMITS.storedSessionTimeoutMs.max
+    )
+    if (storedSessionTimeoutMs === null) {
+      return null
+    }
+
+    const workshopTimeoutMs = parseTimeoutValue(
+      'Workshop action timeout',
+      advancedSettings.workshopTimeoutMs,
+      STEAMCMD_TIMEOUT_LIMITS.workshopTimeoutMs.min,
+      STEAMCMD_TIMEOUT_LIMITS.workshopTimeoutMs.max
+    )
+    if (workshopTimeoutMs === null) {
+      return null
+    }
+
+    return {
+      loginTimeoutMs,
+      storedSessionTimeoutMs,
+      workshopTimeoutMs
+    }
   }
 
   async function loadInstallLogPath(): Promise<void> {
@@ -125,7 +201,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
         return
       }
       advancedSettings.steamCmdManualPath = path
-      advancedSettings.statusMessage = 'SteamCMD executable selected. Save Advanced Options to apply it.'
+      advancedSettings.statusMessage = 'SteamCMD executable selected. Save settings to apply it.'
     } catch (error) {
       const parsed = options.normalizeError(error)
       advancedSettings.statusMessage = `SteamCMD path selection failed (${parsed.code}): ${parsed.message}`
@@ -145,21 +221,26 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     try {
       advancedSettings.isSaving = true
       advancedSettings.statusMessage = ''
+      const timeoutSettings = parseTimeoutSettings()
+      if (!timeoutSettings) {
+        return
+      }
       const normalizedKey = advancedSettings.webApiKey.trim()
       const implicitEnable = normalizedKey.length > 0 ? true : advancedSettings.webApiEnabled
       const payload = await window.workshop.saveAdvancedSettings({
         webApiEnabled: implicitEnable,
         webApiKey: normalizedKey.length > 0 ? normalizedKey : undefined,
-        steamCmdManualPath: advancedSettings.steamCmdManualPath
+        steamCmdManualPath: advancedSettings.steamCmdManualPath,
+        timeouts: timeoutSettings
       })
       applyAdvancedSettings(payload)
       isSteamCmdDetected.value = payload.steamCmdInstalled
       options.setStatusMessage(payload.steamCmdInstalled ? 'SteamCMD is ready.' : 'SteamCMD executable is not configured yet.')
       advancedSettings.webApiKey = ''
-      advancedSettings.statusMessage = 'Advanced options saved.'
+      advancedSettings.statusMessage = 'Settings saved.'
     } catch (error) {
       const parsed = options.normalizeError(error)
-      advancedSettings.statusMessage = `Advanced options save failed (${parsed.code}): ${parsed.message}`
+      advancedSettings.statusMessage = `Settings save failed (${parsed.code}): ${parsed.message}`
     } finally {
       advancedSettings.isSaving = false
     }
@@ -195,6 +276,9 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     advancedSettings,
     setWebApiKey,
     setSteamCmdManualPath,
+    setLoginTimeoutMs,
+    setStoredSessionTimeoutMs,
+    setWorkshopTimeoutMs,
     toggleAdvancedOptions,
     ensureSteamCmdInstalled,
     openInstallLog,

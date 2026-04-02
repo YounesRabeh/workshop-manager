@@ -36,6 +36,9 @@ export interface AdvancedSettingsState {
   steamCmdManualPath: string
   steamCmdInstalled: boolean
   steamCmdSource: 'auto' | 'manual' | 'missing'
+  loginTimeoutMs: string
+  storedSessionTimeoutMs: string
+  workshopTimeoutMs: string
   isSaving: boolean
   statusMessage: string
 }

@@ -5,6 +5,8 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join, parse } from 'node:path'
 import type { ModProfile } from '@shared/contracts'
+import type { SteamCmdTimeoutSettings } from '@shared/runtime-settings'
+import { normalizeSteamCmdTimeoutSettings } from '@shared/runtime-settings'
 
 interface ProfileDb {
   rememberedUsername?: string
@@ -12,6 +14,9 @@ interface ProfileDb {
   webApiEnabled?: boolean
   webApiKeyEncrypted?: string
   steamCmdManualPath?: string
+  loginTimeoutMs?: number
+  storedSessionTimeoutMs?: number
+  workshopTimeoutMs?: number
   profiles: ModProfile[]
 }
 
@@ -47,7 +52,10 @@ function normalizeDb(parsed: unknown): ProfileDb {
     rememberAuth: record.rememberAuth,
     webApiEnabled: record.webApiEnabled,
     webApiKeyEncrypted: record.webApiKeyEncrypted,
-    steamCmdManualPath: record.steamCmdManualPath
+    steamCmdManualPath: record.steamCmdManualPath,
+    loginTimeoutMs: record.loginTimeoutMs,
+    storedSessionTimeoutMs: record.storedSessionTimeoutMs,
+    workshopTimeoutMs: record.workshopTimeoutMs
   }
 }
 
@@ -205,15 +213,38 @@ export class ProfileStore {
     })
   }
 
+  async getTimeoutSettings(): Promise<SteamCmdTimeoutSettings> {
+    const db = await this.readDb()
+    return normalizeSteamCmdTimeoutSettings({
+      loginTimeoutMs: db.loginTimeoutMs,
+      storedSessionTimeoutMs: db.storedSessionTimeoutMs,
+      workshopTimeoutMs: db.workshopTimeoutMs
+    })
+  }
+
+  async setTimeoutSettings(input: SteamCmdTimeoutSettings): Promise<void> {
+    const normalized = normalizeSteamCmdTimeoutSettings(input)
+    await this.updateDb(async (db) => {
+      db.loginTimeoutMs = normalized.loginTimeoutMs
+      db.storedSessionTimeoutMs = normalized.storedSessionTimeoutMs
+      db.workshopTimeoutMs = normalized.workshopTimeoutMs
+    })
+  }
+
   async setAdvancedSettingsState(input: {
     webApiEnabled: boolean
     webApiKeyEncrypted: string | undefined
     steamCmdManualPath: string | undefined
+    timeoutSettings: SteamCmdTimeoutSettings
   }): Promise<void> {
+    const normalizedTimeouts = normalizeSteamCmdTimeoutSettings(input.timeoutSettings)
     await this.updateDb(async (db) => {
       db.webApiEnabled = input.webApiEnabled
       db.webApiKeyEncrypted = input.webApiKeyEncrypted
       db.steamCmdManualPath = input.steamCmdManualPath
+      db.loginTimeoutMs = normalizedTimeouts.loginTimeoutMs
+      db.storedSessionTimeoutMs = normalizedTimeouts.storedSessionTimeoutMs
+      db.workshopTimeoutMs = normalizedTimeouts.workshopTimeoutMs
     })
   }
 }

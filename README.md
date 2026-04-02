@@ -64,19 +64,49 @@ Packaging commands always run inside the repo's Docker builder image, even when 
 | Build Windows package | `pnpm build:win` | Produces Windows installer artifacts |
 | Build Windows package with icon sync | `pnpm build:win:icon` | Regenerates icon assets first |
 | Build Linux and Windows with icon sync | `pnpm build:all:icon` | Runs both platform packaging commands |
-| Release alias | `pnpm release` | Alias for `pnpm build:all:icon` |
+| Write checksums for existing release artifacts | `pnpm release:checksums` | Scans `dist/` and writes one `.checksum.txt` file per artifact |
+| Release bundle with checksums | `pnpm release` | Builds Linux and Windows artifacts with icon sync, then writes per-artifact checksum files |
 
 > [!IMPORTANT]
 > Docker is build-only. The generated `.AppImage` and `.exe` run natively after packaging.
 > Dockerized builds are currently supported on Linux and Windows hosts.
 
-> Packaging commands always rebuild the app bundle first so installers do not ship stale `out/` code.
-> The wrapper performs host-side cleanup before entering Docker so stale local Electron processes do not interfere with packaging.
-> Persistent Docker build caches live under `~/.cache/workshop-manager/docker-build`.
-> Output artifacts are written to `dist/`.
+Packaging commands always rebuild the app bundle first so installers do not ship stale `out/` code.
+The wrapper performs host-side cleanup before entering Docker so stale local Electron processes do not interfere with packaging.
+Persistent Docker build caches live under `~/.cache/workshop-manager/docker-build`.
+Output artifacts are written to `dist/`.
 
-> [!TIP]
-> Use `pnpm release` when you want the full export flow with icon sync for both Linux and Windows artifacts.
+
+> Packaging command suffixes are composable: `:icon` regenerates icon assets first, and `:checksums` runs the package command and then writes per-artifact checksum files. The generic pattern is `pnpm build:<platform>:checksums`, and icon-aware variants follow `pnpm build:<platform>:icon:checksums`. For example, `pnpm build:win:checksums` packages Windows artifacts and writes checksums, while `pnpm build:linux:icon:checksums` also refreshes icon assets first.
+
+## Verifying Release Downloads
+
+Each public release artifact is accompanied by its own checksum file in `dist/`:
+
+- `Workshop Manager-<version>-linux-x86_64.AppImage.checksum.txt`
+- `Workshop Manager-<version>-win-x64.exe.checksum.txt`
+
+Each checksum file contains the SHA-256 hash for its matching artifact. Upload the app files and their `.checksum.txt` companions together on GitHub Releases.
+
+You can generate those checksum files in two ways:
+
+- `pnpm release` to build fresh Linux and Windows artifacts and then write checksums
+- `pnpm release:checksums` to only write checksum files for artifacts that already exist in `dist/`
+
+On Linux, users can verify a download with:
+
+```bash
+sha256sum -c "Workshop Manager-<version>-linux-x86_64.AppImage.checksum.txt"
+```
+
+On Windows PowerShell, users can compare the file hash with:
+
+```powershell
+Get-FileHash ".\Workshop Manager-<version>-win-x64.exe" -Algorithm SHA256
+Get-Content ".\Workshop Manager-<version>-win-x64.exe.checksum.txt"
+```
+
+For this portfolio project, the checksum pipeline is the intended release-integrity mechanism. Native Windows code signing is optional and not required for the published demo builds.
 
 ## Changing The App Icon
 
