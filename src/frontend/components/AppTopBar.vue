@@ -4,10 +4,9 @@
 -->
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { FlowStep } from '../types/ui'
 import profilePlaceholder from '../assets/profile-placeholder.svg'
 import '../styles/themes/app-top-bar.theme.css'
-
-type FlowStep = 'mods' | 'update' | 'create'
 
 const props = defineProps<{
   flowStep: FlowStep
@@ -58,7 +57,13 @@ const avatarSrc = computed(() => props.profileImageUrl?.trim() || profilePlaceho
       </div>
 
       <div class="toolbar-actions flex items-center gap-2.5">
-        <button class="toolbar-btn rounded px-3.5 py-2 text-sm font-semibold" @click="emit('open-settings')">Settings</button>
+        <button
+          class="rounded px-3.5 py-2 text-sm font-semibold"
+          :class="flowStep === 'settings' ? 'toolbar-btn toolbar-btn-active' : 'toolbar-btn'"
+          @click="emit('open-settings')"
+        >
+          Settings
+        </button>
         <button class="toolbar-btn rounded px-3.5 py-2 text-sm font-semibold" @click="emit('open-about')">About</button>
         <button class="toolbar-btn rounded px-3.5 py-2 text-sm font-semibold" @click="emit('toggle-fullscreen')">
           {{ isFullscreen ? 'Windowed' : 'Fullscreen' }}

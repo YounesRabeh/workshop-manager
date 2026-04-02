@@ -5,6 +5,7 @@
 import { reactive, ref } from 'vue'
 import type { AdvancedSettings } from '@shared/contracts'
 import {
+  STEAMCMD_TIMEOUT_DISABLED_VALUE,
   STEAMCMD_TIMEOUT_LIMITS,
   type SteamCmdTimeoutSettings
 } from '@shared/runtime-settings'
@@ -24,6 +25,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
   const isSteamCmdDetected = ref(false)
   const isAdvancedOptionsOpen = ref(false)
   const installLogPath = ref('')
+  let successStatusTimeout: ReturnType<typeof setTimeout> | null = null
 
   const advancedSettings = reactive<AdvancedSettingsState>({
     webApiEnabled: false,
@@ -64,6 +66,27 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     isAdvancedOptionsOpen.value = !isAdvancedOptionsOpen.value
   }
 
+  function millisecondsToSecondsString(value: number): string {
+    if (value === STEAMCMD_TIMEOUT_DISABLED_VALUE) {
+      return String(STEAMCMD_TIMEOUT_DISABLED_VALUE)
+    }
+
+    return String(Math.round(value / 1000))
+  }
+
+  function scheduleSuccessStatusClear(message: string): void {
+    if (successStatusTimeout) {
+      clearTimeout(successStatusTimeout)
+    }
+
+    successStatusTimeout = setTimeout(() => {
+      if (advancedSettings.statusMessage === message) {
+        advancedSettings.statusMessage = ''
+      }
+      successStatusTimeout = null
+    }, 2_000)
+  }
+
   function applyAdvancedSettings(payload: AdvancedSettings): void {
     advancedSettings.webApiEnabled = payload.webApiEnabled
     advancedSettings.hasWebApiKey = payload.hasWebApiKey
@@ -71,25 +94,38 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     advancedSettings.steamCmdManualPath = payload.steamCmdManualPath ?? ''
     advancedSettings.steamCmdInstalled = payload.steamCmdInstalled === true
     advancedSettings.steamCmdSource = payload.steamCmdSource
-    advancedSettings.loginTimeoutMs = String(payload.timeouts.loginTimeoutMs)
-    advancedSettings.storedSessionTimeoutMs = String(payload.timeouts.storedSessionTimeoutMs)
-    advancedSettings.workshopTimeoutMs = String(payload.timeouts.workshopTimeoutMs)
+    advancedSettings.loginTimeoutMs = millisecondsToSecondsString(payload.timeouts.loginTimeoutMs)
+    advancedSettings.storedSessionTimeoutMs = millisecondsToSecondsString(payload.timeouts.storedSessionTimeoutMs)
+    advancedSettings.workshopTimeoutMs = millisecondsToSecondsString(payload.timeouts.workshopTimeoutMs)
   }
 
-  function parseTimeoutValue(fieldLabel: string, rawValue: string, min: number, max: number): number | null {
+  function parseTimeoutValue(
+    fieldLabel: string,
+    rawValue: string,
+    min: number,
+    max: number,
+    allowDisabled = false
+  ): number | null {
     const normalized = rawValue.trim()
     if (!/^\d+$/.test(normalized)) {
-      advancedSettings.statusMessage = `${fieldLabel} must be a whole number of milliseconds.`
+      advancedSettings.statusMessage = `${fieldLabel} must be a whole number of seconds.`
       return null
     }
 
-    const parsed = Number(normalized)
-    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
-      advancedSettings.statusMessage = `${fieldLabel} must be between ${min} and ${max} ms.`
+    const parsedSeconds = Number(normalized)
+    if (allowDisabled && parsedSeconds === STEAMCMD_TIMEOUT_DISABLED_VALUE) {
+      return STEAMCMD_TIMEOUT_DISABLED_VALUE
+    }
+
+    const minSeconds = Math.round(min / 1000)
+    const maxSeconds = Math.round(max / 1000)
+
+    if (!Number.isFinite(parsedSeconds) || parsedSeconds < minSeconds || parsedSeconds > maxSeconds) {
+      advancedSettings.statusMessage = `${fieldLabel} must be between ${minSeconds} and ${maxSeconds} seconds.`
       return null
     }
 
-    return parsed
+    return parsedSeconds * 1000
   }
 
   function parseTimeoutSettings(): SteamCmdTimeoutSettings | null {
@@ -97,7 +133,8 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
       'Login timeout',
       advancedSettings.loginTimeoutMs,
       STEAMCMD_TIMEOUT_LIMITS.loginTimeoutMs.min,
-      STEAMCMD_TIMEOUT_LIMITS.loginTimeoutMs.max
+      STEAMCMD_TIMEOUT_LIMITS.loginTimeoutMs.max,
+      true
     )
     if (loginTimeoutMs === null) {
       return null
@@ -107,7 +144,8 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
       'Saved session timeout',
       advancedSettings.storedSessionTimeoutMs,
       STEAMCMD_TIMEOUT_LIMITS.storedSessionTimeoutMs.min,
-      STEAMCMD_TIMEOUT_LIMITS.storedSessionTimeoutMs.max
+      STEAMCMD_TIMEOUT_LIMITS.storedSessionTimeoutMs.max,
+      true
     )
     if (storedSessionTimeoutMs === null) {
       return null
@@ -117,7 +155,8 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
       'Workshop action timeout',
       advancedSettings.workshopTimeoutMs,
       STEAMCMD_TIMEOUT_LIMITS.workshopTimeoutMs.min,
-      STEAMCMD_TIMEOUT_LIMITS.workshopTimeoutMs.max
+      STEAMCMD_TIMEOUT_LIMITS.workshopTimeoutMs.max,
+      true
     )
     if (workshopTimeoutMs === null) {
       return null
@@ -238,6 +277,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
       options.setStatusMessage(payload.steamCmdInstalled ? 'SteamCMD is ready.' : 'SteamCMD executable is not configured yet.')
       advancedSettings.webApiKey = ''
       advancedSettings.statusMessage = 'Settings saved.'
+      scheduleSuccessStatusClear('Settings saved.')
     } catch (error) {
       const parsed = options.normalizeError(error)
       advancedSettings.statusMessage = `Settings save failed (${parsed.code}): ${parsed.message}`
@@ -261,6 +301,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
       applyAdvancedSettings(payload)
       advancedSettings.webApiKey = ''
       advancedSettings.statusMessage = 'Saved Web API key removed.'
+      scheduleSuccessStatusClear('Saved Web API key removed.')
     } catch (error) {
       const parsed = options.normalizeError(error)
       advancedSettings.statusMessage = `Web API key removal failed (${parsed.code}): ${parsed.message}`

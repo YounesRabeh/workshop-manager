@@ -12,7 +12,7 @@ export interface AuthIssue {
   tone: AuthIssueTone
 }
 
-export type FlowStep = 'mods' | 'update' | 'create'
+export type FlowStep = 'mods' | 'update' | 'create' | 'settings'
 
 export type SteamGuardPromptType =
   | 'none'

@@ -263,6 +263,33 @@ describe('App UI validation gates', () => {
     expect((passwordInput.element as HTMLInputElement).value).toBe('')
   })
 
+  it('toggles login password visibility on button click', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const passwordInput = wrapper.find('input[type="password"]')
+    expect(passwordInput.exists()).toBe(true)
+
+    const toggleButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Show')
+    expect(toggleButton).toBeDefined()
+    await toggleButton?.trigger('click')
+    await flushPromises()
+
+    const revealedPasswordInput = wrapper.find('input[type="text"][autocomplete="current-password"]')
+    expect(revealedPasswordInput.exists()).toBe(true)
+
+    const hideButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Hide')
+    expect(hideButton).toBeDefined()
+    await hideButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('input[type="password"]').exists()).toBe(true)
+  })
+
   it('clears saved session from login panel', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
@@ -630,7 +657,7 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).toContain('Version: v0.1.0')
   })
 
-  it('opens the signed-in settings dialog and saves timeout settings', async () => {
+  it('opens the signed-in settings stage and saves timeout settings', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
@@ -649,12 +676,18 @@ describe('App UI validation gates', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Application Settings')
+    expect(wrapper.find('input[placeholder="Path to executable"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Steam Web API Key')
+    expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(false)
 
     const timeoutInputs = wrapper.findAll('input[type="number"]')
     expect(timeoutInputs).toHaveLength(3)
-    await timeoutInputs[0].setValue('45000')
-    await timeoutInputs[1].setValue('15000')
-    await timeoutInputs[2].setValue('120000')
+    expect((timeoutInputs[0]!.element as HTMLInputElement).value).toBe('30')
+    expect((timeoutInputs[1]!.element as HTMLInputElement).value).toBe('10')
+    expect((timeoutInputs[2]!.element as HTMLInputElement).value).toBe('60')
+    await timeoutInputs[0].setValue('45')
+    await timeoutInputs[1].setValue('15')
+    await timeoutInputs[2].setValue('120')
 
     const saveButton = wrapper
       .findAll('button')
@@ -671,6 +704,114 @@ describe('App UI validation gates', () => {
         loginTimeoutMs: 45_000,
         storedSessionTimeoutMs: 15_000,
         workshopTimeoutMs: 120_000
+      }
+    })
+  })
+
+  it('can disable saved-session and workshop timeouts in the signed-in settings stage', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const settingsButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Settings')
+    expect(settingsButton).toBeDefined()
+    await settingsButton?.trigger('click')
+    await flushPromises()
+
+    const timeoutToggles = wrapper.findAll('.advanced-timeout-toggle input[type="checkbox"]')
+    expect(timeoutToggles).toHaveLength(3)
+    await timeoutToggles[1]!.setValue(true)
+    await timeoutToggles[2]!.setValue(true)
+    await flushPromises()
+
+    const timeoutInputs = wrapper.findAll('input[type="number"]')
+    expect(timeoutInputs).toHaveLength(3)
+    expect(timeoutInputs[1]!.attributes('disabled')).toBeDefined()
+    expect(timeoutInputs[2]!.attributes('disabled')).toBeDefined()
+
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Save Settings'))
+    expect(saveButton).toBeDefined()
+    await saveButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
+      webApiEnabled: false,
+      webApiKey: undefined,
+      steamCmdManualPath: '',
+      timeouts: {
+        loginTimeoutMs: 30_000,
+        storedSessionTimeoutMs: 0,
+        workshopTimeoutMs: 0
+      }
+    })
+  })
+
+  it('shows only login timeout in the login advanced options panel', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const advancedToggle = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Advanced Developer Options'))
+    expect(advancedToggle).toBeDefined()
+    await advancedToggle?.trigger('click')
+    await flushPromises()
+
+    const timeoutInputs = wrapper.findAll('input[type="number"]')
+    expect(timeoutInputs).toHaveLength(1)
+
+    const cardTitles = wrapper.findAll('.advanced-card-title').map((node) => node.text().trim())
+    expect(cardTitles).toEqual([
+      'SteamCMD Executable',
+      'SteamCMD Timeouts',
+      'Steam Web API Key'
+    ])
+  })
+
+  it('can disable the login timeout from the login advanced options panel', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const advancedToggle = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Advanced Developer Options'))
+    expect(advancedToggle).toBeDefined()
+    await advancedToggle?.trigger('click')
+    await flushPromises()
+
+    const timeoutToggle = wrapper.find('.advanced-timeout-toggle input[type="checkbox"]')
+    expect(timeoutToggle.exists()).toBe(true)
+    await timeoutToggle.setValue(true)
+    await flushPromises()
+
+    const timeoutInput = wrapper.find('input[type="number"]')
+    expect(timeoutInput.attributes('disabled')).toBeDefined()
+
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Save Advanced Options'))
+    expect(saveButton).toBeDefined()
+    await saveButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
+      webApiEnabled: false,
+      webApiKey: undefined,
+      steamCmdManualPath: '',
+      timeouts: {
+        loginTimeoutMs: 0,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
       }
     })
   })

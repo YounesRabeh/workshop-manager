@@ -100,6 +100,23 @@ describe('profile and run-log persistence', () => {
     })
   })
 
+  it('persists a disabled login timeout without normalizing it away', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'profile-store-disabled-timeout-'))
+    const store = new ProfileStore(join(root, 'profiles.json'))
+
+    await store.setTimeoutSettings({
+      loginTimeoutMs: 0,
+      storedSessionTimeoutMs: 15_000,
+      workshopTimeoutMs: 90_000
+    })
+
+    expect(await store.getTimeoutSettings()).toEqual({
+      loginTimeoutMs: 0,
+      storedSessionTimeoutMs: 15_000,
+      workshopTimeoutMs: 90_000
+    })
+  })
+
   it('stores steamcmd output in a single session file and overwrites it on next run', async () => {
     const root = await mkdtemp(join(tmpdir(), 'run-log-store-'))
     const store = new RunLogStore(join(root, 'runs'))

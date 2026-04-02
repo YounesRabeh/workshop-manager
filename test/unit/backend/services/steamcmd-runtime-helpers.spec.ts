@@ -97,6 +97,16 @@ describe('steamcmd runtime helpers', () => {
     ).toBe(12_000)
   })
 
+  it('preserves a disabled login timeout when runtime settings opt out of it', () => {
+    expect(
+      resolveLoginTimeoutMs(false, {
+        loginTimeoutMs: 0,
+        storedSessionTimeoutMs: 12_000,
+        workshopTimeoutMs: 90_000
+      })
+    ).toBe(0)
+  })
+
   it('rejects placeholder Steam account ids when deriving steamId64', () => {
     expect(steamId64FromAccountId('0')).toBeUndefined()
     expect(parseSteamId64(["Logging in user 'alice' [U:1:0] to Steam Public..."])).toBeUndefined()

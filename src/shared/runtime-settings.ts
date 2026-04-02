@@ -8,6 +8,8 @@ export interface SteamCmdTimeoutSettings {
   workshopTimeoutMs: number
 }
 
+export const STEAMCMD_TIMEOUT_DISABLED_VALUE = 0
+
 type TimeoutKey = keyof SteamCmdTimeoutSettings
 
 interface TimeoutFieldDefinition {
@@ -66,6 +68,10 @@ function normalizeTimeoutField(key: TimeoutKey, value: unknown): number {
 
   if (!Number.isFinite(normalized)) {
     return defaultValue
+  }
+
+  if (normalized === STEAMCMD_TIMEOUT_DISABLED_VALUE) {
+    return STEAMCMD_TIMEOUT_DISABLED_VALUE
   }
 
   return Math.min(max, Math.max(min, Math.round(normalized)))

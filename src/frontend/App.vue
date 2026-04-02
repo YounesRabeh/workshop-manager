@@ -10,10 +10,10 @@ import { evaluateCreateRequirements, evaluateUpdateRequirements } from '@shared/
 import AppTopBar from './components/AppTopBar.vue'
 import AboutDialog from './components/dialogs/AboutDialog.vue'
 import ActionConfirmDialog from './components/dialogs/ActionConfirmDialog.vue'
-import SettingsDialog from './components/dialogs/SettingsDialog.vue'
 import CreatePublishSection from './components/publish/sections/CreatePublishSection.vue'
 import LoginSection from './components/LoginSection.vue'
 import LogsSection from './components/LogsSection.vue'
+import SettingsSection from './components/settings/sections/SettingsSection.vue'
 import UpdatePublishSection from './components/publish/sections/UpdatePublishSection.vue'
 import WorkshopItemsSection from './components/WorkshopItemsSection.vue'
 import {
@@ -38,7 +38,6 @@ import type {
 
 const flowStep = ref<FlowStep>('mods')
 const appVersion = ref('dev')
-const isSettingsOpen = ref(false)
 const publishProgress = new PublishProgressTracker()
 
 const {
@@ -318,7 +317,6 @@ signedOutHandler = () => {
   resetPublishActionState()
   resetWorkshopState()
   resetDraftsState()
-  isSettingsOpen.value = false
   flowStep.value = 'mods'
 }
 
@@ -427,13 +425,9 @@ function clearUpdateWorkspace(): void {
   statusMessage.value = 'Mod content cleared.'
 }
 
-async function openSettingsModal(): Promise<void> {
+async function openSettingsStage(): Promise<void> {
   await loadAdvancedSettings()
-  isSettingsOpen.value = true
-}
-
-function closeSettingsModal(): void {
-  isSettingsOpen.value = false
+  flowStep.value = 'settings'
 }
 
 async function pickUpdatePreviewFile(): Promise<void> {
@@ -477,6 +471,7 @@ async function pickUpdatePreviewFile(): Promise<void> {
         :advanced-settings="advancedSettings"
         :is-web-api-key-peek="isWebApiKeyPeek"
         :install-log-path="installLogPath"
+        timeout-scope="login_only"
         @submit-login="login"
         @update-username="setLoginUsername"
         @update-password="setLoginPassword"
@@ -533,7 +528,7 @@ async function pickUpdatePreviewFile(): Promise<void> {
           :is-dev-mode="advancedSettings.hasWebApiKey"
           :profile-image-url="accountProfileImageUrl"
           @navigate="goToStep"
-          @open-settings="openSettingsModal"
+          @open-settings="openSettingsStage"
           @open-about="openAboutModal"
           @toggle-fullscreen="toggleFullscreen"
           @sign-out="signOut"
@@ -622,6 +617,22 @@ async function pickUpdatePreviewFile(): Promise<void> {
           @upload="openCreateConfirmation"
         />
 
+        <SettingsSection
+          v-if="flowStep === 'settings'"
+          :advanced-settings="advancedSettings"
+          :is-web-api-key-peek="isWebApiKeyPeek"
+          @go-to-mods="goToStep('mods')"
+          @update-web-api-key="setWebApiKey"
+          @update-steamcmd-manual-path="setSteamCmdManualPath"
+          @update-login-timeout-ms="setLoginTimeoutMs"
+          @update-stored-session-timeout-ms="setStoredSessionTimeoutMs"
+          @update-workshop-timeout-ms="setWorkshopTimeoutMs"
+          @pick-steamcmd-manual-path="pickSteamCmdManualPath"
+          @set-web-api-key-peek="setWebApiKeyPeek"
+          @save-advanced-settings="saveAdvancedSettings"
+          @clear-web-api-key="clearSavedWebApiKey"
+        />
+
         <ActionConfirmDialog
           :open="isUpdateConfirmOpen"
           kicker="Confirm Update"
@@ -645,21 +656,6 @@ async function pickUpdatePreviewFile(): Promise<void> {
         />
 
         <AboutDialog :open="isAboutOpen" :app-version="appVersion" @close="closeAboutModal" />
-        <SettingsDialog
-          :open="isSettingsOpen"
-          :advanced-settings="advancedSettings"
-          :is-web-api-key-peek="isWebApiKeyPeek"
-          @close="closeSettingsModal"
-          @update-web-api-key="setWebApiKey"
-          @update-steamcmd-manual-path="setSteamCmdManualPath"
-          @update-login-timeout-ms="setLoginTimeoutMs"
-          @update-stored-session-timeout-ms="setStoredSessionTimeoutMs"
-          @update-workshop-timeout-ms="setWorkshopTimeoutMs"
-          @pick-steamcmd-manual-path="pickSteamCmdManualPath"
-          @set-web-api-key-peek="setWebApiKeyPeek"
-          @save-advanced-settings="saveAdvancedSettings"
-          @clear-web-api-key="clearSavedWebApiKey"
-        />
       </div>
     </template>
   </main>

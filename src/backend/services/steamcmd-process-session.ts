@@ -58,7 +58,7 @@ interface ActiveInteractiveRun {
   writeInput: (value: string) => void
   lines: string[]
   emitOutputEvents: boolean
-  timeout: ReturnType<typeof setTimeout>
+  timeout: ReturnType<typeof setTimeout> | null
   settleTimeout: ReturnType<typeof setTimeout> | null
   lineQueue: Promise<void>
   pendingResult: { exitCode: number; runtimeError?: AppError } | null
@@ -90,7 +90,7 @@ interface ActiveRunConfig {
   emitRunEvents: boolean
   persistLogs: boolean
   emitOutputEvents: boolean
-  timeout: ReturnType<typeof setTimeout>
+  timeout: ReturnType<typeof setTimeout> | null
   writeInput: (value: string) => void
   resolve: (value: { lines: string[]; exitCode: number }) => void
   reject: (error: Error) => void
@@ -235,9 +235,10 @@ export class SteamCmdProcessSession {
     }
     if (persistLogs) {
       const modeLabel = modeSuffix.length > 0 ? ` ${modeSuffix}` : ''
+      const timeoutLabel = timeoutMs > 0 ? `${timeoutMs}` : 'disabled'
       await this.deps.runLogStore.appendLine(
         runId,
-        formatRunMeta(`started phase=${phase} timeoutMs=${timeoutMs} executable=${executablePath}${modeLabel}`)
+        formatRunMeta(`started phase=${phase} timeoutMs=${timeoutLabel} executable=${executablePath}${modeLabel}`)
       )
     }
 
@@ -256,7 +257,11 @@ export class SteamCmdProcessSession {
     persistLogs: boolean,
     timeoutMeta: string,
     onTimeout: () => void
-  ): ReturnType<typeof setTimeout> {
+  ): ReturnType<typeof setTimeout> | null {
+    if (timeoutMs <= 0) {
+      return null
+    }
+
     return setTimeout(() => {
       if (persistLogs) {
         this.deps.runLogStore
@@ -546,7 +551,9 @@ export class SteamCmdProcessSession {
 
     this.activeInteractiveRun = null
     this.activeRuns.delete(activeRun.runId)
-    clearTimeout(activeRun.timeout)
+    if (activeRun.timeout) {
+      clearTimeout(activeRun.timeout)
+    }
     if (activeRun.promptDispatchFallback) {
       clearTimeout(activeRun.promptDispatchFallback)
       activeRun.promptDispatchFallback = null

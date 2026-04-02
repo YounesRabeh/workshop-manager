@@ -31,6 +31,7 @@ const props = defineProps<{
   advancedSettings: AdvancedSettingsState
   isWebApiKeyPeek: boolean
   installLogPath: string
+  timeoutScope?: 'all' | 'login_only'
 }>()
 
 const emit = defineEmits<{
@@ -273,12 +274,10 @@ watch(
           <button
             type="button"
             class="login-peek rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
-            @mouseenter="emit('set-password-peek', true)"
-            @mouseleave="emit('set-password-peek', false)"
-            @focus="emit('set-password-peek', true)"
-            @blur="emit('set-password-peek', false)"
+            :aria-pressed="isPasswordPeek ? 'true' : 'false'"
+            @click="emit('set-password-peek', !isPasswordPeek)"
           >
-            Show
+            {{ isPasswordPeek ? 'Hide' : 'Show' }}
           </button>
         </div>
 
@@ -330,6 +329,9 @@ watch(
           class="mt-3"
           :advanced-settings="advancedSettings"
           :is-web-api-key-peek="isWebApiKeyPeek"
+          :timeout-scope="timeoutScope"
+          web-api-section-placement="after_timeouts"
+          summary="Configure a custom SteamCMD path, optional Steam Web API access, and the Steam login timeout for this device."
           @update-web-api-key="emit('update-web-api-key', $event)"
           @update-steamcmd-manual-path="emit('update-steamcmd-manual-path', $event)"
           @update-login-timeout-ms="emit('update-login-timeout-ms', $event)"

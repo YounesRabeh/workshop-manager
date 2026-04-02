@@ -28,6 +28,9 @@ const emit = defineEmits<{
       <p class="mt-2 text-xs text-slate-400">
         Version: <span class="font-semibold text-slate-200">v{{ props.appVersion || 'dev' }}</span>
       </p>
+      <p class="mt-1 text-xs text-slate-400">
+        Author: <span class="font-semibold text-slate-200">Younes Rabeh</span>
+      </p>
       <p class="mt-3 text-xs text-slate-400">* Not an official Steam product.</p>
       <div class="mt-4 flex justify-end">
         <button class="steam-btn-muted rounded px-3 py-1.5 text-xs font-semibold" @click="emit('close')">Close</button>

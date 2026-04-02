@@ -4,7 +4,11 @@
 -->
 <script setup lang="ts">
 import { computed } from 'vue'
-import { STEAMCMD_TIMEOUT_LIMITS } from '@shared/runtime-settings'
+import {
+  DEFAULT_STEAMCMD_TIMEOUT_SETTINGS,
+  STEAMCMD_TIMEOUT_DISABLED_VALUE,
+  STEAMCMD_TIMEOUT_LIMITS
+} from '@shared/runtime-settings'
 import type { AdvancedSettingsState } from '../../types/ui'
 
 const props = withDefaults(defineProps<{
@@ -13,10 +17,18 @@ const props = withDefaults(defineProps<{
   kicker?: string
   summary?: string
   saveLabel?: string
+  timeoutScope?: 'all' | 'login_only'
+  showSteamCmdSection?: boolean
+  showWebApiSection?: boolean
+  webApiSectionPlacement?: 'before_timeouts' | 'after_timeouts'
 }>(), {
   kicker: 'Advanced Developer Options',
   summary: 'Configure a custom SteamCMD path, optional Steam Web API access, and SteamCMD timeout behavior for this device.',
-  saveLabel: 'Save Advanced Options'
+  saveLabel: 'Save Advanced Options',
+  timeoutScope: 'all',
+  showSteamCmdSection: true,
+  showWebApiSection: true,
+  webApiSectionPlacement: 'before_timeouts'
 })
 
 const emit = defineEmits<{
@@ -46,14 +58,47 @@ function onLoginTimeoutInput(event: Event): void {
   emit('update-login-timeout-ms', target?.value ?? '')
 }
 
+function onLoginTimeoutDisabledChange(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit(
+    'update-login-timeout-ms',
+    toggleTimeoutValue(
+      target?.checked === true,
+      DEFAULT_STEAMCMD_TIMEOUT_SETTINGS.loginTimeoutMs
+    )
+  )
+}
+
 function onStoredSessionTimeoutInput(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit('update-stored-session-timeout-ms', target?.value ?? '')
 }
 
+function onStoredSessionTimeoutDisabledChange(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit(
+    'update-stored-session-timeout-ms',
+    toggleTimeoutValue(
+      target?.checked === true,
+      DEFAULT_STEAMCMD_TIMEOUT_SETTINGS.storedSessionTimeoutMs
+    )
+  )
+}
+
 function onWorkshopTimeoutInput(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit('update-workshop-timeout-ms', target?.value ?? '')
+}
+
+function onWorkshopTimeoutDisabledChange(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit(
+    'update-workshop-timeout-ms',
+    toggleTimeoutValue(
+      target?.checked === true,
+      DEFAULT_STEAMCMD_TIMEOUT_SETTINGS.workshopTimeoutMs
+    )
+  )
 }
 
 const canSaveAdvancedSettings = computed(() => {
@@ -117,6 +162,49 @@ const steamCmdHint = computed(() => {
   }
   return 'Auto-install is available on Linux and Windows. On macOS, set this manually.'
 })
+
+const showsLoginTimeout = computed(() => true)
+const showsStoredSessionTimeout = computed(() => props.timeoutScope === 'all')
+const showsWorkshopTimeout = computed(() => props.timeoutScope === 'all')
+const timeoutCardCopy = computed(() => {
+  if (props.timeoutScope === 'login_only') {
+    return 'Tune how long the app waits for a full SteamCMD login before marking sign-in as timed out.'
+  }
+  return 'Tune how long the app waits for SteamCMD login and Workshop actions before marking the run as timed out.'
+})
+const timeoutBadgeLabel = computed(() => props.timeoutScope === 'login_only' ? 'LOGIN' : 'RUNTIME')
+const usesSingleTimeoutColumn = computed(() => props.timeoutScope === 'login_only')
+const placesWebApiAfterTimeouts = computed(() => {
+  return (
+    props.showWebApiSection &&
+    (props.timeoutScope === 'login_only' || props.webApiSectionPlacement === 'after_timeouts')
+  )
+})
+const isLoginTimeoutDisabled = computed(() => {
+  return isTimeoutDisabled(props.advancedSettings.loginTimeoutMs)
+})
+const isStoredSessionTimeoutDisabled = computed(() => {
+  return isTimeoutDisabled(props.advancedSettings.storedSessionTimeoutMs)
+})
+const isWorkshopTimeoutDisabled = computed(() => {
+  return isTimeoutDisabled(props.advancedSettings.workshopTimeoutMs)
+})
+
+function timeoutLimitSeconds(timeoutMs: number): number {
+  return Math.round(timeoutMs / 1000)
+}
+
+function isTimeoutDisabled(value: string): boolean {
+  return Number(value.trim()) === STEAMCMD_TIMEOUT_DISABLED_VALUE
+}
+
+function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string {
+  return String(
+    disabled
+      ? STEAMCMD_TIMEOUT_DISABLED_VALUE
+      : timeoutLimitSeconds(defaultTimeoutMs)
+  )
+}
 </script>
 
 <template>
@@ -129,7 +217,7 @@ const steamCmdHint = computed(() => {
     </div>
 
     <div class="advanced-card-grid mt-4">
-      <section class="advanced-card">
+      <section v-if="props.showSteamCmdSection" class="advanced-card">
         <div class="advanced-card-header">
           <div>
             <h3 class="advanced-card-title">SteamCMD Executable</h3>
@@ -172,7 +260,7 @@ const steamCmdHint = computed(() => {
         </div>
       </section>
 
-      <section class="advanced-card">
+      <section v-if="props.showWebApiSection && !placesWebApiAfterTimeouts" class="advanced-card">
         <div class="advanced-card-header">
           <div>
             <h3 class="advanced-card-title">Steam Web API Key</h3>
@@ -220,54 +308,134 @@ const steamCmdHint = computed(() => {
         <div class="advanced-card-header">
           <div>
             <h3 class="advanced-card-title">SteamCMD Timeouts</h3>
-            <p class="advanced-card-copy">Tune how long the app waits for SteamCMD login and Workshop actions before marking the run as timed out.</p>
+            <p class="advanced-card-copy">{{ timeoutCardCopy }}</p>
           </div>
-          <span class="advanced-badge advanced-badge-info">Runtime</span>
+          <span class="advanced-badge advanced-badge-info">{{ timeoutBadgeLabel }}</span>
         </div>
 
-        <div class="advanced-timeout-grid mt-4">
-          <label class="advanced-label">
-            Login Timeout
+        <div
+          class="advanced-timeout-grid mt-4"
+          :class="{ 'advanced-timeout-grid-single': usesSingleTimeoutColumn }"
+        >
+          <div v-if="showsLoginTimeout" class="advanced-label">
+            <span>Login Timeout (seconds)</span>
             <input
               type="number"
               inputmode="numeric"
-              :min="STEAMCMD_TIMEOUT_LIMITS.loginTimeoutMs.min"
-              :max="STEAMCMD_TIMEOUT_LIMITS.loginTimeoutMs.max"
-              :value="advancedSettings.loginTimeoutMs"
-              class="login-input advanced-input mt-2"
+              step="1"
+              :min="timeoutLimitSeconds(STEAMCMD_TIMEOUT_LIMITS.loginTimeoutMs.min)"
+              :max="timeoutLimitSeconds(STEAMCMD_TIMEOUT_LIMITS.loginTimeoutMs.max)"
+              :value="isLoginTimeoutDisabled ? '' : advancedSettings.loginTimeoutMs"
+              :disabled="isLoginTimeoutDisabled"
+              :placeholder="isLoginTimeoutDisabled ? 'No timeout' : undefined"
+              class="login-input advanced-input advanced-number-input mt-2"
               @input="onLoginTimeoutInput"
             />
-            <span class="advanced-meta">Used for full username/password sign-ins.</span>
-          </label>
+            <span class="advanced-timeout-toggle">
+              <input
+                type="checkbox"
+                aria-label="Disable login timeout"
+                :checked="isLoginTimeoutDisabled"
+                @change="onLoginTimeoutDisabledChange"
+              />
+              <span>Disable timeout</span>
+            </span>
+          </div>
 
-          <label class="advanced-label">
-            Saved Session Timeout
+          <label v-if="showsStoredSessionTimeout" class="advanced-label">
+            Saved Session Timeout (seconds)
             <input
               type="number"
               inputmode="numeric"
-              :min="STEAMCMD_TIMEOUT_LIMITS.storedSessionTimeoutMs.min"
-              :max="STEAMCMD_TIMEOUT_LIMITS.storedSessionTimeoutMs.max"
-              :value="advancedSettings.storedSessionTimeoutMs"
-              class="login-input advanced-input mt-2"
+              step="1"
+              :min="timeoutLimitSeconds(STEAMCMD_TIMEOUT_LIMITS.storedSessionTimeoutMs.min)"
+              :max="timeoutLimitSeconds(STEAMCMD_TIMEOUT_LIMITS.storedSessionTimeoutMs.max)"
+              :value="isStoredSessionTimeoutDisabled ? '' : advancedSettings.storedSessionTimeoutMs"
+              :disabled="isStoredSessionTimeoutDisabled"
+              :placeholder="isStoredSessionTimeoutDisabled ? 'No timeout' : undefined"
+              class="login-input advanced-input advanced-number-input mt-2"
               @input="onStoredSessionTimeoutInput"
             />
-            <span class="advanced-meta">Used when restoring a cached SteamCMD login.</span>
+            <span class="advanced-timeout-toggle">
+              <input
+                type="checkbox"
+                aria-label="Disable saved session timeout"
+                :checked="isStoredSessionTimeoutDisabled"
+                @change="onStoredSessionTimeoutDisabledChange"
+              />
+              <span>Disable timeout</span>
+            </span>
           </label>
 
-          <label class="advanced-label">
-            Workshop Action Timeout
+          <label v-if="showsWorkshopTimeout" class="advanced-label">
+            Workshop Action Timeout (seconds)
             <input
               type="number"
               inputmode="numeric"
-              :min="STEAMCMD_TIMEOUT_LIMITS.workshopTimeoutMs.min"
-              :max="STEAMCMD_TIMEOUT_LIMITS.workshopTimeoutMs.max"
-              :value="advancedSettings.workshopTimeoutMs"
-              class="login-input advanced-input mt-2"
+              step="1"
+              :min="timeoutLimitSeconds(STEAMCMD_TIMEOUT_LIMITS.workshopTimeoutMs.min)"
+              :max="timeoutLimitSeconds(STEAMCMD_TIMEOUT_LIMITS.workshopTimeoutMs.max)"
+              :value="isWorkshopTimeoutDisabled ? '' : advancedSettings.workshopTimeoutMs"
+              :disabled="isWorkshopTimeoutDisabled"
+              :placeholder="isWorkshopTimeoutDisabled ? 'No timeout' : undefined"
+              class="login-input advanced-input advanced-number-input mt-2"
               @input="onWorkshopTimeoutInput"
             />
-            <span class="advanced-meta">Used for create, update, and visibility actions.</span>
+            <span class="advanced-timeout-toggle">
+              <input
+                type="checkbox"
+                aria-label="Disable workshop action timeout"
+                :checked="isWorkshopTimeoutDisabled"
+                @change="onWorkshopTimeoutDisabledChange"
+              />
+              <span>Disable timeout</span>
+            </span>
           </label>
         </div>
+      </section>
+
+      <section v-if="props.showWebApiSection && placesWebApiAfterTimeouts" class="advanced-card">
+        <div class="advanced-card-header">
+          <div>
+            <h3 class="advanced-card-title">Steam Web API Key</h3>
+            <p class="advanced-card-copy">Save a Steam Web API key for API-backed lookups and store it securely when supported.</p>
+          </div>
+          <span class="advanced-badge" :class="webApiStatusClass">{{ webApiStatusLabel }}</span>
+        </div>
+
+        <label class="advanced-label mt-4">Steam Web API Key</label>
+        <div class="advanced-key-row">
+          <input
+            :type="isWebApiKeyPeek ? 'text' : 'password'"
+            :value="advancedSettings.webApiKey"
+            :placeholder="advancedSettings.hasWebApiKey ? 'Saved securely (enter new key to replace)' : 'Paste key...'"
+            autocomplete="off"
+            class="login-input advanced-input"
+            @input="onWebApiKeyInput"
+          />
+          <button
+            type="button"
+            class="login-peek advanced-inline-button"
+            @mouseenter="emit('set-web-api-key-peek', true)"
+            @mouseleave="emit('set-web-api-key-peek', false)"
+            @focus="emit('set-web-api-key-peek', true)"
+            @blur="emit('set-web-api-key-peek', false)"
+          >
+            Show
+          </button>
+        </div>
+
+        <p class="advanced-meta">
+          {{
+            advancedSettings.secureStorageAvailable
+              ? 'Key is stored encrypted using OS secure storage.'
+              : 'Secure storage is not available. Leave the key field empty to save SteamCMD settings only.'
+          }}
+        </p>
+        <p v-if="isWebApiKeySaveBlocked" class="advanced-meta">
+          Clear the key field to save SteamCMD path changes without secure storage.
+        </p>
+        <p v-if="advancedSettings.hasWebApiKey" class="advanced-meta advanced-meta-success">Saved key detected and ready to use.</p>
       </section>
     </div>
 
@@ -283,6 +451,7 @@ const steamCmdHint = computed(() => {
         {{ advancedSettings.isSaving ? 'Saving...' : props.saveLabel }}
       </button>
       <button
+        v-if="props.showWebApiSection"
         type="button"
         class="login-peek advanced-secondary-action text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
         :disabled="advancedSettings.isSaving || !advancedSettings.hasWebApiKey"
