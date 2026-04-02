@@ -1,5 +1,5 @@
 /**
- * Type declarations for `scripts/kill-old-instance.mjs`.
+ * Type declarations for `scripts/runtime/kill-old-instance.mjs`.
  * Exported helpers are intentionally declared so tests can validate process
  * targeting logic without shelling out to the real OS commands.
  */

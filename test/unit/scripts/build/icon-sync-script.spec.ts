@@ -3,7 +3,7 @@ import {
   buildLinuxLauncherContent,
   escapeSingleQuotesForBash,
   rewriteDesktopEntryMappings
-} from '../../../../scripts/sync-app-icon.mjs'
+} from '../../../../scripts/build/sync-app-icon.mjs'
 
 describe('sync-app-icon script helpers', () => {
   it('escapes single quotes for bash-safe paths', () => {

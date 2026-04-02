@@ -49,7 +49,7 @@ const emit = defineEmits<{
             type="button"
             title="Back to mod list"
             aria-label="Back to mod list"
-            class="inline-flex h-8 items-center justify-center gap-1 rounded border border-[#4d7ca0] bg-transparent px-2.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-[#22374b]"
+            class="steam-btn-muted inline-flex h-8 items-center justify-center gap-1 rounded px-2.5 text-xs font-semibold text-slate-100"
             @click="emit('go-to-mods')"
           >
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

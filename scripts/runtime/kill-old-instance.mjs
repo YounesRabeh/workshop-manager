@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
 
 const thisDir = dirname(fileURLToPath(import.meta.url))
-const projectRoot = resolve(thisDir, '..')
+const projectRoot = resolve(thisDir, '..', '..')
 
 function sleep(ms) {
   return new Promise((resolveSleep) => setTimeout(resolveSleep, ms))

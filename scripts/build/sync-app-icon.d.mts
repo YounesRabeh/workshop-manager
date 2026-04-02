@@ -1,5 +1,5 @@
 /**
- * Type declarations for `scripts/sync-app-icon.mjs`.
+ * Type declarations for `scripts/build/sync-app-icon.mjs`.
  * They document the exported launcher/icon helpers and keep script tests typed.
  */
 export interface LinuxLauncherContentOptions {

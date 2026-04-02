@@ -6,7 +6,7 @@
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { resolvePnpmCommand } from './build-executable.mjs'
+import { resolvePnpmCommand } from '../build/build-executable.mjs'
 
 export const SUPPORTED_ELECTRON_VITE_COMMANDS = ['dev', 'preview']
 

@@ -1,7 +1,7 @@
 {
   "name": "workshop-manager",
   "productName": "Workshop Manager",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Create and update items for Steam's Workshop.",
   "author": "Younes Rabeh",
   "license": "MIT",
@@ -22,7 +22,7 @@
     "directories": {
       "output": "dist"
     },
-    "beforeBuild": "./scripts/electron-builder-before-build.mjs",
+    "beforeBuild": "./scripts/build/electron-builder-before-build.mjs",
     "asar": true,
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "files": [
@@ -70,20 +70,20 @@
     }
   },
   "scripts": {
-    "clean": "node scripts/clean.mjs",
-    "kill:instance": "node scripts/kill-old-instance.mjs",
+    "clean": "node scripts/maintenance/clean.mjs",
+    "kill:instance": "node scripts/runtime/kill-old-instance.mjs",
     "predev": "pnpm kill:instance",
     "dev": "env -u ELECTRON_RUN_AS_NODE CHROME_DESKTOP=workshop-manager.desktop electron-vite dev",
     "dev:icon": "pnpm sync:icon && pnpm dev",
-    "sync:icon": "node scripts/sync-app-icon.mjs",
+    "sync:icon": "node scripts/build/sync-app-icon.mjs",
     "build:bundle:native": "electron-vite build",
-    "build:bundle": "node scripts/run-build-in-docker.mjs build:bundle:native",
-    "build": "node scripts/run-build-in-docker.mjs build:bundle:native",
-    "build:exe:native": "node scripts/build-executable.mjs",
-    "build:linux": "node scripts/run-build-in-docker.mjs build:exe:native",
-    "build:linux:icon": "node scripts/run-build-in-docker.mjs build:exe:native --generate-icon",
-    "build:win": "node scripts/run-build-in-docker.mjs build:exe:native --win",
-    "build:win:icon": "node scripts/run-build-in-docker.mjs build:exe:native --win --generate-icon",
+    "build:bundle": "node scripts/build/run-build-in-docker.mjs build:bundle:native",
+    "build": "node scripts/build/run-build-in-docker.mjs build:bundle:native",
+    "build:exe:native": "node scripts/build/build-executable.mjs",
+    "build:linux": "node scripts/build/run-build-in-docker.mjs build:exe:native",
+    "build:linux:icon": "node scripts/build/run-build-in-docker.mjs build:exe:native --generate-icon",
+    "build:win": "node scripts/build/run-build-in-docker.mjs build:exe:native --win",
+    "build:win:icon": "node scripts/build/run-build-in-docker.mjs build:exe:native --win --generate-icon",
     "build:all:icon": "pnpm build:linux:icon && pnpm build:win:icon",
     "release": "pnpm build:all:icon",
     "preview": "env -u ELECTRON_RUN_AS_NODE CHROME_DESKTOP=workshop-manager.desktop electron-vite preview",

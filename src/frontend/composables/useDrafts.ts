@@ -60,15 +60,6 @@ export function mergeContentFiles(existing: StagedContentFile[], incoming: Stage
   return dedupeContentFiles([...existing, ...incoming])
 }
 
-export function isPathInContentFolder(filePath: string, contentFolder: string): boolean {
-  const normalizedFile = normalizeFsPath(filePath)
-  const normalizedFolder = normalizeFsPath(contentFolder)
-  if (!normalizedFolder) {
-    return false
-  }
-  return normalizedFile === normalizedFolder || normalizedFile.startsWith(`${normalizedFolder}/`)
-}
-
 export function toStagedContentFile(entry: ContentFolderFileEntry): StagedContentFile {
   return {
     absolutePath: entry.absolutePath,
@@ -217,10 +208,6 @@ export function useDrafts() {
     return mode === 'create' ? createDraft : updateDraft
   }
 
-  function getStagedFilesForMode(mode: 'create' | 'update'): StagedContentFile[] {
-    return mode === 'create' ? createStagedContentFiles.value : updateStagedContentFiles.value
-  }
-
   function setDraftField<K extends keyof UploadDraftState>(
     mode: 'create' | 'update',
     field: K,
@@ -266,7 +253,6 @@ export function useDrafts() {
     clearCreatePreviewFile,
     clearUpdatePreviewFile,
     getDraftForMode,
-    getStagedFilesForMode,
     setDraftField,
     setStagedFilesForMode,
     clearWorkspaceForMode,
