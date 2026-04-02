@@ -16,6 +16,58 @@
   padding-bottom: 14px;
 }
 
+.app-top-bar .session-name-row {
+  min-width: 0;
+}
+
+.app-top-bar .session-name-row .session-name {
+  min-width: 0;
+}
+
+.app-top-bar .dev-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(102, 192, 244, 0.22);
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: rgba(72, 126, 166, 0.14);
+  color: #a8d9fb;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: help;
+}
+
+.app-top-bar .dev-tooltip {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 10px);
+  z-index: 8;
+  min-width: 230px;
+  transform: translateX(-50%);
+  border: 1px solid #4f83a7;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(12, 23, 34, 0.96);
+  color: #d4e6f4;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: normal;
+  white-space: normal;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.34);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.app-top-bar .dev-badge:hover .dev-tooltip,
+.app-top-bar .dev-badge:focus-visible .dev-tooltip {
+  opacity: 1;
+}
+
 .app-top-bar .toolbar-btn {
   border: 1px solid #466780;
   background: linear-gradient(180deg, #253b4f 0%, #1d3041 100%);

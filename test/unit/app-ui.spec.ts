@@ -493,6 +493,30 @@ describe('App UI validation gates', () => {
     expect(avatar.attributes('src')).toContain('https://example.invalid/avatar.png')
   })
 
+  it('shows DEV badge in top bar when a saved web api key is present', async () => {
+    workshop.getAdvancedSettings.mockResolvedValueOnce({
+      webApiEnabled: true,
+      hasWebApiKey: true,
+      secureStorageAvailable: true,
+      steamCmdManualPath: undefined,
+      steamCmdInstalled: true,
+      steamCmdSource: 'auto'
+    })
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('DEV')
+    expect(wrapper.find('[aria-label="Dev mode enabled"]').exists()).toBe(true)
+  })
+
   it('shows app version in About modal and not in top bar session meta', async () => {
     const wrapper = mount(App)
     await flushPromises()
