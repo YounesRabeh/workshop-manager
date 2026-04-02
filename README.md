@@ -4,7 +4,10 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 
 > [!NOTE]
 > `pnpm dev`, `pnpm preview`, `pnpm test`, and `pnpm typecheck` run natively on the host.
-> All `pnpm build*` and `pnpm release` packaging commands run through Docker on Linux.
+> All `pnpm build*` and `pnpm release` packaging commands run through Docker on Linux or Windows.
+
+> [!TIP]
+> The public scripts are cross-platform now: Linux and Windows hosts use the same `pnpm` commands for local dev, preview, testing, and packaging.
 
 ## Screenshots
 
@@ -28,7 +31,10 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 | --- | --- |
 | Development | Node.js `22.x` |
 | Development | `pnpm` `10.x` |
-| Packaging builds | Docker on a Linux host |
+| Packaging builds | Docker on a Linux or Windows host |
+
+
+Packaging commands always run inside the repo's Docker builder image, even when launched from Windows.
 
 > [!TIP]
 > Use `pnpm dev:icon` or `pnpm preview:icon` only when you want to regenerate icon assets first.
@@ -38,11 +44,11 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 | Step | Command | Notes |
 | --- | --- | --- |
 | Install dependencies | `pnpm install` | Required once after cloning |
-| Start development mode | `pnpm dev` | Fast local dev path |
+| Start development mode | `pnpm dev` | Fast local dev path on Linux and Windows |
 | Start development mode with icon sync | `pnpm dev:icon` | Regenerates icon assets first |
 | Run tests | `pnpm test` | Runs Vitest |
 | Run type checks | `pnpm typecheck` | Checks Node, renderer, and test TS configs |
-| Preview production renderer | `pnpm preview` | Local preview path |
+| Preview production renderer | `pnpm preview` | Local preview path on Linux and Windows |
 | Preview with icon sync | `pnpm preview:icon` | Regenerates icon assets first |
 
 ## Build And Package
@@ -59,44 +65,22 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 
 > [!IMPORTANT]
 > Docker is build-only. The generated `.AppImage` and `.exe` run natively after packaging.
-> Dockerized builds are currently supported on Linux hosts only.
-
+> Dockerized builds are currently supported on Linux and Windows hosts.
 
 > Packaging commands always rebuild the app bundle first so installers do not ship stale `out/` code.
 > The wrapper performs host-side cleanup before entering Docker so stale local Electron processes do not interfere with packaging.
 > Persistent Docker build caches live under `~/.cache/workshop-manager/docker-build`.
 > Output artifacts are written to `dist/`.
 
-## Windows Runtime
-
-The Windows package is built on Linux, but it is meant to be run on Windows.
-
-| Step | Action |
-| --- | --- |
-| 1 | Run `pnpm build:win` |
-| 2 | Find the generated installer in `dist/` |
-| 3 | Run the installer on a Windows system |
-| 4 | Install and launch the app |
-
-> [!NOTE]
-> The Windows package is built on Linux, but it is intended to be installed and used on Windows.
+> [!TIP]
+> Use `pnpm release` when you want the full export flow with icon sync for both Linux and Windows artifacts.
 
 ## Changing The App Icon
 
-Use `resources/img/app-icon.png` as the source icon.
+`resources/img/app-icon.png` is the single source of truth for the app icon used by both the app and packaged builds.
 
-> [!IMPORTANT]
-> `resources/img/app-icon.png` is the single source of truth for the app icon used by both the app and packaged builds.
-
-| Task | Command |
-| --- | --- |
-| Manually regenerate derived icon assets | `pnpm sync:icon` |
-| Sync icons and launch development mode | `pnpm dev:icon` |
-| Sync icons and preview the renderer | `pnpm preview:icon` |
-| Regenerate icons during Linux packaging | `pnpm build:linux:icon` |
-| Regenerate icons during Windows packaging | `pnpm build:win:icon` |
-| Regenerate icons during both packaging flows | `pnpm build:all:icon` |
-| Same combined packaging flow via alias | `pnpm release` |
+> [!NOTE]
+> `pnpm sync:icon` is the manual icon-only step. The `:icon` build and preview commands simply run that sync step first, then continue with the main command.
 
 ## Project Layout
 
@@ -118,9 +102,3 @@ Use `resources/img/app-icon.png` as the source icon.
 | Passwords | Not stored as plain local config values |
 | Steam Web API keys | Stored through Electron secure storage when available |
 | Run logs | Stored locally so failed SteamCMD runs can be inspected later |
-
-## Current Scope
-
-- Linux and Windows are the primary runtime targets
-- V1 intentionally excludes a Workshop stats dashboard
-- V1 intentionally excludes `workshop_download_item`
