@@ -8,7 +8,7 @@ import {
   normalizeBuildTargetPlatform,
   parseBuildExecutableOptions,
   resolvePnpmCommand
-} from '../../scripts/build-executable.mjs'
+} from '../../../../scripts/build-executable.mjs'
 
 describe('build-executable script helpers', () => {
   it('maps platform to packaging target correctly', () => {

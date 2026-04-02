@@ -18,7 +18,7 @@ vi.mock('node:https', () => ({
   get: getMock
 }))
 
-const { SteamCmdInstallManager } = await import('../../src/backend/services/steamcmd-install-manager')
+const { SteamCmdInstallManager } = await import('@backend/services/steamcmd-install-manager')
 
 describe('SteamCmdInstallManager download failures', () => {
   beforeEach(() => {

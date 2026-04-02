@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { listContentFolderFiles } from '../../src/backend/services/content-folder-scanner'
+import { listContentFolderFiles } from '@backend/services/content-folder-scanner'
 
 describe('content folder scanner', () => {
   it('recursively lists files (including hidden) with relative paths and sizes', async () => {

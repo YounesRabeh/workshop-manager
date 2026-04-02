@@ -2,8 +2,8 @@ import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ProfileStore } from '../../src/backend/stores/profile-store'
-import { RunLogStore } from '../../src/backend/stores/run-log-store'
+import { ProfileStore } from '@backend/stores/profile-store'
+import { RunLogStore } from '@backend/stores/run-log-store'
 
 describe('profile and run-log persistence', () => {
   it('persists profiles and remembered username', async () => {

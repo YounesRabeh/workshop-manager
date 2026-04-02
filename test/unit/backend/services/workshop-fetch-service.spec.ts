@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { AppError } from '../../src/backend/utils/errors'
-import { WorkshopFetchService } from '../../src/backend/services/workshop-fetch-service'
+import { AppError } from '@backend/utils/errors'
+import { WorkshopFetchService } from '@backend/services/workshop-fetch-service'
 
 describe('WorkshopFetchService', () => {
   beforeEach(() => {

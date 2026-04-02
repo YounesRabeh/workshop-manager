@@ -2,8 +2,8 @@
 
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import App from '../../src/frontend/App.vue'
-import type { PersistedRunLog } from '../../src/shared/contracts'
+import App from '@frontend/App.vue'
+import type { PersistedRunLog } from '@shared/contracts'
 
 const workshop = {
   ensureSteamCmdInstalled: vi.fn(async () => ({

@@ -6,7 +6,7 @@ import {
   parseSteamId64FromConnectionLog,
   parseSteamId64FromProfileXml,
   SteamIdentityResolver
-} from '../../src/backend/services/steam-identity-resolver'
+} from '@backend/services/steam-identity-resolver'
 
 describe('SteamIdentityResolver', () => {
   beforeEach(() => {

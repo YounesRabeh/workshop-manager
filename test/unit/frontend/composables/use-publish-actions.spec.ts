@@ -2,7 +2,7 @@
 
 import { computed, reactive, ref } from 'vue'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { usePublishActions } from '../../src/frontend/composables/usePublishActions'
+import { usePublishActions } from '@frontend/composables/usePublishActions'
 
 describe('usePublishActions composable', () => {
   const workshop = {

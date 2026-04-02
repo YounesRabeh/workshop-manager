@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContentTree, mergeContentFiles } from '../../src/frontend/composables/useDrafts'
+import { buildContentTree, mergeContentFiles } from '@frontend/composables/useDrafts'
 
 describe('useDrafts composable', () => {
   it('deduplicates merged content files by absolute path', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { generateWorkshopVdf } from '../../src/backend/services/vdf-generator'
+import { generateWorkshopVdf } from '@backend/services/vdf-generator'
 
 describe('generateWorkshopVdf', () => {
   it('renders deterministic upload VDF with escaped values', () => {

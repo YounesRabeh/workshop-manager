@@ -2,11 +2,11 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AppError } from '../../src/backend/utils/errors'
-import { WorkshopCommandService } from '../../src/backend/services/workshop-command-service'
-import { listContentFolderFiles } from '../../src/backend/services/content-folder-scanner'
+import { AppError } from '@backend/utils/errors'
+import { WorkshopCommandService } from '@backend/services/workshop-command-service'
+import { listContentFolderFiles } from '@backend/services/content-folder-scanner'
 
-vi.mock('../../src/backend/services/content-folder-scanner', () => ({
+vi.mock('@backend/services/content-folder-scanner', () => ({
   listContentFolderFiles: vi.fn(async () => [])
 }))
 

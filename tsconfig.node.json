@@ -9,11 +9,11 @@
     "test/**/*.ts"
   ],
   "exclude": [
-    "test/unit/app-ui.spec.ts",
-    "test/unit/use-auth-flow.spec.ts",
-    "test/unit/use-drafts.spec.ts",
-    "test/unit/use-publish-actions.spec.ts",
-    "test/unit/use-workshop-items.spec.ts"
+    "test/unit/frontend/app/app-ui.spec.ts",
+    "test/unit/frontend/composables/use-auth-flow.spec.ts",
+    "test/unit/frontend/composables/use-drafts.spec.ts",
+    "test/unit/frontend/composables/use-publish-actions.spec.ts",
+    "test/unit/frontend/composables/use-workshop-items.spec.ts"
   ],
   "compilerOptions": {
     "composite": true,
