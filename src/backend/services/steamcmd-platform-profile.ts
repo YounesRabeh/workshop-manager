@@ -17,7 +17,7 @@ export interface SteamCmdPlatformBehavior {
   interactiveLineEnding: '\n' | '\r\n'
   loginExecution: 'interactive' | 'one_shot'
   workshopExecution: 'interactive' | 'one_shot'
-  persistentSessionStartup: 'empty_process' | 'startup_args'
+  persistentSessionStartup: 'empty_process' | 'startup_args' | 'none'
   identityResolution: 'steamcmd_output' | 'steamcmd_output_then_custom_profile'
   waitForPromptBeforeInteractiveLogin: boolean
   enableInteractiveLoginRetry: boolean
@@ -50,16 +50,16 @@ const STEAMCMD_PLATFORM_BEHAVIORS: Record<SteamCmdPlatformProfile, SteamCmdPlatf
     archiveKind: 'zip',
     expectedExecutableName: 'steamcmd.exe',
     requiresExecutableBit: false,
-    useShellHost: true,
+    useShellHost: false,
     hideWindowsConsole: true,
     interactiveLineEnding: '\r\n',
     loginExecution: 'one_shot',
     workshopExecution: 'one_shot',
-    persistentSessionStartup: 'startup_args',
+    persistentSessionStartup: 'none',
     identityResolution: 'steamcmd_output_then_custom_profile',
-    waitForPromptBeforeInteractiveLogin: true,
-    enableInteractiveLoginRetry: true,
-    enablePromptDispatchFallback: true
+    waitForPromptBeforeInteractiveLogin: false,
+    enableInteractiveLoginRetry: false,
+    enablePromptDispatchFallback: false
   }
 }
 

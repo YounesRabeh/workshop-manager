@@ -119,20 +119,6 @@ export class SteamCmdRuntimeService extends EventEmitter {
     this.emit('run-event', event)
   }
 
-  private async ensurePersistentWorkshopSession(username: string): Promise<void> {
-    if (this.platformBehavior.persistentSessionStartup !== 'startup_args' || this.processSession.hasPersistentProcess()) {
-      return
-    }
-
-    await this.processSession.runPersistentStartup(createRunId(), ['+login', username], {
-      phase: 'login',
-      timeoutMs: resolveLoginTimeoutMs(true),
-      emitOutputEvents: false,
-      emitRunEvents: false,
-      persistLogs: false
-    })
-  }
-
   private async resolveLoginSteamId64(runId: string, username: string, lines: string[]): Promise<string | undefined> {
     const parsedSteamId64 = parseSteamId64(lines)
     if (parsedSteamId64) {
@@ -258,13 +244,6 @@ export class SteamCmdRuntimeService extends EventEmitter {
     this.lastAuthenticatedState = {
       username: this.loginState.username,
       steamId64: this.loginState.steamId64
-    }
-    if (this.platformBehavior.persistentSessionStartup === 'startup_args') {
-      try {
-        await this.ensurePersistentWorkshopSession(normalizedUsername)
-      } catch {
-        // Keep the successful login result. Upload/update will retry this bootstrap if needed.
-      }
     }
     this.emitRunEvent({ runId, ts: Date.now(), type: 'run_finished', phase: 'login' })
     await this.runLogStore.finalize(runId, {
@@ -403,21 +382,6 @@ export class SteamCmdRuntimeService extends EventEmitter {
       throw new AppError('auth', 'You must login before uploading or updating mods')
     }
     const prepared = await this.workshopCommandService.prepare(this.loginState.username, draft, mode)
-    if (
-      prepared.execution === 'interactive' &&
-      this.platformBehavior.persistentSessionStartup === 'startup_args'
-    ) {
-      try {
-        await this.ensurePersistentWorkshopSession(this.loginState.username)
-      } catch (error) {
-        throw new AppError(
-          'auth',
-          error instanceof Error
-            ? `Steam session is not ready for workshop commands. ${error.message}`
-            : 'Steam session is not ready for workshop commands. Sign in again and retry.'
-        )
-      }
-    }
 
     this.emitRunEvent({ runId: prepared.runId, ts: Date.now(), type: 'phase_changed', phase: mode })
 

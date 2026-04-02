@@ -35,7 +35,7 @@ export function parseSteamLoginFailure(lines: string[]): LoginFailure | undefine
   const joined = lines.join('\n')
 
   if (
-    /invalid password|incorrect password|password is incorrect|account name or password|login failure:\s*invalidpassword|login failure:\s*invalid/i.test(
+    /invalid password|incorrect password|password is incorrect|account name or password|bad credentials|login failure:\s*invalidpassword|login failure:\s*badcredentials|login failure:\s*invalid/i.test(
       joined
     )
   ) {

@@ -27,8 +27,10 @@ describe('steamcmd platform profile', () => {
     expect(getSteamCmdPlatformBehavior('windows')).toMatchObject({
       expectedExecutableName: 'steamcmd.exe',
       archiveKind: 'zip',
+      useShellHost: false,
       loginExecution: 'one_shot',
-      persistentSessionStartup: 'startup_args',
+      workshopExecution: 'one_shot',
+      persistentSessionStartup: 'none',
       identityResolution: 'steamcmd_output_then_custom_profile'
     })
   })

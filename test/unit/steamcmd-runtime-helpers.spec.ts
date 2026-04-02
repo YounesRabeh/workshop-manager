@@ -49,6 +49,18 @@ describe('steamcmd runtime helpers', () => {
     })
   })
 
+  it('classifies Windows bad credentials login failures', () => {
+    const failure = parseSteamLoginFailure([
+      "Logging in user 'alice' to Steam Public...",
+      'Login Failure: BadCredentials'
+    ])
+
+    expect(failure).toEqual({
+      code: 'auth',
+      message: 'Steam login failed: username or password is incorrect.'
+    })
+  })
+
   it('classifies invalid steam guard code failures', () => {
     const failure = parseSteamLoginFailure([
       'This account is protected by Steam Guard.',

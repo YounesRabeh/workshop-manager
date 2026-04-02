@@ -407,18 +407,9 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(childRef?.commands.filter((command) => command.startsWith('login '))).toHaveLength(1)
   })
 
-  it('uses a one-shot Windows login before restoring a persistent workshop session', async () => {
+  it('uses a single one-shot Windows login without restoring a persistent workshop session', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-'))
     const store = new RunLogStore(join(root, 'runs'))
-    let childRef:
-      | (EventEmitter & {
-          stdout: PassThrough
-          stderr: PassThrough
-          stdin: PassThrough
-          commands: string[]
-          kill: () => void
-        })
-      | undefined
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
       if (args.join(' ') === '+login alice secret +quit') {
@@ -429,22 +420,6 @@ describe('SteamCmdRuntimeService lifecycle', () => {
             'Waiting for user info...OK'
           ]
         })
-      }
-
-      if (args.join(' ') === '+login alice') {
-        childRef = createInteractiveFakeChild(
-          {},
-          {
-            startupResponse: {
-              lines: [
-                "Logging in user 'alice' [U:1:42] to Steam Public...",
-                'Waiting for user info...OK',
-                'Steam>'
-              ]
-            }
-          }
-        )
-        return childRef
       }
 
       throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
@@ -462,31 +437,82 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       1,
       'C:\\steamcmd\\steamcmd.exe',
       ['+login', 'alice', 'secret', '+quit'],
-      expect.objectContaining({ shell: true, windowsHide: true })
+      expect.objectContaining({ shell: false, windowsHide: true })
     )
-    expect(spawn).toHaveBeenNthCalledWith(
-      2,
-      'C:\\steamcmd\\steamcmd.exe',
-      ['+login', 'alice'],
-      expect.objectContaining({ shell: true, windowsHide: true })
-    )
-    expect(childRef?.commands).toHaveLength(0)
+    expect(spawn).toHaveBeenCalledTimes(1)
     const persisted = await store.list()
     expect(persisted[0]?.lines.join('\n')).toContain('Waiting for confirmation on your Steam Guard Mobile Authenticator...')
   })
 
-  it('reuses the restored Windows persistent session for workshop commands', async () => {
+  it('keeps Windows login state available for workshop fetches after a one-shot login', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-workshop-fetch-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+      if (args.join(' ') === '+login alice secret +quit') {
+        return createOneShotFakeChild({
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        })
+      }
+
+      throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+    })
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+
+      if (url.includes('/myworkshopfiles/')) {
+        return new Response(
+          '<html><body><a href="https://steamcommunity.com/sharedfiles/filedetails/?id=100">Mod</a></body></html>',
+          { status: 200, headers: { 'content-type': 'text/html' } }
+        )
+      }
+
+      if (url === 'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/') {
+        expect(init?.method).toBe('POST')
+        return jsonResponse({
+          response: {
+            publishedfiledetails: [
+              {
+                publishedfileid: '100',
+                title: 'Fetched item',
+                consumer_appid: '480',
+                visibility: 0,
+                time_updated: 10
+              }
+            ]
+          }
+        })
+      }
+
+      throw new Error(`Unexpected fetch url: ${url}`)
+    })
+
+    const runtime = new SteamCmdRuntimeService(
+      async () => 'C:\\steamcmd\\steamcmd.exe',
+      store,
+      join(root, 'runtime'),
+      'windows'
+    )
+    await runtime.login('alice', 'secret')
+
+    const items = await runtime.getMyWorkshopItems(undefined, undefined, {
+      allowWebApi: false,
+      webApiAccess: 'disabled'
+    })
+
+    expect(items).toHaveLength(1)
+    expect(items[0]?.publishedFileId).toBe('100')
+    expect(spawn).toHaveBeenCalledTimes(1)
+    fetchSpy.mockRestore()
+  })
+
+  it('uses one-shot Windows workshop commands after login', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-workshop-'))
     const store = new RunLogStore(join(root, 'runs'))
-    let childRef:
-      | (EventEmitter & {
-          stdout: PassThrough
-          stderr: PassThrough
-          stdin: PassThrough
-          commands: string[]
-          kill: () => void
-        })
-      | undefined
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
       if (args.join(' ') === '+login alice secret +quit') {
@@ -497,22 +523,6 @@ describe('SteamCmdRuntimeService lifecycle', () => {
             'Waiting for user info...OK'
           ]
         })
-      }
-
-      if (args.join(' ') === '+login alice') {
-        childRef = createInteractiveFakeChild(
-          {},
-          {
-            startupResponse: {
-              lines: [
-                "Logging in user 'alice' [U:1:42] to Steam Public...",
-                'Waiting for user info...OK',
-                'Steam>'
-              ]
-            }
-          }
-        )
-        return childRef
       }
 
       if (args.includes('+workshop_build_item')) {
@@ -543,11 +553,13 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     )
 
     expect(result.success).toBe(true)
-    expect(spawn).toHaveBeenCalledTimes(3)
-    expect(childRef?.commands).toHaveLength(0)
-    const uploadArgs = vi.mocked(spawn).mock.calls[2]?.[1]
+    expect(spawn).toHaveBeenCalledTimes(2)
+    const uploadArgs = vi.mocked(spawn).mock.calls[1]?.[1]
     expect(uploadArgs).toEqual(
       expect.arrayContaining(['+login', 'alice', '+workshop_build_item', '+quit'])
+    )
+    expect(vi.mocked(spawn).mock.calls[1]?.[2]).toEqual(
+      expect.objectContaining({ shell: false, windowsHide: true })
     )
   })
 
@@ -563,21 +575,6 @@ describe('SteamCmdRuntimeService lifecycle', () => {
             'Waiting for user info...OK'
           ]
         })
-      }
-
-      if (args.join(' ') === '+login alice') {
-        return createInteractiveFakeChild(
-          {},
-          {
-            startupResponse: {
-              lines: [
-                "Logging in user 'alice' [U:1:42] to Steam Public...",
-                'Waiting for user info...OK',
-                'Steam>'
-              ]
-            }
-          }
-        )
       }
 
       throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
@@ -638,6 +635,44 @@ describe('SteamCmdRuntimeService lifecycle', () => {
 
     const persisted = await store.list()
     expect(persisted[0]?.lines.join('\n')).toContain('resolved steamId64 via custom profile XML')
+    expect(spawn).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails Windows bad credentials login without attempting a second bootstrap', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-auth-failure-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+      if (args.join(' ') === '+login alice wrong +quit') {
+        return createOneShotFakeChild({
+          lines: [
+            "Logging in user 'alice' to Steam Public...",
+            'Login Failure: BadCredentials'
+          ],
+          closeCode: 1
+        })
+      }
+
+      throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+    })
+
+    const runtime = new SteamCmdRuntimeService(
+      async () => 'C:\\steamcmd\\steamcmd.exe',
+      store,
+      join(root, 'runtime'),
+      'windows'
+    )
+
+    await expect(runtime.login('alice', 'wrong')).rejects.toThrow(
+      'Steam login failed: username or password is incorrect.'
+    )
+
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(spawn).toHaveBeenCalledWith(
+      'C:\\steamcmd\\steamcmd.exe',
+      ['+login', 'alice', 'wrong', '+quit'],
+      expect.objectContaining({ shell: false, windowsHide: true })
+    )
   })
 
   it('fails update early when selected content folder has no files', async () => {
