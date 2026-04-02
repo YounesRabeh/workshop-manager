@@ -258,12 +258,6 @@ const hasPendingUpdateChanges = computed(() => {
   )
 })
 
-const signedInStatusClass = computed(() =>
-  /(failed|error|required|cannot|unavailable)/i.test(statusMessage.value)
-    ? 'border-rose-200 bg-rose-50 text-rose-700'
-    : 'border-[#2c4b63] bg-[linear-gradient(180deg,rgba(27,45,63,0.94)_0%,rgba(16,30,43,0.94)_100%)] text-slate-100'
-)
-
 const publishActions = usePublishActions({
   loginState,
   selectedWorkshopItemId,
@@ -583,16 +577,6 @@ watch(
           @toggle-fullscreen="toggleFullscreen"
           @sign-out="signOut"
         />
-
-        <section
-          v-if="statusMessage"
-          class="mt-5 rounded-xl border px-4 py-3 text-sm shadow-sm"
-          :class="signedInStatusClass"
-          role="status"
-          aria-live="polite"
-        >
-          {{ statusMessage }}
-        </section>
 
         <section
           v-if="publishProgressVisible"
