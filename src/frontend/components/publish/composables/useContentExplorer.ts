@@ -1,5 +1,5 @@
 /**
- * Overview: Shared content-explorer state utilities for publish section panels.
+ * Overview: Content-explorer state helpers for publish section panels.
  * Responsibility: Flattens staged file trees and manages collapsed/expanded folder state plus explorer toggle behavior.
  */
 import { computed, ref, watch, type ComputedRef } from 'vue'

@@ -6,11 +6,11 @@
 import { ref } from 'vue'
 import type { PublishChecklistItem } from '../../../types/ui'
 import {
-  readinessItemClass as sharedReadinessItemClass,
-  readinessStatusClass as sharedReadinessStatusClass,
-  readinessStatusLabel as sharedReadinessStatusLabel,
+  readinessItemClass as resolveReadinessItemClass,
+  readinessStatusClass as resolveReadinessStatusClass,
+  readinessStatusLabel as resolveReadinessStatusLabel,
   type ReadinessStyleContext
-} from '../shared'
+} from '../theme/readiness-theme'
 
 const props = defineProps<{
   title: string
@@ -26,15 +26,15 @@ function toggleCollapsed(): void {
 }
 
 function readinessItemClass(item: PublishChecklistItem): string {
-  return sharedReadinessItemClass(item, props.context)
+  return resolveReadinessItemClass(item, props.context)
 }
 
 function readinessStatusClass(item: PublishChecklistItem): string {
-  return sharedReadinessStatusClass(item, props.context)
+  return resolveReadinessStatusClass(item, props.context)
 }
 
 function readinessStatusLabel(item: PublishChecklistItem): string {
-  return sharedReadinessStatusLabel(item, props.context)
+  return resolveReadinessStatusLabel(item, props.context)
 }
 </script>
 

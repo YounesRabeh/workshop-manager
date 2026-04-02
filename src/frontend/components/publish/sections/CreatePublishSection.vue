@@ -7,18 +7,14 @@
 import { computed } from 'vue'
 import type { ContentTreeNode, PublishChecklistItem, StagedContentFile, UploadDraftState } from '../../../types/ui'
 import { formatSizeLabel } from '../../../utils/size-format'
+import { useContentExplorer } from '../composables/useContentExplorer'
+import { useUploadPreview } from '../composables/useUploadPreview'
+import { splitCreateReadinessItems } from '../model/readiness'
+import { visibilityHint, visibilityLabel, visibilityOptions } from '../model/visibility'
 import PublishContentExplorerPanel from '../panels/PublishContentExplorerPanel.vue'
 import PublishDraftMetadataFields from '../panels/PublishDraftMetadataFields.vue'
 import PublishReadinessCard from '../panels/PublishReadinessCard.vue'
-import {
-  previewBorderClass,
-  useContentExplorer,
-  useUploadPreview,
-  visibilityHint,
-  visibilityLabel,
-  visibilityOptions
-} from '../shared'
-import '../styles/publish-section.shared.css'
+import { previewBorderClass } from '../theme/visibility-theme'
 
 const props = defineProps<{
   publishChecklist: PublishChecklistItem[]
@@ -89,13 +85,8 @@ const {
   toggleContentExplorerCollapsed
 } = useContentExplorer(computed(() => props.stagedContentTree))
 
-const readinessBuckets = computed(() => {
-  const topLabels = new Set(['App ID', 'Title', 'Content folder'])
-  const top = props.publishChecklist.filter((item) => topLabels.has(item.label))
-  const secondary = props.publishChecklist.filter((item) => !topLabels.has(item.label))
-  return { top, secondary }
-})
-const topReadinessItems = computed(() => readinessBuckets.value.top)
+const readinessBuckets = computed(() => splitCreateReadinessItems(props.publishChecklist))
+const topReadinessItems = computed(() => readinessBuckets.value.primary)
 const secondaryReadinessItems = computed(() => readinessBuckets.value.secondary)
 
 const readinessContext = computed(() => ({

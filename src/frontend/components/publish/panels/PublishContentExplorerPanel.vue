@@ -4,7 +4,7 @@
   (collapse/expand/reset/select-folder) for publish flows.
 -->
 <script setup lang="ts">
-import type { FlattenedContentNode } from '../shared'
+import type { FlattenedContentNode } from '../composables/useContentExplorer'
 import type { StagedContentFile } from '../../../types/ui'
 import { formatSizeLabel } from '../../../utils/size-format'
 
