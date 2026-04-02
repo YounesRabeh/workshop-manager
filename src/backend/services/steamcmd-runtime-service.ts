@@ -6,6 +6,7 @@
 import { EventEmitter } from 'node:events'
 import { mkdir } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
+import { dirname, join } from 'node:path'
 import type {
   RunEvent,
   RunResult,
@@ -13,7 +14,7 @@ import type {
   UploadDraft,
   WorkshopItemSummary
 } from '@shared/contracts'
-import { AppError } from '@backend/utils/errors'
+import { AppError, isRunCancelledError } from '@backend/utils/errors'
 import { RunLogStore } from '@backend/stores/run-log-store'
 import {
   isSteamGuardPrompt,
@@ -118,6 +119,27 @@ export class SteamCmdRuntimeService extends EventEmitter {
     this.emit('run-event', event)
   }
 
+  private async getSteamIdentityLogPaths(): Promise<string[]> {
+    const candidates = [
+      join(this.runtimeDir, 'connection_log.txt'),
+      join(this.runtimeDir, 'logs', 'connection_log.txt'),
+      join(this.runtimeDir, 'Steam', 'logs', 'connection_log.txt')
+    ]
+
+    try {
+      const executablePath = await this.steamCmdExecutablePath()
+      const executableDir = dirname(executablePath)
+      candidates.push(
+        join(executableDir, 'connection_log.txt'),
+        join(executableDir, 'logs', 'connection_log.txt')
+      )
+    } catch {
+      // Ignore executable lookup failures here; the login command already completed.
+    }
+
+    return [...new Set(candidates)]
+  }
+
   private async resolveLoginSteamId64(runId: string, username: string, lines: string[]): Promise<string | undefined> {
     const parsedSteamId64 = parseSteamId64(lines)
     if (parsedSteamId64) {
@@ -129,26 +151,41 @@ export class SteamCmdRuntimeService extends EventEmitter {
       `[RUN_META] no valid steamId64 detected in ${this.platformBehavior.profile} login output`
     )
 
+    await this.runLogStore.appendLine(
+      runId,
+      '[RUN_META] attempting Steam account identity resolution via SteamCMD connection logs'
+    )
+    const resolvedFromConnectionLog = await this.steamIdentityResolver.resolveFromConnectionLogs(
+      await this.getSteamIdentityLogPaths()
+    )
+    if (resolvedFromConnectionLog) {
+      await this.runLogStore.appendLine(
+        runId,
+        `[RUN_META] resolved steamId64 via SteamCMD connection log: ${resolvedFromConnectionLog}`
+      )
+      return resolvedFromConnectionLog
+    }
+
     if (this.platformBehavior.identityResolution !== 'steamcmd_output_then_custom_profile') {
       return undefined
     }
 
     await this.runLogStore.appendLine(
       runId,
-      '[RUN_META] attempting Steam account identity resolution via custom profile XML'
+      '[RUN_META] attempting Steam account identity resolution via explicit Steam community profile reference'
     )
     const resolvedSteamId64 = await this.steamIdentityResolver.resolveFromCustomProfile(username)
     if (resolvedSteamId64) {
       await this.runLogStore.appendLine(
         runId,
-        `[RUN_META] resolved steamId64 via custom profile XML: ${resolvedSteamId64}`
+        `[RUN_META] resolved steamId64 via Steam community profile reference: ${resolvedSteamId64}`
       )
       return resolvedSteamId64
     }
 
     await this.runLogStore.appendLine(
       runId,
-      '[RUN_META] custom profile XML identity resolution did not return a valid steamId64'
+      '[RUN_META] Steam account identity resolution did not return a valid steamId64'
     )
     return undefined
   }
@@ -424,6 +461,14 @@ export class SteamCmdRuntimeService extends EventEmitter {
     } catch (error) {
       const runError =
         error instanceof AppError ? error : new AppError('command_failed', errorMessage(error))
+      if (isRunCancelledError(runError)) {
+        await this.runLogStore.finalize(prepared.runId, {
+          success: false,
+          status: 'cancelled'
+        })
+        throw runError
+      }
+
       this.emitRunEvent({
         runId: prepared.runId,
         ts: Date.now(),

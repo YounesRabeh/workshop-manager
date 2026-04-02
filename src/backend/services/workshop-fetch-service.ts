@@ -47,6 +47,42 @@ function unresolvedIdentityMessage(
 export class WorkshopFetchService {
   constructor(private readonly context: WorkshopFetchContext) {}
 
+  private async fetchPublishedFileDetails(ids: string[]): Promise<WorkshopItemSummary[]> {
+    const items: WorkshopItemSummary[] = []
+    const batchSize = 100
+
+    for (let start = 0; start < ids.length; start += batchSize) {
+      const batch = ids.slice(start, start + batchSize)
+      const detailsParams = new URLSearchParams({ itemcount: String(batch.length) })
+      for (const [index, id] of batch.entries()) {
+        detailsParams.set(`publishedfileids[${index}]`, id)
+      }
+
+      const detailsResponse = await fetch(
+        'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/x-www-form-urlencoded; charset=UTF-8'
+          },
+          body: detailsParams.toString()
+        }
+      )
+
+      if (!detailsResponse.ok) {
+        throw new AppError(
+          'command_failed',
+          `Workshop details fetch failed with status ${detailsResponse.status}`
+        )
+      }
+
+      const payload = (await detailsResponse.json()) as unknown
+      items.push(...normalizeWorkshopItems(payload))
+    }
+
+    return mergeWorkshopItems(items)
+  }
+
   async getCurrentProfile(): Promise<SteamProfileSummary> {
     const loginState = this.context.getLoginState()
     if (!loginState) {
@@ -256,7 +292,8 @@ export class WorkshopFetchService {
 
     const firstHtml = await firstPage.text()
     const allIds = extractWorkshopFileIdsFromHtml(firstHtml)
-    const maxPage = Math.min(extractMaxWorkshopPage(firstHtml), 10)
+    const seenIds = new Set(allIds)
+    const maxPage = extractMaxWorkshopPage(firstHtml)
 
     for (let page = 2; page <= maxPage; page += 1) {
       params.set('p', String(page))
@@ -269,7 +306,8 @@ export class WorkshopFetchService {
       const html = await response.text()
       const ids = extractWorkshopFileIdsFromHtml(html)
       for (const id of ids) {
-        if (!allIds.includes(id)) {
+        if (!seenIds.has(id)) {
+          seenIds.add(id)
           allIds.push(id)
         }
       }
@@ -279,31 +317,7 @@ export class WorkshopFetchService {
       return []
     }
 
-    const detailsParams = new URLSearchParams({ itemcount: String(allIds.length) })
-    for (const [index, id] of allIds.entries()) {
-      detailsParams.set(`publishedfileids[${index}]`, id)
-    }
-
-    const detailsResponse = await fetch(
-      'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/',
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/x-www-form-urlencoded; charset=UTF-8'
-        },
-        body: detailsParams.toString()
-      }
-    )
-
-    if (!detailsResponse.ok) {
-      throw new AppError(
-        'command_failed',
-        `Workshop details fetch failed with status ${detailsResponse.status}`
-      )
-    }
-
-    const payload = (await detailsResponse.json()) as unknown
-    const normalized = normalizeWorkshopItems(payload)
+    const normalized = await this.fetchPublishedFileDetails(allIds)
 
     if (appId) {
       return normalized.filter((item) => item.appId === appId)

@@ -1,4 +1,4 @@
-import { access, mkdtemp } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -651,9 +651,57 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     )
   })
 
-  it('resolves the Windows steamId64 from custom profile XML when SteamCMD only reports [U:1:0]', async () => {
+  it('accepts a successful Windows one-shot workshop run even when SteamCMD omits an explicit success line', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-workshop-no-success-line-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+      if (args.join(' ') === '+login alice secret +quit') {
+        return createOneShotFakeChild({
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        })
+      }
+
+      if (args.includes('+workshop_build_item')) {
+        return createOneShotFakeChild({
+          lines: ['Published File Id: 777']
+        })
+      }
+
+      throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+    })
+
+    const runtime = new SteamCmdRuntimeService(
+      async () => 'C:\\steamcmd\\steamcmd.exe',
+      store,
+      join(root, 'runtime'),
+      'windows'
+    )
+    await runtime.login('alice', 'secret')
+
+    const result = await runtime.upload(
+      {
+        appId: '480',
+        contentFolder: '/mods',
+        previewFile: '/mods/preview.png',
+        title: 'My Mod'
+      },
+      'upload'
+    )
+
+    expect(result.success).toBe(true)
+    expect(result.publishedFileId).toBe('777')
+  })
+
+  it('resolves the Windows steamId64 from SteamCMD connection logs when output only reports [U:1:0]', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-identity-'))
     const store = new RunLogStore(join(root, 'runs'))
+    const runtimeDir = join(root, 'runtime')
+    await mkdir(join(runtimeDir, 'logs'), { recursive: true })
+    await writeFile(join(runtimeDir, 'logs', 'connection_log.txt'), 'SetSteamID( [U:1:42] )\n', 'utf8')
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
       if (args.join(' ') === '+login alice secret +quit') {
@@ -671,16 +719,9 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
 
-      if (url === 'https://steamcommunity.com/id/alice/?xml=1') {
-        return new Response('<profile><steamID64>76561198000000042</steamID64></profile>', {
-          status: 200,
-          headers: { 'content-type': 'application/xml' }
-        })
-      }
-
       if (url.includes('IPublishedFileService/GetUserFiles')) {
         const parsed = new URL(url)
-        expect(parsed.searchParams.get('steamid')).toBe('76561198000000042')
+        expect(parsed.searchParams.get('steamid')).toBe('76561197960265770')
 
         return jsonResponse({
           response: {
@@ -707,7 +748,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     const runtime = new SteamCmdRuntimeService(
       async () => 'C:\\steamcmd\\steamcmd.exe',
       store,
-      join(root, 'runtime'),
+      runtimeDir,
       'windows'
     )
     await runtime.login('alice', 'secret')
@@ -719,11 +760,111 @@ describe('SteamCmdRuntimeService lifecycle', () => {
 
     expect(items).toHaveLength(1)
     expect(items[0]?.publishedFileId).toBe('100')
-    expect(fetchSpy).toHaveBeenCalledWith('https://steamcommunity.com/id/alice/?xml=1')
+    expect(fetchSpy).not.toHaveBeenCalledWith('https://steamcommunity.com/id/alice/?xml=1')
 
     const persisted = await store.list()
-    expect(persisted[0]?.lines.join('\n')).toContain('resolved steamId64 via custom profile XML')
+    expect(persisted[0]?.lines.join('\n')).toContain('resolved steamId64 via SteamCMD connection log')
     expect(spawn).toHaveBeenCalledTimes(1)
+    fetchSpy.mockRestore()
+  })
+
+  it('marks cancelled uploads as cancelled without emitting a conflicting run_failed event', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-cancel-upload-'))
+    const store = new RunLogStore(join(root, 'runs'))
+    const events: string[] = []
+    let resolveUploadReady!: (runId: string) => void
+    const uploadReadyPromise = new Promise<string>((resolve) => {
+      resolveUploadReady = resolve
+    })
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() =>
+      createInteractiveFakeChild({
+        login: {
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        },
+        workshopBuild: {
+          lines: ['Preparing upload...']
+        }
+      })
+    )
+
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
+    runtime.on('run-event', (event) => {
+      if (event.type === 'phase_changed' || event.type === 'run_started' || event.type === 'run_failed' || event.type === 'run_cancelled') {
+        events.push(`${event.type}:${event.runId}`)
+      }
+      if (event.type === 'stdout' && event.phase === 'upload') {
+        resolveUploadReady(event.runId)
+      }
+    })
+
+    await runtime.login('alice', 'secret')
+
+    const uploadPromise = runtime.upload(
+      {
+        appId: '480',
+        contentFolder: '/mods',
+        previewFile: '/mods/preview.png',
+        title: 'My Mod'
+      },
+      'upload'
+    )
+
+    const runId = await uploadReadyPromise
+
+    runtime.cancelRun(runId)
+
+    await expect(uploadPromise).rejects.toThrow('SteamCMD run cancelled by user.')
+
+    const persisted = await store.get(runId)
+    expect(persisted?.status).toBe('cancelled')
+    expect(events).toContain(`run_cancelled:${runId}`)
+    expect(events).not.toContain(`run_failed:${runId}`)
+  })
+
+  it('clears pending Steam Guard prompts when a login run is cancelled', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-cancel-login-'))
+    const store = new RunLogStore(join(root, 'runs'))
+    let resolveSessionId!: (runId: string) => void
+    let resolveGuardPrompt!: () => void
+    const sessionIdPromise = new Promise<string>((resolve) => {
+      resolveSessionId = resolve
+    })
+    const guardPromptPromise = new Promise<void>((resolve) => {
+      resolveGuardPrompt = resolve
+    })
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() =>
+      createInteractiveFakeChild({
+        login: {
+          lines: ['Steam Guard code:']
+        }
+      })
+    )
+
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
+    runtime.on('run-event', (event) => {
+      if (event.type === 'run_started' && event.phase === 'login') {
+        resolveSessionId(event.runId)
+      }
+      if (event.type === 'steam_guard_required' && event.phase === 'login') {
+        resolveGuardPrompt()
+      }
+    })
+
+    const loginPromise = runtime.login('alice', 'secret')
+    const sessionId = await sessionIdPromise
+    await guardPromptPromise
+
+    runtime.cancelRun(sessionId)
+
+    await expect(loginPromise).rejects.toThrow('SteamCMD run cancelled by user.')
+    expect(() => runtime.submitSteamGuardCode(sessionId, '12345')).toThrow(
+      'No Steam Guard prompt is currently waiting for this session'
+    )
   })
 
   it('fails Windows bad credentials login without attempting a second bootstrap', async () => {
