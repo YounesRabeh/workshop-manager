@@ -12,15 +12,14 @@ import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 
 const thisDir = dirname(fileURLToPath(import.meta.url))
-const projectRoot = resolve(thisDir, '..')
+const projectRoot = resolve(thisDir, '..', '..')
 const iconDir = resolve(projectRoot, 'resources/img')
 const sourceIconPath = resolve(iconDir, 'app-icon.png')
 const normalizedIconPath = resolve(iconDir, 'app-icon.normalized.png')
 const sourceIcoPath = resolve(iconDir, 'app-icon.ico')
 const sourceIcnsPath = resolve(iconDir, 'app-icon.icns')
 const targetIconPaths = [
-  resolve(projectRoot, 'src/renderer/public/app-icon.png'),
-  resolve(projectRoot, 'src/frontend/public/app-icon.png')
+  resolve(projectRoot, 'src/renderer/public/app-icon.png')
 ]
 
 async function assertReadable(path) {

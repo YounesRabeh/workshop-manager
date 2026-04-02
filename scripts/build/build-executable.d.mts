@@ -1,5 +1,5 @@
 /**
- * Type declarations for `scripts/build-executable.mjs`.
+ * Type declarations for `scripts/build/build-executable.mjs`.
  * These keep script-focused unit tests typed without converting the script itself
  * away from plain ESM JavaScript.
  */

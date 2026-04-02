@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPowershellKillScript, isTargetProcessForProject } from '../../../../scripts/kill-old-instance.mjs'
+import { buildPowershellKillScript, isTargetProcessForProject } from '../../../../scripts/runtime/kill-old-instance.mjs'
 
 describe('kill-old-instance script helpers', () => {
   const projectRoot = '/home/yuyu/Desktop/DEV/Steam Projects/Mod Manager'
@@ -15,7 +15,7 @@ describe('kill-old-instance script helpers', () => {
   })
 
   it('does not target the kill script itself', () => {
-    const command = `node ${projectRoot}/scripts/kill-old-instance.mjs`
+    const command = `node ${projectRoot}/scripts/runtime/kill-old-instance.mjs`
     expect(isTargetProcessForProject(command, projectRoot)).toBe(false)
   })
 

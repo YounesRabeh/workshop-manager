@@ -82,7 +82,6 @@ const {
   isLoginSubmitting,
   statusMessage,
   authIssue,
-  isSteamCmdDetected,
   isAdvancedOptionsOpen,
   installLogPath,
   loginForm,

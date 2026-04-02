@@ -6,7 +6,7 @@
 <script setup lang="ts">
 import type { PersistedRunLog } from '@shared/contracts'
 
-const props = defineProps<{
+defineProps<{
   recentRuns: PersistedRunLog[]
   selectedRunId: string
   selectedRun: PersistedRunLog | null

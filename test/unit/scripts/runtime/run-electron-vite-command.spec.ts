@@ -6,7 +6,7 @@ import {
   createElectronViteEnv,
   normalizeElectronViteCommand,
   runElectronViteCommand
-} from '../../../../scripts/run-electron-vite-command.mjs'
+} from '../../../../scripts/runtime/run-electron-vite-command.mjs'
 
 describe('run-electron-vite-command helpers', () => {
   it('exports the supported command list', () => {
