@@ -30,6 +30,7 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 - Docker on a Linux host
 
 `pnpm dev`, `pnpm preview`, `pnpm test`, and `pnpm typecheck` run natively on the host.
+Use `pnpm dev:icon` or `pnpm preview:icon` only when you want to regenerate icon assets first.
 
 All `pnpm build*` commands in this repo run through Docker on Linux.
 
@@ -45,6 +46,12 @@ All `pnpm build*` commands in this repo run through Docker on Linux.
 
    ```bash
    pnpm dev
+   ```
+
+   To regenerate icons first:
+
+   ```bash
+   pnpm dev:icon
    ```
 
 3. Run tests:
@@ -63,6 +70,12 @@ All `pnpm build*` commands in this repo run through Docker on Linux.
 
    ```bash
    pnpm preview
+   ```
+
+   To regenerate icons first:
+
+   ```bash
+   pnpm preview:icon
    ```
 
 ## Build And Package
@@ -128,7 +141,13 @@ Typical flow:
 Use `resources/img/app-icon.png` as the source icon.
 
 - This file is the single source of truth for the app icon used by both the app and packaged builds.
-- Run `pnpm sync:icon` after replacing it so the generated icon assets stay in sync.
+- To manually regenerate the derived icon assets after replacing it, run:
+
+  ```bash
+  pnpm sync:icon
+  ```
+
+- If you want to sync icons and then launch the app, use `pnpm dev:icon` or `pnpm preview:icon`.
 - If you want packaging icons regenerated during packaging, use `pnpm build:appImage:icon` or `pnpm build:win:icon`.
 
 ## Project Layout

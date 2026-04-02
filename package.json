@@ -71,8 +71,9 @@
   "scripts": {
     "clean": "node scripts/clean.mjs",
     "kill:instance": "node scripts/kill-old-instance.mjs",
-    "predev": "pnpm kill:instance && pnpm sync:icon",
+    "predev": "pnpm kill:instance",
     "dev": "env -u ELECTRON_RUN_AS_NODE CHROME_DESKTOP=workshop-manager.desktop electron-vite dev",
+    "dev:icon": "pnpm sync:icon && pnpm dev",
     "sync:icon": "node scripts/sync-app-icon.mjs",
     "build:bundle:native": "electron-vite build",
     "build:bundle": "node scripts/run-build-in-docker.mjs build:bundle:native",
@@ -82,8 +83,8 @@
     "build:appImage:icon": "node scripts/run-build-in-docker.mjs build:exe:native --generate-icon",
     "build:win": "node scripts/run-build-in-docker.mjs build:exe:native --win",
     "build:win:icon": "node scripts/run-build-in-docker.mjs build:exe:native --win --generate-icon",
-    "prepreview": "pnpm sync:icon",
     "preview": "env -u ELECTRON_RUN_AS_NODE CHROME_DESKTOP=workshop-manager.desktop electron-vite preview",
+    "preview:icon": "pnpm sync:icon && pnpm preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.renderer.json && vue-tsc --noEmit -p tsconfig.renderer-tests.json",
     "test": "vitest run",
     "test:watch": "vitest"
