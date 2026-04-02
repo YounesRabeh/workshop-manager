@@ -125,6 +125,33 @@ describe('usePublishActions composable', () => {
     expect(harness.toasts.at(-1)?.title).toBe('Upload Completed')
   })
 
+  it('shows success popup after confirming an update', async () => {
+    const harness = createHarness()
+
+    harness.publish.openUpdateConfirmation()
+    expect(harness.publish.isUpdateConfirmOpen.value).toBe(true)
+
+    await harness.publish.confirmUpdateItem()
+
+    expect(workshop.updateMod).toHaveBeenCalledTimes(1)
+    expect(harness.publish.isUpdateConfirmOpen.value).toBe(false)
+    expect(harness.toasts.at(-1)?.title).toBe('Update Completed')
+  })
+
+  it('shows update failure popup when the update command fails', async () => {
+    workshop.updateMod.mockRejectedValueOnce(new Error('[command_failed] upstream failed'))
+    const harness = createHarness()
+
+    harness.publish.openUpdateConfirmation()
+    await harness.publish.confirmUpdateItem()
+
+    expect(harness.toasts.at(-1)).toEqual({
+      title: 'Update Failed',
+      tone: 'error'
+    })
+    expect(harness.statuses.at(-1)).toBe('Update failed. See popup.')
+  })
+
   it('blocks update confirmation when no pending changes exist', () => {
     const harness = createHarness({ hasPendingUpdateChanges: false })
     harness.publish.openUpdateConfirmation()

@@ -105,7 +105,6 @@ export class SteamCmdRuntimeService extends EventEmitter {
       emitRunEvent: (event) => this.emitRunEvent(event),
       onSessionInvalidated: () => {
         this.loginState = null
-        this.lastAuthenticatedState = null
       }
     }, platformProfile)
     this.steamIdentityResolver = new SteamIdentityResolver(platformProfile)
@@ -282,7 +281,11 @@ export class SteamCmdRuntimeService extends EventEmitter {
     }
 
     const rememberedUsername = this.lastAuthenticatedState?.username?.trim()
-    if (rememberedUsername && rememberedUsername === normalizedUsername) {
+    if (
+      rememberedUsername &&
+      rememberedUsername === normalizedUsername &&
+      this.processSession.hasPersistentProcess()
+    ) {
       return true
     }
 
@@ -377,11 +380,30 @@ export class SteamCmdRuntimeService extends EventEmitter {
     this.processSession.cancelRun(runId)
   }
 
-  async upload(draft: UploadDraft, mode: 'upload' | 'update' | 'visibility'): Promise<RunResult> {
-    if (!this.loginState) {
+  private async resolveWorkshopLoginState(): Promise<LoginState> {
+    if (this.loginState) {
+      return this.loginState
+    }
+
+    const rememberedState = this.lastAuthenticatedState
+    if (!rememberedState) {
       throw new AppError('auth', 'You must login before uploading or updating mods')
     }
-    const prepared = await this.workshopCommandService.prepare(this.loginState.username, draft, mode)
+
+    if (this.platformBehavior.workshopExecution === 'interactive') {
+      await this.login(rememberedState.username, '', true)
+      if (!this.loginState) {
+        throw new AppError('auth', 'Saved Steam session is not available. Enter password to sign in again.')
+      }
+      return this.loginState
+    }
+
+    return rememberedState
+  }
+
+  async upload(draft: UploadDraft, mode: 'upload' | 'update' | 'visibility'): Promise<RunResult> {
+    const loginState = await this.resolveWorkshopLoginState()
+    const prepared = await this.workshopCommandService.prepare(loginState.username, draft, mode)
 
     this.emitRunEvent({ runId: prepared.runId, ts: Date.now(), type: 'phase_changed', phase: mode })
 
