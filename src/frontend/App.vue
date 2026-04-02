@@ -565,6 +565,7 @@ watch(
           :workshop-items-count="workshopItems.length"
           :app-version="appVersion"
           :is-fullscreen="isFullscreen"
+          :is-dev-mode="advancedSettings.hasWebApiKey"
           :profile-image-url="accountProfileImageUrl"
           @navigate="goToStep"
           @open-about="openAboutModal"
