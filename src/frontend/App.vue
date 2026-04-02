@@ -12,6 +12,7 @@ import CreatePublishSection from './components/publish/sections/CreatePublishSec
 import LoginSection from './components/LoginSection.vue'
 import LogsSection from './components/LogsSection.vue'
 import UpdatePublishSection from './components/publish/sections/UpdatePublishSection.vue'
+import WorkshopItemsSection from './components/WorkshopItemsSection.vue'
 import {
   applyDraft,
   cloneDraft,
@@ -187,11 +188,33 @@ const workshopFilterAppId = workshopStore.workshopFilterAppId
 const workshopVisibilityFilter = workshopStore.workshopVisibilityFilter
 const workshopItems = workshopStore.workshopItems
 const selectedWorkshopItemId = workshopStore.selectedWorkshopItemId
-
+const workshopListMessage = workshopStore.workshopListMessage
+const filteredWorkshopItems = workshopStore.filteredWorkshopItems
+const onChangeAppId = workshopStore.onChangeAppId
+const onChangeWorkshopVisibilityFilter = workshopStore.onChangeWorkshopVisibilityFilter
 const selectedWorkshopItem = workshopStore.selectedWorkshopItem
 const canAccessUpdate = computed(() => canAccessMods.value && selectedWorkshopItemId.value.trim().length > 0)
 const createRequirements = computed(() => evaluateCreateRequirements(createDraft))
 const updateRequirements = computed(() => evaluateUpdateRequirements(updateDraft))
+const workshopItemsEmptyStateMessage = computed(() => {
+  if (filteredWorkshopItems.value.length > 0) {
+    return ''
+  }
+
+  const explicitMessage = workshopListMessage.value.trim()
+  if (explicitMessage.length > 0) {
+    return explicitMessage
+  }
+
+  return 'No workshop items found for the current filters.'
+})
+const shouldShowWorkshopItemsEmptyState = computed(() => {
+  if (filteredWorkshopItems.value.length > 0) {
+    return false
+  }
+
+  return workshopListMessage.value.trim().length > 0 || workshopItems.value.length > 0
+})
 
 function normalizeComparableTitle(value: string | undefined): string {
   if (typeof value !== 'string') {
@@ -367,6 +390,10 @@ async function loadWorkshopItems(): Promise<void> {
   if (!hasCurrentSelection && workshopItems.value.length > 0) {
     hydrateSelectedWorkshopItem(workshopItems.value[0], { navigateToUpdate: false })
   }
+}
+
+async function resetWorkshopAppIdFilter(): Promise<void> {
+  await workshopStore.resetAppIdFilter()
 }
 
 function hydrateSelectedWorkshopItem(
@@ -590,6 +617,22 @@ watch(
             {{ publishProgressLastLine }}
           </p>
         </section>
+
+        <WorkshopItemsSection
+          v-if="flowStep === 'mods'"
+          :app-id="workshopFilterAppId"
+          :workshop-items="filteredWorkshopItems"
+          :all-items-count="workshopItems.length"
+          :visibility-filter="workshopVisibilityFilter"
+          :selected-workshop-item-id="selectedWorkshopItemId"
+          :empty-state-message="workshopItemsEmptyStateMessage"
+          :show-empty-state="shouldShowWorkshopItemsEmptyState"
+          @change-app-id="onChangeAppId"
+          @change-visibility-filter="onChangeWorkshopVisibilityFilter"
+          @reset-filter="resetWorkshopAppIdFilter"
+          @refresh="loadWorkshopItems"
+          @select-item="selectWorkshopItem"
+        />
 
         <UpdatePublishSection
           v-if="flowStep === 'update'"
