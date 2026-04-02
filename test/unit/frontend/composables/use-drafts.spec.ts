@@ -30,4 +30,18 @@ describe('useDrafts composable', () => {
     expect(tree[0]?.sizeBytes).toBe(9)
     expect(tree[1]?.name).toBe('readme.txt')
   })
+
+  it('preserves distinct files that differ only by case-sensitive path segments', () => {
+    const merged = mergeContentFiles(
+      [
+        { absolutePath: '/mods/Foo.txt', relativePath: 'Foo.txt', sizeBytes: 5 }
+      ],
+      [
+        { absolutePath: '/mods/foo.txt', relativePath: 'foo.txt', sizeBytes: 8 }
+      ]
+    )
+
+    expect(merged).toHaveLength(2)
+    expect(merged.map((file) => file.relativePath).sort()).toEqual(['Foo.txt', 'foo.txt'])
+  })
 })

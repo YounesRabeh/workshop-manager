@@ -23,7 +23,9 @@ describe('usePublishActions composable', () => {
     const loginState = ref<'signed_out' | 'signed_in'>('signed_in')
     const selectedWorkshopItemId = ref('100')
     const workshopItems = ref([{ publishedFileId: '100', title: 'Item', appId: '480', visibility: 0 as 0 | 1 | 2 | 3 }])
-    const selectedWorkshopItem = computed(() => workshopItems.value[0])
+    const selectedWorkshopItem = computed(() =>
+      workshopItems.value.find((item) => item.publishedFileId === selectedWorkshopItemId.value)
+    )
     const workshopFilterAppId = ref('')
     const createDraft = reactive({
       appId: '480',
@@ -72,7 +74,7 @@ describe('usePublishActions composable', () => {
       }
     })
 
-    return { loginState, statuses, toasts, publish, workshopItems }
+    return { loginState, selectedWorkshopItemId, statuses, toasts, publish, workshopItems }
   }
 
   it('blocks create confirm when signed out', () => {
@@ -92,6 +94,15 @@ describe('usePublishActions composable', () => {
 
     harness.publish.setPendingVisibility(2)
     expect(harness.publish.canChangeVisibility.value).toBe(true)
+  })
+
+  it('disables visibility changes when the selected item no longer exists', () => {
+    const harness = createHarness()
+    harness.publish.setVisibilityFromSelection(0)
+    harness.publish.setPendingVisibility(2)
+    harness.workshopItems.value = []
+
+    expect(harness.publish.canChangeVisibility.value).toBe(false)
   })
 
   it('runs update visibility flow and mutates workshop list', async () => {

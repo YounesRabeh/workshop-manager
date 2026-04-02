@@ -25,6 +25,7 @@ interface UseAuthFlowOptions {
 
 export function useAuthFlow(options: UseAuthFlowOptions) {
   const loginState = ref<'signed_out' | 'signed_in'>('signed_out')
+  const activeLoginRunId = ref<string | null>(null)
   const steamGuardSessionId = ref<string | null>(null)
   const steamGuardCode = ref('')
   const isPasswordPeek = ref(false)
@@ -205,6 +206,25 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     return canUseStoredSessionForCurrentLogin.value
   }
 
+  function setLoginUsername(value: string): void {
+    loginForm.username = value
+  }
+
+  function setLoginPassword(value: string): void {
+    loginForm.password = value
+  }
+
+  function setRememberUsername(value: boolean): void {
+    loginForm.rememberUsername = value || loginForm.rememberAuth
+  }
+
+  function setRememberAuth(value: boolean): void {
+    loginForm.rememberAuth = value
+    if (value) {
+      loginForm.rememberUsername = true
+    }
+  }
+
   function setPasswordPeek(value: boolean): void {
     isPasswordPeek.value = value
   }
@@ -246,6 +266,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       isStoredSessionLoginAttempt.value = false
       steamGuardSessionId.value = null
       steamGuardCode.value = ''
+      activeLoginRunId.value = null
       steamGuardPromptType.value = 'none'
       authIssue.value = null
       statusMessage.value = 'Saved session cleared. Enter password to sign in.'
@@ -259,6 +280,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     loginState.value = 'signed_in'
     options.onHideTimeoutLogs()
     steamGuardSessionId.value = null
+    activeLoginRunId.value = null
     steamGuardPromptType.value = 'none'
     authIssue.value = null
     statusMessage.value = successMessage
@@ -281,6 +303,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       authIssue.value = null
       isLoginSubmitting.value = true
       isPasswordPeek.value = false
+      activeLoginRunId.value = null
       steamGuardSessionId.value = null
       steamGuardCode.value = ''
       steamGuardPromptType.value = 'waiting'
@@ -299,6 +322,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         await options.onShowTimeoutLogs()
       }
       if (isSavedSessionFallbackError(parsed)) {
+        activeLoginRunId.value = null
         steamGuardPromptType.value = 'none'
         steamGuardSessionId.value = null
         authIssue.value = null
@@ -306,6 +330,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         statusMessage.value = 'Saved session expired. Enter password to sign in again.'
         return
       }
+      activeLoginRunId.value = null
       statusMessage.value = `Auto sign-in failed (${parsed.code}): ${parsed.message}`
       authIssue.value = toAuthIssue(parsed)
     } finally {
@@ -387,6 +412,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         await options.onShowTimeoutLogs()
       }
       steamGuardPromptType.value = 'none'
+      activeLoginRunId.value = null
       steamGuardSessionId.value = null
       if (isSavedSessionFallbackError(parsed) && usingSavedSession) {
         canUseStoredSessionForCurrentLogin.value = false
@@ -410,6 +436,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
 
     loginState.value = 'signed_out'
+    activeLoginRunId.value = null
     steamGuardSessionId.value = null
     steamGuardCode.value = ''
     steamGuardPromptType.value = 'none'
@@ -457,6 +484,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
   function handleRunEvent(event: RunEvent): void {
     if (event.type === 'run_started' && event.phase === 'login') {
+      activeLoginRunId.value = event.runId
       steamGuardSessionId.value = event.runId
       steamGuardCode.value = ''
       steamGuardPromptType.value = 'waiting'
@@ -464,6 +492,10 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       statusMessage.value = isStoredSessionLoginAttempt.value
         ? 'Checking saved Steam session...'
         : 'Signing in to Steam...'
+    }
+
+    if (event.phase !== 'login' || event.runId !== activeLoginRunId.value) {
+      return
     }
 
     if (event.type === 'steam_guard_required') {
@@ -517,6 +549,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
 
     if (event.type === 'run_finished' && event.phase === 'login') {
+      activeLoginRunId.value = null
       steamGuardSessionId.value = null
       steamGuardCode.value = ''
       steamGuardPromptType.value = 'none'
@@ -525,6 +558,15 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
 
     if (event.type === 'run_failed' && event.phase === 'login') {
+      activeLoginRunId.value = null
+      steamGuardCode.value = ''
+      steamGuardPromptType.value = 'none'
+      steamGuardSessionId.value = null
+      isStoredSessionLoginAttempt.value = false
+    }
+
+    if (event.type === 'run_cancelled' && event.phase === 'login') {
+      activeLoginRunId.value = null
       steamGuardCode.value = ''
       steamGuardPromptType.value = 'none'
       steamGuardSessionId.value = null
@@ -558,6 +600,10 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     normalizeError,
     toAuthIssue,
     canUseStoredSessionForLogin,
+    setLoginUsername,
+    setLoginPassword,
+    setRememberUsername,
+    setRememberAuth,
     setPasswordPeek,
     setWebApiKeyPeek,
     setWebApiKey,

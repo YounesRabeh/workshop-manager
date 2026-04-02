@@ -110,10 +110,19 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     return options.updateDraft.appId.trim()
   })
 
+  const selectedUpdatePublishedFileId = computed(() => {
+    const fromItem = options.selectedWorkshopItem.value?.publishedFileId?.trim()
+    if (fromItem) {
+      return fromItem
+    }
+    return options.selectedWorkshopItemId.value.trim()
+  })
+
   const canChangeVisibility = computed(() => {
     return (
       options.loginState.value === 'signed_in' &&
-      options.selectedWorkshopItemId.value.trim().length > 0 &&
+      options.selectedWorkshopItem.value !== undefined &&
+      selectedUpdatePublishedFileId.value.length > 0 &&
       selectedUpdateAppId.value.length > 0 &&
       pendingVisibility.value !== committedVisibility.value
     )
@@ -316,7 +325,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     }
 
     const appId = selectedUpdateAppId.value
-    const publishedFileId = options.selectedWorkshopItemId.value.trim()
+    const publishedFileId = selectedUpdatePublishedFileId.value
     const targetVisibility = pendingVisibility.value
 
     try {

@@ -66,6 +66,18 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     options.onSelectWorkshopItem(item)
   }
 
+  function reconcileSelection(items: WorkshopItemSummary[]): void {
+    const selectedId = selectedWorkshopItemId.value.trim()
+    if (!selectedId) {
+      return
+    }
+
+    const selectionStillExists = items.some((item) => item.publishedFileId === selectedId)
+    if (!selectionStillExists) {
+      selectedWorkshopItemId.value = ''
+    }
+  }
+
   async function loadWorkshopItems(): Promise<void> {
     if (!options.canAccessMods()) {
       options.setStatusMessage('Login first to load workshop items.')
@@ -75,6 +87,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     try {
       const items = await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value || undefined })
       workshopItems.value = items
+      reconcileSelection(items)
       hasWorkshopItemsError.value = false
       if (items.length === 0) {
         workshopListMessage.value = 'No workshop items found for this account/filter.'
@@ -136,6 +149,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     try {
       const items = await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value || undefined })
       workshopItems.value = items
+      reconcileSelection(items)
       hasWorkshopItemsError.value = false
 
       if (currentSelectedId) {

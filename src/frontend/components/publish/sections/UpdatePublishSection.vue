@@ -38,6 +38,8 @@ const emit = defineEmits<{
   (e: 'pick-preview-file'): void
   (e: 'clear-preview-file'): void
   (e: 'update-item'): void
+  (e: 'update-title', value: string): void
+  (e: 'update-release-notes', value: string): void
   (e: 'change-visibility-selection', value: 0 | 1 | 2 | 3): void
   (e: 'update-visibility-only'): void
 }>()
@@ -119,12 +121,15 @@ function submitPrimaryAction(): void {
       />
 
       <PublishDraftMetadataFields
-        :draft="draft"
+        :title-value="draft.title"
+        :release-notes-value="draft.releaseNotes"
         :has-content-folder="hasContentFolder"
         :preview-file-value="previewFileValue"
         :upload-preview-image-src="uploadPreviewImageSrc"
         :preview-image-load-failed="previewImageLoadFailed"
         :preview-image-is-square="previewImageIsSquare"
+        @update-title="emit('update-title', $event)"
+        @update-release-notes="emit('update-release-notes', $event)"
         @pick-preview-file="emit('pick-preview-file')"
         @clear-preview-file="emit('clear-preview-file')"
         @preview-load="onUploadPreviewLoad"

@@ -106,6 +106,12 @@ describe('useAuthFlow composable', () => {
     flow.handleRunEvent({
       runId: 'r1',
       ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
       type: 'steam_guard_required',
       phase: 'login',
       promptType: 'steam_guard_code'
@@ -113,6 +119,38 @@ describe('useAuthFlow composable', () => {
 
     expect(flow.steamGuardPromptType.value).toBe('steam_guard_code')
     expect(flow.statusMessage.value).toContain('Steam Guard code required')
+  })
+
+  it('ignores steam guard-like output from non-login or stale runs', () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.handleRunEvent({
+      runId: 'login-run',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    flow.handleRunEvent({
+      runId: 'update-run',
+      ts: Date.now(),
+      type: 'stdout',
+      phase: 'update',
+      line: 'Steam Guard mobile authenticator'
+    })
+    flow.handleRunEvent({
+      runId: 'other-login-run',
+      ts: Date.now(),
+      type: 'stdout',
+      phase: 'login',
+      line: 'auth code'
+    })
+
+    expect(flow.steamGuardPromptType.value).toBe('waiting')
   })
 
   it('clears stored session flags and password', async () => {

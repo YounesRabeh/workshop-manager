@@ -53,6 +53,7 @@ const {
   clearCreatePreviewFile,
   clearUpdatePreviewFile,
   getDraftForMode,
+  setDraftField,
   setStagedFilesForMode,
   clearWorkspaceForMode
 } = useDrafts()
@@ -110,6 +111,10 @@ const {
   loginHeaderStatusMessage,
   normalizeError,
   canUseStoredSessionForLogin,
+  setLoginUsername,
+  setLoginPassword,
+  setRememberUsername,
+  setRememberAuth,
   setPasswordPeek,
   setWebApiKeyPeek,
   setWebApiKey,
@@ -195,7 +200,7 @@ const filteredWorkshopItems = workshopStore.filteredWorkshopItems
 const onChangeAppId = workshopStore.onChangeAppId
 const onChangeWorkshopVisibilityFilter = workshopStore.onChangeWorkshopVisibilityFilter
 const selectedWorkshopItem = workshopStore.selectedWorkshopItem
-const canAccessUpdate = computed(() => canAccessMods.value && selectedWorkshopItemId.value.trim().length > 0)
+const canAccessUpdate = computed(() => canAccessMods.value && selectedWorkshopItem.value !== undefined)
 const createRequirements = computed(() => evaluateCreateRequirements(createDraft))
 const updateRequirements = computed(() => evaluateUpdateRequirements(updateDraft))
 const workshopItemsEmptyStateMessage = computed(() => {
@@ -372,14 +377,7 @@ function setContentFolderSelectionError(mode: 'create' | 'update', contentFolder
 
 async function loadWorkshopItems(): Promise<void> {
   await workshopStore.loadWorkshopItems()
-  const selectedId = selectedWorkshopItemId.value.trim()
-  const hasCurrentSelection =
-    selectedId.length > 0 &&
-    workshopItems.value.some((item) => item.publishedFileId === selectedId)
-
-  if (!hasCurrentSelection && workshopItems.value.length > 0) {
-    hydrateSelectedWorkshopItem(workshopItems.value[0], { navigateToUpdate: false })
-  }
+  reconcileWorkshopSelection()
 }
 
 async function resetWorkshopAppIdFilter(): Promise<void> {
@@ -439,6 +437,7 @@ async function openSelectedWorkshopItem(): Promise<void> {
 
 async function refreshSelectedWorkshopItem(): Promise<void> {
   await workshopStore.refreshSelectedWorkshopItem()
+  reconcileWorkshopSelection()
 }
 
 async function pickCreatePreviewFile(): Promise<void> {
@@ -487,6 +486,26 @@ watch(
   },
   { deep: true }
 )
+
+function reconcileWorkshopSelection(): void {
+  const selectedId = selectedWorkshopItemId.value.trim()
+  const hasCurrentSelection =
+    selectedId.length > 0 &&
+    workshopItems.value.some((item) => item.publishedFileId === selectedId)
+
+  if (hasCurrentSelection) {
+    return
+  }
+
+  if (workshopItems.value.length > 0) {
+    hydrateSelectedWorkshopItem(workshopItems.value[0], { navigateToUpdate: false })
+    return
+  }
+
+  if (flowStep.value === 'update') {
+    flowStep.value = 'mods'
+  }
+}
 </script>
 
 <template>
@@ -523,6 +542,10 @@ watch(
         :is-web-api-key-peek="isWebApiKeyPeek"
         :install-log-path="installLogPath"
         @submit-login="login"
+        @update-username="setLoginUsername"
+        @update-password="setLoginPassword"
+        @update-remember-username="setRememberUsername"
+        @update-remember-auth="setRememberAuth"
         @set-password-peek="setPasswordPeek"
         @submit-guard-code="submitSteamGuardCode"
         @update-steam-guard-code="setSteamGuardCode"
@@ -632,6 +655,8 @@ watch(
           @clear-workspace="clearUpdateWorkspace"
           @pick-preview-file="pickUpdatePreviewFile"
           @clear-preview-file="clearUpdatePreviewFile"
+          @update-title="setDraftField('update', 'title', $event)"
+          @update-release-notes="setDraftField('update', 'releaseNotes', $event)"
           @change-visibility-selection="setPendingVisibility"
           @update-visibility-only="updateVisibilityOnly"
           @update-item="openUpdateConfirmation"
@@ -650,6 +675,9 @@ watch(
           @clear-workspace="clearCreateWorkspace"
           @pick-preview-file="pickCreatePreviewFile"
           @clear-preview-file="clearCreatePreviewFile"
+          @update-app-id="setDraftField('create', 'appId', $event)"
+          @update-title="setDraftField('create', 'title', $event)"
+          @update-release-notes="setDraftField('create', 'releaseNotes', $event)"
           @change-visibility-selection="setCreateVisibility"
           @upload="openCreateConfirmation"
         />

@@ -32,6 +32,9 @@ const emit = defineEmits<{
   (e: 'pick-preview-file'): void
   (e: 'clear-preview-file'): void
   (e: 'upload'): void
+  (e: 'update-app-id', value: string): void
+  (e: 'update-title', value: string): void
+  (e: 'update-release-notes', value: string): void
   (e: 'change-visibility-selection', value: 0 | 1 | 2 | 3): void
 }>()
 
@@ -42,6 +45,11 @@ function onVisibilitySelectChange(event: Event): void {
     return
   }
   emit('change-visibility-selection', parsed as 0 | 1 | 2 | 3)
+}
+
+function onAppIdInput(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit('update-app-id', target?.value ?? '')
 }
 
 const sectionTitle = 'Create Workshop Item'
@@ -119,11 +127,12 @@ function submitPrimaryAction(): void {
         <label class="block text-sm text-slate-300">
           App ID
           <input
-            v-model="draft.appId"
+            :value="draft.appId"
             inputmode="numeric"
             pattern="[0-9]*"
             class="publish-field-input mt-1"
             :class="createAppIdHasInvalidFormat ? 'border-rose-400 focus-visible:outline-rose-300' : ''"
+            @input="onAppIdInput"
           />
           <p class="mt-1 text-[11px]" :class="createAppIdHasInvalidFormat ? 'text-rose-300' : 'text-slate-400'">
             {{ createAppIdHelperText }}
@@ -148,12 +157,15 @@ function submitPrimaryAction(): void {
       </div>
 
       <PublishDraftMetadataFields
-        :draft="draft"
+        :title-value="draft.title"
+        :release-notes-value="draft.releaseNotes"
         :has-content-folder="hasContentFolder"
         :preview-file-value="previewFileValue"
         :upload-preview-image-src="uploadPreviewImageSrc"
         :preview-image-load-failed="previewImageLoadFailed"
         :preview-image-is-square="previewImageIsSquare"
+        @update-title="emit('update-title', $event)"
+        @update-release-notes="emit('update-release-notes', $event)"
         @pick-preview-file="emit('pick-preview-file')"
         @clear-preview-file="emit('clear-preview-file')"
         @preview-load="onUploadPreviewLoad"

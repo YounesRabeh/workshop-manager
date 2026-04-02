@@ -67,6 +67,42 @@ describe('useWorkshopItems composable', () => {
     expect(store.selectedWorkshopItemId.value).toBe('1')
   })
 
+  it('clears stale selection when a reload no longer includes the selected item', async () => {
+    const store = useWorkshopItems({
+      canAccessMods: () => true,
+      normalizeError: () => ({ code: 'command_failed', message: 'failed' }),
+      setStatusMessage: () => undefined,
+      onSelectWorkshopItem: () => undefined
+    })
+
+    await store.loadWorkshopItems()
+    store.selectWorkshopItem(store.workshopItems.value[0]!)
+
+    workshop.getMyWorkshopItems.mockResolvedValueOnce([])
+    await store.loadWorkshopItems()
+
+    expect(store.selectedWorkshopItemId.value).toBe('')
+  })
+
+  it('clears stale selection when refreshing a removed item', async () => {
+    const store = useWorkshopItems({
+      canAccessMods: () => true,
+      normalizeError: () => ({ code: 'command_failed', message: 'failed' }),
+      setStatusMessage: () => undefined,
+      onSelectWorkshopItem: () => undefined
+    })
+
+    await store.loadWorkshopItems()
+    store.selectWorkshopItem(store.workshopItems.value[0]!)
+
+    workshop.getMyWorkshopItems.mockResolvedValueOnce([
+      { publishedFileId: '2', title: 'Item Two', appId: '480', visibility: 2 }
+    ])
+    await store.refreshSelectedWorkshopItem()
+
+    expect(store.selectedWorkshopItemId.value).toBe('')
+  })
+
   it('stores an explicit error message instead of falling back to the empty-state copy', async () => {
     workshop.getMyWorkshopItems.mockRejectedValueOnce(
       new Error('[auth] Signed in to Steam, but account identity could not be resolved on this platform.')

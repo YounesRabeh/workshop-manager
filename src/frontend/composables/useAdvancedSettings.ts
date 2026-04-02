@@ -137,6 +137,11 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
       return
     }
 
+    if (!advancedSettings.secureStorageAvailable && advancedSettings.webApiKey.trim().length > 0) {
+      advancedSettings.statusMessage = 'Secure storage is unavailable. Clear the Web API key field to save SteamCMD settings only.'
+      return
+    }
+
     try {
       advancedSettings.isSaving = true
       advancedSettings.statusMessage = ''

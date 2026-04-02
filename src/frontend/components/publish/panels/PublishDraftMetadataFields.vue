@@ -6,7 +6,8 @@
 import type { UploadDraftState } from '../../../types/ui'
 
 const props = defineProps<{
-  draft: UploadDraftState
+  titleValue: UploadDraftState['title']
+  releaseNotesValue: UploadDraftState['releaseNotes']
   hasContentFolder: boolean
   previewFileValue: string
   uploadPreviewImageSrc: string
@@ -15,6 +16,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  (e: 'update-title', value: string): void
+  (e: 'update-release-notes', value: string): void
   (e: 'pick-preview-file'): void
   (e: 'clear-preview-file'): void
   (e: 'preview-load', event: Event): void
@@ -24,19 +27,30 @@ const emit = defineEmits<{
 function onPreviewLoad(event: Event): void {
   emit('preview-load', event)
 }
+
+function onTitleInput(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit('update-title', target?.value ?? '')
+}
+
+function onReleaseNotesInput(event: Event): void {
+  const target = event.target as HTMLTextAreaElement | null
+  emit('update-release-notes', target?.value ?? '')
+}
 </script>
 
 <template>
   <label class="mt-3 block text-sm text-slate-300">Title</label>
-  <input v-model="props.draft.title" class="publish-field-input mt-1" />
+  <input :value="props.titleValue" class="publish-field-input mt-1" @input="onTitleInput" />
 
   <label class="mt-3 block text-sm text-slate-300">Release Notes (optional)</label>
   <textarea
-    v-model="props.draft.releaseNotes"
+    :value="props.releaseNotesValue"
     rows="2"
     :disabled="!props.hasContentFolder"
     :placeholder="!props.hasContentFolder ? 'Select a content folder to enable release notes.' : ''"
     class="publish-field-textarea mt-1"
+    @input="onReleaseNotesInput"
   />
 
   <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">

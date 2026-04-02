@@ -34,6 +34,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'submit-login'): void
+  (e: 'update-username', value: string): void
+  (e: 'update-password', value: string): void
+  (e: 'update-remember-username', value: boolean): void
+  (e: 'update-remember-auth', value: boolean): void
   (e: 'set-password-peek', value: boolean): void
   (e: 'submit-guard-code'): void
   (e: 'update-steam-guard-code', value: string): void
@@ -74,6 +78,28 @@ function onSteamCmdManualPathInput(event: Event): void {
   emit('update-steamcmd-manual-path', target?.value ?? '')
 }
 
+function onUsernameInput(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit('update-username', target?.value ?? '')
+  onCredentialInput()
+}
+
+function onPasswordInput(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit('update-password', target?.value ?? '')
+  onCredentialInput()
+}
+
+function onRememberUsernameChange(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit('update-remember-username', target?.checked ?? false)
+}
+
+function onRememberAuthChange(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit('update-remember-auth', target?.checked ?? false)
+}
+
 const canSubmitLogin = computed(() => {
   const hasUsername = props.loginForm.username.trim().length > 0
   const hasPassword = props.loginForm.password.trim().length > 0
@@ -106,11 +132,15 @@ const missingStoredSessionHint = computed(() => {
 })
 
 const canSaveAdvancedSettings = computed(() => {
-  return !props.advancedSettings.isSaving
+  return !props.advancedSettings.isSaving && !isWebApiKeySaveBlocked.value
 })
 
 const canClearSteamCmdPath = computed(() => {
   return !props.advancedSettings.isSaving && props.advancedSettings.steamCmdManualPath.trim().length > 0
+})
+
+const isWebApiKeySaveBlocked = computed(() => {
+  return !props.advancedSettings.secureStorageAvailable && props.advancedSettings.webApiKey.trim().length > 0
 })
 
 const shouldShowInstallLogButton = computed(() => {
@@ -290,23 +320,23 @@ watch(
         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Account name</label>
         <input
           ref="usernameInputRef"
-          v-model="loginForm.username"
+          :value="loginForm.username"
           class="login-input mt-1 w-full rounded border border-slate-300 px-3 py-2"
           @keydown="onLoginControlArrowKey($event, 0)"
-          @input="onCredentialInput"
+          @input="onUsernameInput"
         />
 
         <label class="mt-3 block text-xs font-semibold uppercase tracking-wide text-slate-500">Password</label>
         <div class="mt-1 flex items-center gap-2">
           <input
             ref="passwordInputRef"
-            v-model="loginForm.password"
+            :value="loginForm.password"
             :type="isPasswordPeek ? 'text' : 'password'"
             :placeholder="passwordPlaceholder"
             autocomplete="current-password"
             class="login-input w-full rounded border border-slate-300 px-3 py-2"
             @keydown="onLoginControlArrowKey($event, 1)"
-            @input="onCredentialInput"
+            @input="onPasswordInput"
           />
           <button
             type="button"
@@ -323,9 +353,10 @@ watch(
         <label class="mt-3 flex items-center gap-2 text-sm text-slate-700">
           <input
             ref="rememberUsernameRef"
-            v-model="loginForm.rememberUsername"
+            :checked="loginForm.rememberUsername"
             type="checkbox"
             @keydown="onLoginControlArrowKey($event, 2)"
+            @change="onRememberUsernameChange"
           />
           Remember account name
         </label>
@@ -333,9 +364,10 @@ watch(
         <label class="mt-2 flex items-center gap-2 text-sm text-slate-700">
           <input
             ref="rememberAuthRef"
-            v-model="loginForm.rememberAuth"
+            :checked="loginForm.rememberAuth"
             type="checkbox"
             @keydown="onLoginControlArrowKey($event, 3)"
+            @change="onRememberAuthChange"
           />
           Keep me signed in on this device
         </label>
@@ -448,8 +480,11 @@ watch(
                 {{
                   advancedSettings.secureStorageAvailable
                     ? 'Key is stored encrypted using OS secure storage.'
-                    : 'Secure storage is not available. Key saving is disabled on this device.'
+                    : 'Secure storage is not available. Leave the key field empty to save SteamCMD settings only.'
                 }}
+              </p>
+              <p v-if="isWebApiKeySaveBlocked" class="advanced-meta">
+                Clear the key field to save SteamCMD path changes without secure storage.
               </p>
               <p v-if="advancedSettings.hasWebApiKey" class="advanced-meta advanced-meta-success">Saved key detected and ready to use.</p>
             </section>
@@ -461,7 +496,7 @@ watch(
             <button
               type="button"
               class="login-submit advanced-primary-action text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="!canSaveAdvancedSettings || !advancedSettings.secureStorageAvailable"
+              :disabled="!canSaveAdvancedSettings"
               @click="emit('save-advanced-settings')"
             >
               {{ advancedSettings.isSaving ? 'Saving...' : 'Save Advanced Options' }}

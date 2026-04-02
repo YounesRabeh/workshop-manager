@@ -702,6 +702,83 @@ describe('App UI validation gates', () => {
     })
   })
 
+  it('still saves a manual SteamCMD path when secure storage is unavailable', async () => {
+    workshop.getAdvancedSettings.mockResolvedValueOnce({
+      webApiEnabled: false,
+      hasWebApiKey: false,
+      secureStorageAvailable: false,
+      steamCmdManualPath: undefined,
+      steamCmdInstalled: true,
+      steamCmdSource: 'auto'
+    })
+    workshop.saveAdvancedSettings.mockResolvedValueOnce({
+      webApiEnabled: false,
+      hasWebApiKey: false,
+      secureStorageAvailable: false,
+      steamCmdManualPath: '/tools/steamcmd.sh',
+      steamCmdInstalled: true,
+      steamCmdSource: 'manual'
+    })
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const advancedToggle = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Advanced Developer Options'))
+    expect(advancedToggle).toBeDefined()
+    await advancedToggle?.trigger('click')
+    await flushPromises()
+
+    const browseButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Browse')
+    expect(browseButton).toBeDefined()
+    await browseButton?.trigger('click')
+    await flushPromises()
+
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Save Advanced Options'))
+    expect(saveButton).toBeDefined()
+    expect(saveButton?.attributes('disabled')).toBeUndefined()
+    await saveButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith({
+      webApiEnabled: false,
+      webApiKey: undefined,
+      steamCmdManualPath: '/tools/steamcmd.sh'
+    })
+  })
+
+  it('returns to mods when refresh removes the selected workshop item', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    await openUpdateTab(wrapper)
+
+    workshop.getMyWorkshopItems.mockResolvedValueOnce([])
+
+    const refreshButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Refresh')
+    expect(refreshButton).toBeDefined()
+    await refreshButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('My Workshop Items')
+    const updateTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Update')
+    expect(updateTab?.attributes('disabled')).toBeDefined()
+  })
+
   it('shows success popup when visibility change succeeds', async () => {
     const wrapper = mount(App)
     await flushPromises()

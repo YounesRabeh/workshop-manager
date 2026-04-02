@@ -39,7 +39,7 @@ export function applyDraft(target: UploadDraftState, source: UploadDraftState): 
 }
 
 export function normalizeFsPath(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  return path.replace(/\\/g, '/').replace(/\/+$/, '')
 }
 
 export function normalizeRelativePath(path: string): string {
@@ -221,6 +221,15 @@ export function useDrafts() {
     return mode === 'create' ? createStagedContentFiles.value : updateStagedContentFiles.value
   }
 
+  function setDraftField<K extends keyof UploadDraftState>(
+    mode: 'create' | 'update',
+    field: K,
+    value: UploadDraftState[K]
+  ): void {
+    const draft = getDraftForMode(mode)
+    draft[field] = value
+  }
+
   function setStagedFilesForMode(mode: 'create' | 'update', files: StagedContentFile[]): void {
     if (mode === 'create') {
       createStagedContentFiles.value = files
@@ -250,6 +259,7 @@ export function useDrafts() {
     clearUpdatePreviewFile,
     getDraftForMode,
     getStagedFilesForMode,
+    setDraftField,
     setStagedFilesForMode,
     clearWorkspaceForMode
   }
