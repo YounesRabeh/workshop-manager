@@ -151,6 +151,23 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).not.toContain('No workshop items found for the current filters.')
   })
 
+  it('renders loaded workshop items in the Workshop Items section after login', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('My Workshop Items')
+    expect(wrapper.text()).toContain('Showing 1 of 1 item(s).')
+    expect(wrapper.text()).toContain('Test Item')
+    expect(wrapper.text()).toContain('ID: 123')
+  })
+
   it('keeps readiness layout tweaks: top row App ID + Title, separator visible, and no Published File ID in update', async () => {
     const wrapper = mount(App)
     await flushPromises()
