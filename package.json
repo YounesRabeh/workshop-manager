@@ -4,6 +4,7 @@
   "version": "1.0.3",
   "description": "Create and update items for Steam's Workshop.",
   "author": "Younes Rabeh",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.32.1",
