@@ -324,7 +324,6 @@ const createChecklist = computed<PublishChecklistItem[]>(() => {
 const publishProgressVisible = publishProgress.visible
 const publishProgressPercent = publishProgress.percent
 const publishProgressLabel = publishProgress.label
-const publishProgressLastLine = publishProgress.lastLine
 const publishProgressTitle = publishProgress.title
 
 function handleRunEvent(event: RunEvent): void {
@@ -592,9 +591,6 @@ watch(
             ></div>
           </div>
           <p class="mt-2 text-xs text-slate-300">{{ publishProgressLabel }}</p>
-          <p v-if="publishProgressLastLine" class="mt-1 truncate text-[11px] text-slate-400" :title="publishProgressLastLine">
-            {{ publishProgressLastLine }}
-          </p>
         </section>
 
         <WorkshopItemsSection
