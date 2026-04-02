@@ -51,6 +51,9 @@ Packaging commands always run inside the repo's Docker builder image, even when 
 | Preview production renderer | `pnpm preview` | Local preview path on Linux and Windows |
 | Preview with icon sync | `pnpm preview:icon` | Regenerates icon assets first |
 
+> [!NOTE]
+> On Windows, the native `Choose Content Folder` dialog is a directory picker, not a normal file browser. It may not show the files inside a folder while you are navigating, but the app will still scan the selected folder and show its files afterward in the in-app Content Explorer.
+
 ## Build And Package
 
 | Goal | Command | Output / Notes |

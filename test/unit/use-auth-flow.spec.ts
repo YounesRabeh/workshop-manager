@@ -200,4 +200,62 @@ describe('useAuthFlow composable', () => {
     expect(flow.loginForm.rememberUsername).toBe(true)
     expect(flow.loginForm.rememberAuth).toBe(false)
   })
+
+  it('keeps saved-session login available for the current sign-in after turning off keep-signed-in', async () => {
+    workshop.getProfiles.mockResolvedValueOnce({
+      profiles: [],
+      rememberedUsername: 'alice',
+      rememberAuth: true,
+      hasStoredAuth: true
+    })
+
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    await flow.refreshRememberedLoginState()
+    flow.loginForm.rememberAuth = false
+
+    await flow.login()
+
+    expect(workshop.login).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'alice',
+        password: '',
+        rememberAuth: false,
+        useStoredAuth: true
+      })
+    )
+  })
+
+  it('requires password again after signing out from a saved-session login with keep-signed-in disabled', async () => {
+    workshop.getProfiles.mockResolvedValueOnce({
+      profiles: [],
+      rememberedUsername: 'alice',
+      rememberAuth: true,
+      hasStoredAuth: true
+    })
+
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    await flow.refreshRememberedLoginState()
+    flow.loginForm.rememberAuth = false
+
+    await flow.login()
+    await flow.signOut()
+
+    workshop.login.mockClear()
+    await flow.login()
+
+    expect(workshop.login).not.toHaveBeenCalled()
+    expect(flow.statusMessage.value).toBe('Enter your password to sign in.')
+  })
 })

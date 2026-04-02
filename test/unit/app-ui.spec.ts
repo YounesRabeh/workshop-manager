@@ -417,6 +417,44 @@ describe('App UI validation gates', () => {
     )
   })
 
+  it('keeps current saved-session login available after unticking keep-signed-in', async () => {
+    workshop.getProfiles.mockResolvedValueOnce({
+      profiles: [],
+      rememberedUsername: 'alice',
+      rememberAuth: true,
+      hasStoredAuth: true
+    })
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    expect(checkboxes.length).toBeGreaterThanOrEqual(2)
+    await checkboxes[1].setValue(false)
+    await flushPromises()
+
+    const passwordInput = wrapper.find('input[type="password"]')
+    expect(passwordInput.attributes('placeholder')).toBe('********')
+
+    const submitButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Sign in with saved session'))
+    expect(submitButton).toBeDefined()
+    expect(submitButton?.attributes('disabled')).toBeUndefined()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(workshop.login).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'alice',
+        password: '',
+        rememberAuth: false,
+        useStoredAuth: true
+      })
+    )
+  })
+
   it('shows dedicated logs section when login times out', async () => {
     const timeoutRun = {
       runId: '1700000000000-timeout',

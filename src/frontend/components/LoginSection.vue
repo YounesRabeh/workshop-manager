@@ -25,6 +25,7 @@ const props = defineProps<{
   steamGuardCode: string
   isStoredSessionLoginAttempt: boolean
   canClearStoredSession: boolean
+  canUseStoredSessionForLogin: boolean
   isAdvancedOptionsOpen: boolean
   advancedSettings: AdvancedSettingsState
   isWebApiKeyPeek: boolean
@@ -76,7 +77,7 @@ function onSteamCmdManualPathInput(event: Event): void {
 const canSubmitLogin = computed(() => {
   const hasUsername = props.loginForm.username.trim().length > 0
   const hasPassword = props.loginForm.password.trim().length > 0
-  const canUseSavedSession = props.canClearStoredSession && props.loginForm.rememberAuth && !hasPassword
+  const canUseSavedSession = props.canUseStoredSessionForLogin && !hasPassword
   return !props.isLoginSubmitting && hasUsername && (hasPassword || canUseSavedSession)
 })
 
@@ -84,21 +85,21 @@ const submitLabel = computed(() => {
   if (props.isLoginSubmitting) {
     return 'Signing in...'
   }
-  if (props.canClearStoredSession && props.loginForm.rememberAuth && props.loginForm.password.trim().length === 0) {
+  if (props.canUseStoredSessionForLogin && props.loginForm.password.trim().length === 0) {
     return 'Sign in with saved session'
   }
   return 'Sign in'
 })
 
 const passwordPlaceholder = computed(() => {
-  if (props.canClearStoredSession && props.loginForm.rememberAuth && props.loginForm.password.trim().length === 0) {
+  if (props.canUseStoredSessionForLogin && props.loginForm.password.trim().length === 0) {
     return '********'
   }
   return ''
 })
 
 const missingStoredSessionHint = computed(() => {
-  if (!props.loginForm.rememberAuth || props.canClearStoredSession) {
+  if (!props.loginForm.rememberAuth || props.canUseStoredSessionForLogin || props.canClearStoredSession) {
     return ''
   }
   return 'No saved session found yet. Enter password to sign in and create one.'
@@ -200,7 +201,7 @@ function onLoginControlArrowKey(event: KeyboardEvent, index: number): void {
 function resolveDefaultFocusTarget(): number {
   const hasUsername = props.loginForm.username.trim().length > 0
   const hasPassword = props.loginForm.password.trim().length > 0
-  const canUseSavedSession = props.canClearStoredSession && props.loginForm.rememberAuth && !hasPassword
+  const canUseSavedSession = props.canUseStoredSessionForLogin && !hasPassword
 
   if (!hasUsername) {
     return 0
@@ -238,6 +239,7 @@ watch(
     props.loginForm.username,
     props.loginForm.password,
     props.loginForm.rememberAuth,
+    props.canUseStoredSessionForLogin,
     props.canClearStoredSession,
     props.isLoginSubmitting
   ],
@@ -249,8 +251,7 @@ watch(
 
     // If cached credentials hydrate after mount, move focus from fields to Sign in once.
     const shouldAutoFocusSubmitForSavedSession =
-      props.canClearStoredSession &&
-      props.loginForm.rememberAuth &&
+      props.canUseStoredSessionForLogin &&
       props.loginForm.password.trim().length === 0
 
     if (

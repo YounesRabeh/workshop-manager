@@ -32,6 +32,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   const steamGuardPromptType = ref<SteamGuardPromptType>('none')
   const isStoredSessionLoginAttempt = ref(false)
   const hasPersistedStoredSession = ref(false)
+  const canUseStoredSessionForCurrentLogin = ref(false)
   const isLoginSubmitting = ref(false)
   const statusMessage = ref<string>('')
   const authIssue = ref<AuthIssue | null>(null)
@@ -201,7 +202,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   }
 
   function canUseStoredSessionForLogin(): boolean {
-    return loginForm.rememberAuth && hasPersistedStoredSession.value
+    return canUseStoredSessionForCurrentLogin.value
   }
 
   function setPasswordPeek(value: boolean): void {
@@ -224,6 +225,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     const hasStoredAuth = payload.hasStoredAuth === true
     loginForm.rememberAuth = payload.rememberAuth === true && hasStoredAuth
     hasPersistedStoredSession.value = hasStoredAuth
+    canUseStoredSessionForCurrentLogin.value = hasStoredAuth
     if (loginForm.rememberAuth) {
       loginForm.rememberUsername = true
     }
@@ -237,6 +239,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     try {
       await window.workshop.clearStoredSession()
       hasPersistedStoredSession.value = false
+      canUseStoredSessionForCurrentLogin.value = false
       loginForm.rememberAuth = false
       loginForm.password = ''
       isPasswordPeek.value = false
@@ -261,6 +264,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     statusMessage.value = successMessage
     loginForm.password = ''
     hasPersistedStoredSession.value = loginForm.rememberAuth
+    canUseStoredSessionForCurrentLogin.value = loginForm.rememberAuth
     await options.onSignedIn()
   }
 
@@ -298,6 +302,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         steamGuardPromptType.value = 'none'
         steamGuardSessionId.value = null
         authIssue.value = null
+        canUseStoredSessionForCurrentLogin.value = false
         statusMessage.value = 'Saved session expired. Enter password to sign in again.'
         return
       }
@@ -384,6 +389,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       steamGuardPromptType.value = 'none'
       steamGuardSessionId.value = null
       if (isSavedSessionFallbackError(parsed) && usingSavedSession) {
+        canUseStoredSessionForCurrentLogin.value = false
         statusMessage.value = 'Saved session unavailable. Enter password to sign in again.'
         authIssue.value = null
         return

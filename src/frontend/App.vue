@@ -108,6 +108,7 @@ const {
   canAccessMods,
   loginHeaderStatusMessage,
   normalizeError,
+  canUseStoredSessionForLogin,
   setPasswordPeek,
   setWebApiKeyPeek,
   setWebApiKey,
@@ -515,6 +516,7 @@ watch(
         :steam-guard-code="steamGuardCode"
         :is-stored-session-login-attempt="isStoredSessionLoginAttempt"
         :can-clear-stored-session="hasPersistedStoredSession"
+        :can-use-stored-session-for-login="canUseStoredSessionForLogin()"
         :is-advanced-options-open="isAdvancedOptionsOpen"
         :advanced-settings="advancedSettings"
         :is-web-api-key-peek="isWebApiKeyPeek"
