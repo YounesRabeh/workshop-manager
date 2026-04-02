@@ -166,6 +166,8 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).toContain('Showing 1 of 1 item(s).')
     expect(wrapper.text()).toContain('Test Item')
     expect(wrapper.text()).toContain('ID: 123')
+    expect(wrapper.text()).not.toContain('Steam login successful. Loading workshop items...')
+    expect(wrapper.text()).not.toContain('Loaded 1 workshop item(s).')
   })
 
   it('keeps readiness layout tweaks: top row App ID + Title, separator visible, and no Published File ID in update', async () => {
@@ -666,6 +668,7 @@ describe('App UI validation gates', () => {
     expect(workshop.updateVisibility).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Visibility Updated')
     expect(wrapper.text()).toContain('Changed to Hidden.')
+    expect(wrapper.text()).not.toContain('"runId":"r3"')
   })
 
   it('shows upload failed popup and uses short status text', async () => {
