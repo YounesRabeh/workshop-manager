@@ -671,6 +671,66 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).not.toContain('"runId":"r3"')
   })
 
+  it('shows upload success popup after creating an item', async () => {
+    workshop.uploadMod.mockResolvedValueOnce({
+      runId: 'r-upload-success',
+      success: true,
+      publishedFileId: '200'
+    })
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
+    expect(createTab).toBeDefined()
+    await createTab?.trigger('click')
+    await flushPromises()
+
+    const pickContentFolderButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Choose Content Folder'))
+    expect(pickContentFolderButton).toBeDefined()
+    await pickContentFolderButton?.trigger('click')
+    await flushPromises()
+
+    const createButton = wrapper.findAll('button').find((button) => button.text().includes('Create New Item'))
+    expect(createButton).toBeDefined()
+    const publishArticle = createButton!.element.closest('article')
+    expect(publishArticle).toBeTruthy()
+    const publishInputs = publishArticle!.querySelectorAll('input')
+    expect(publishInputs.length).toBeGreaterThanOrEqual(2)
+    ;(publishInputs[0] as HTMLInputElement).value = '480'
+    publishInputs[0].dispatchEvent(new Event('input', { bubbles: true }))
+    ;(publishInputs[1] as HTMLInputElement).value = 'Created Mod'
+    publishInputs[1].dispatchEvent(new Event('input', { bubbles: true }))
+    const releaseNotesField = publishArticle!.querySelector('textarea')
+    expect(releaseNotesField).toBeTruthy()
+    ;(releaseNotesField as HTMLTextAreaElement).value = 'Initial release notes'
+    releaseNotesField!.dispatchEvent(new Event('input', { bubbles: true }))
+    await flushPromises()
+
+    await createButton?.trigger('click')
+    await flushPromises()
+
+    const confirmCreateButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Create Item')
+    expect(confirmCreateButton).toBeDefined()
+    await confirmCreateButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.uploadMod).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Upload Completed')
+    expect(wrapper.text()).toContain('Published File ID: 200')
+  })
+
   it('shows upload failed popup and uses short status text', async () => {
     workshop.uploadMod.mockRejectedValueOnce(new Error('[command_failed] ERROR (No Connection)'))
 
@@ -903,8 +963,8 @@ describe('App UI validation gates', () => {
     await flushPromises()
 
     expect(workshop.updateMod).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('Update Failed')
-    expect(wrapper.text()).toContain('Steam connection failed after 4 retries')
+    expect(wrapper.text()).not.toContain('Update Failed')
+    expect(wrapper.text()).not.toContain('Steam connection failed after 4 retries')
     expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Update failed. See popup.')
   })
 
@@ -1117,8 +1177,8 @@ describe('App UI validation gates', () => {
     await confirmUpdateButton?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Update Failed')
-    expect(wrapper.text()).toContain('Selected content folder is empty')
+    expect(wrapper.text()).not.toContain('Update Failed')
+    expect(wrapper.text()).not.toContain('Selected content folder is empty')
     expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Update failed. See popup.')
   })
 
