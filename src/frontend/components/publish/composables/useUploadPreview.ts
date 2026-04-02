@@ -1,5 +1,5 @@
 /**
- * Overview: Shared preview-image helpers for publish draft media selection.
+ * Overview: Preview-image helpers for publish draft media selection.
  * Responsibility: Normalizes local file URLs and provides reactive preview loading, error, and square-aspect detection state.
  */
 import { computed, ref, watch, type ComputedRef } from 'vue'

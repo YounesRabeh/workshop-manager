@@ -19,12 +19,32 @@ describe('frontend publish structure', () => {
     ).toBe(true)
     expect(
       existsSync(
-        resolve(root, 'src/frontend/components/publish/shared/index.ts')
+        resolve(root, 'src/frontend/components/publish/composables/useContentExplorer.ts')
+      )
+    ).toBe(true)
+    expect(
+      existsSync(
+        resolve(root, 'src/frontend/components/publish/composables/useUploadPreview.ts')
+      )
+    ).toBe(true)
+    expect(
+      existsSync(
+        resolve(root, 'src/frontend/components/publish/model/visibility.ts')
+      )
+    ).toBe(true)
+    expect(
+      existsSync(
+        resolve(root, 'src/frontend/components/publish/theme/visibility-theme.ts')
       )
     ).toBe(true)
     expect(
       existsSync(
         resolve(root, 'src/frontend/components/publish/panels/PublishReadinessCard.vue')
+      )
+    ).toBe(true)
+    expect(
+      existsSync(
+        resolve(root, 'src/frontend/components/publish/panels/PublishUpdateOverviewCard.vue')
       )
     ).toBe(true)
     expect(
@@ -43,6 +63,9 @@ describe('frontend publish structure', () => {
     ).toBe(false)
     expect(
       existsSync(resolve(root, 'src/frontend/components/publish/publish-section.shared.ts'))
+    ).toBe(false)
+    expect(
+      existsSync(resolve(root, 'src/frontend/components/publish/shared/index.ts'))
     ).toBe(false)
   })
 

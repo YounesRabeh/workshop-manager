@@ -1,6 +1,6 @@
 /**
- * Overview: Shared readiness presentation rules for publish checklist items.
- * Responsibility: Computes checklist item tone/status labels and splits prioritized readiness groups for create/update UI cards.
+ * Overview: Readiness styling rules for publish checklist items.
+ * Responsibility: Computes checklist item tone and status labels from readiness state and feature context.
  */
 import type { PublishChecklistItem } from '../../../types/ui'
 
@@ -86,16 +86,4 @@ export function readinessStatusLabel(item: PublishChecklistItem, context: Readin
     return 'Invalid'
   }
   return item.optional ? 'Optional' : 'Missing'
-}
-
-export function splitReadinessItems(items: PublishChecklistItem[]): {
-  top: PublishChecklistItem[]
-  secondary: PublishChecklistItem[]
-} {
-  const topLabels = ['App ID', 'Title'] as const
-  const top = topLabels
-    .map((label) => items.find((item) => item.label === label))
-    .filter((item): item is PublishChecklistItem => Boolean(item))
-  const secondary = items.filter((item) => !topLabels.includes(item.label as (typeof topLabels)[number]))
-  return { top, secondary }
 }

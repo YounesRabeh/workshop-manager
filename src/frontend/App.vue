@@ -26,6 +26,7 @@ import { usePublishActions } from './composables/usePublishActions'
 import { useUiShell } from './composables/useUiShell'
 import { useWorkshopItems } from './composables/useWorkshopItems'
 import './styles/themes/app.theme.css'
+import './components/publish/styles/publish-section.shared.css'
 import { PublishProgressTracker } from './utils/publish-progress-tracker'
 import { formatSizeLabel } from './utils/size-format'
 import type {
