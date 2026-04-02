@@ -23,6 +23,7 @@
       "output": "dist"
     },
     "beforeBuild": "./scripts/build/electron-builder-before-build.mjs",
+    "afterSign": "./scripts/build/after-sign.mjs",
     "asar": true,
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "files": [

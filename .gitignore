@@ -1,14 +1,14 @@
+# Dependencies
 node_modules/
 .pnpm-store/
+
+# Build outputs
 out/
 dist/
-squashfs-root/
-.vite/
-*.log
-.DS_Store
 coverage/
+.vite/
 *.tsbuildinfo
-.vscode/
+squashfs-root/
 
 # Packaged executable artifacts
 *.AppImage
@@ -22,11 +22,30 @@ latest*.yml
 builder-debug.yml
 builder-effective-config.yaml
 
-#for doc-AI
-.codex
-
-# Generated icon artifacts (source is resources/img/app-icon.png)
+# Generated icon artifacts
+# Source of truth: resources/img/app-icon.png
 resources/img/app-icon.*
 !resources/img/app-icon.png
 resources/.icon-source
 **/public/app-icon.png
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local tool metadata
+.codex
