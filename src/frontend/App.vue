@@ -367,11 +367,6 @@ function setStagedContentFilesFromFolder(mode: 'create' | 'update', contentFolde
 function setContentFolderSelectionError(mode: 'create' | 'update', contentFolder: string, message: string): void {
   setStagedFilesForMode(mode, [])
   statusMessage.value = `Content folder selected: ${contentFolder}. Scan failed: ${message}`
-  showToast({
-    tone: 'error',
-    title: 'Content Scan Failed',
-    detail: message
-  })
 }
 
 async function loadWorkshopItems(): Promise<void> {

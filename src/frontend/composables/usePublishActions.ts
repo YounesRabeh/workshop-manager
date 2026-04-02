@@ -176,11 +176,13 @@ export function usePublishActions(options: UsePublishActionsOptions) {
   function handleActionFailure(operation: 'upload' | 'update' | 'visibility', error: unknown): void {
     const parsed = options.normalizeError(error)
     options.setStatusMessage(actionFailureStatus(operation))
-    options.showToast({
-      tone: 'error',
-      title: actionFailureTitle(operation),
-      detail: parsed.message
-    })
+    if (operation !== 'update') {
+      options.showToast({
+        tone: 'error',
+        title: actionFailureTitle(operation),
+        detail: parsed.message
+      })
+    }
   }
 
   async function upload(): Promise<void> {
@@ -255,13 +257,6 @@ export function usePublishActions(options: UsePublishActionsOptions) {
           ? { ...item, visibility: committedVisibility.value }
           : item
       )
-      options.showToast({
-        tone: 'success',
-        title: 'Update Completed',
-        detail: result.publishedFileId
-          ? `Updated item ID: ${result.publishedFileId}`
-          : 'Workshop item update finished successfully.'
-      })
       if (updatedItemId) {
         delete options.updateDraftCache.value[updatedItemId]
       }
