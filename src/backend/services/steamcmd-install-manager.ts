@@ -165,9 +165,9 @@ async function listDirectoryTree(rootDir: string, maxDepth: number): Promise<str
 
 function download(url: string, targetPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const file = createWriteStream(targetPath)
     let settled = false
     let activeResponse: IncomingMessage | null = null
+    let file: ReturnType<typeof createWriteStream> | null = null
 
     const rejectOnce = (error: AppError) => {
       if (settled) {
@@ -175,7 +175,7 @@ function download(url: string, targetPath: string): Promise<void> {
       }
       settled = true
       activeResponse?.destroy()
-      file.destroy()
+      file?.destroy()
       void rm(targetPath, { force: true })
         .catch(() => undefined)
         .finally(() => reject(error))
@@ -189,37 +189,59 @@ function download(url: string, targetPath: string): Promise<void> {
       resolve()
     }
 
-    file.once('error', (error) => {
-      rejectOnce(toInstallError('SteamCMD download failed', error))
-    })
+    const requestDownload = (currentUrl: string, redirectsRemaining: number) => {
+      const request = get(currentUrl, (res) => {
+        activeResponse = res
+        const statusCode = res.statusCode ?? 0
+        const location = res.headers?.location
 
-    const request = get(url, (res) => {
-      activeResponse = res
-      if (!res.statusCode || res.statusCode >= 400) {
-        res.resume()
-        rejectOnce(new AppError('install', `SteamCMD download failed with status ${res.statusCode}`))
-        return
-      }
-
-      res.once('error', (error) => {
-        rejectOnce(toInstallError('SteamCMD download failed', error))
-      })
-
-      res.pipe(file)
-      file.on('finish', () => {
-        file.close((error) => {
-          if (error) {
-            rejectOnce(toInstallError('SteamCMD download failed', error))
+        if (statusCode >= 300 && statusCode < 400) {
+          res.resume()
+          if (!location) {
+            rejectOnce(new AppError('install', `SteamCMD download failed with status ${statusCode}`))
             return
           }
-          resolveOnce()
+          if (redirectsRemaining <= 0) {
+            rejectOnce(new AppError('install', 'SteamCMD download failed: too many redirects'))
+            return
+          }
+          requestDownload(new URL(location, currentUrl).toString(), redirectsRemaining - 1)
+          return
+        }
+
+        if (statusCode < 200 || statusCode >= 400) {
+          res.resume()
+          rejectOnce(new AppError('install', `SteamCMD download failed with status ${statusCode}`))
+          return
+        }
+
+        res.once('error', (error) => {
+          rejectOnce(toInstallError('SteamCMD download failed', error))
+        })
+
+        file = createWriteStream(targetPath)
+        file.once('error', (error) => {
+          rejectOnce(toInstallError('SteamCMD download failed', error))
+        })
+
+        res.pipe(file)
+        file.on('finish', () => {
+          file?.close((error) => {
+            if (error) {
+              rejectOnce(toInstallError('SteamCMD download failed', error))
+              return
+            }
+            resolveOnce()
+          })
         })
       })
-    })
 
-    request.once('error', (error) => {
-      rejectOnce(toInstallError('SteamCMD download failed', error))
-    })
+      request.once('error', (error) => {
+        rejectOnce(toInstallError('SteamCMD download failed', error))
+      })
+    }
+
+    requestDownload(url, 3)
   })
 }
 

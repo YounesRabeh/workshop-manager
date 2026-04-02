@@ -12,3 +12,16 @@ export class AppError extends Error implements ApiError {
     this.code = code
   }
 }
+
+export class RunCancelledError extends AppError {
+  readonly cancelled = true
+
+  constructor(message = 'SteamCMD run cancelled by user.') {
+    super('command_failed', message)
+    this.name = 'RunCancelledError'
+  }
+}
+
+export function isRunCancelledError(error: unknown): error is RunCancelledError {
+  return error instanceof RunCancelledError
+}

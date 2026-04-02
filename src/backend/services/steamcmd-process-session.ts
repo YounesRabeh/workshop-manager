@@ -6,7 +6,7 @@
 import { mkdir } from 'node:fs/promises'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { RunEvent } from '@shared/contracts'
-import { AppError } from '@backend/utils/errors'
+import { AppError, RunCancelledError } from '@backend/utils/errors'
 import { RunLogStore } from '@backend/stores/run-log-store'
 import {
   buildLoginArgs,
@@ -582,13 +582,26 @@ export class SteamCmdProcessSession {
     activeRun.resolve({ lines: activeRun.lines, exitCode: pending.exitCode })
   }
 
+  private rejectPendingSteamGuard(runId: string, error: Error): void {
+    const pending = this.pendingSteamGuard.get(runId)
+    if (!pending) {
+      return
+    }
+
+    this.pendingSteamGuard.delete(runId)
+    pending.reject(error)
+  }
+
   private failActiveRun(activeRun: ActiveInteractiveRun, error: Error): void {
     if (this.activeInteractiveRun !== activeRun) {
       return
     }
+    const normalizedError =
+      error instanceof AppError ? error : new AppError('command_failed', error.message)
+    this.rejectPendingSteamGuard(activeRun.runId, normalizedError)
     activeRun.pendingResult = {
       exitCode: 1,
-      runtimeError: error instanceof AppError ? error : new AppError('command_failed', error.message)
+      runtimeError: normalizedError
     }
     this.finishActiveRun(activeRun)
   }
@@ -837,20 +850,31 @@ export class SteamCmdProcessSession {
             }
 
             if (!activeRun.pendingResult) {
-              const parsedLoginFailure = phase === 'login' ? parseSteamLoginFailure(activeRun.lines) : undefined
-              if (parsedLoginFailure) {
-                activeRun.pendingResult = { exitCode: 1 }
-              } else if (phase === 'login' && activeRun.lines.some((line) => isLoginSuccessLine(line))) {
-                activeRun.pendingResult = { exitCode: exitCode ?? 0 }
-              } else if ((exitCode ?? 1) !== 0) {
-                activeRun.pendingResult = {
-                  exitCode: exitCode ?? 1,
-                  runtimeError: new AppError('command_failed', `SteamCMD process exited unexpectedly (code ${exitCode ?? 1})`)
+              if (phase === 'login') {
+                const parsedLoginFailure = parseSteamLoginFailure(activeRun.lines)
+                if (parsedLoginFailure) {
+                  activeRun.pendingResult = { exitCode: 1 }
+                } else if (activeRun.lines.some((line) => isLoginSuccessLine(line))) {
+                  activeRun.pendingResult = { exitCode: exitCode ?? 0 }
+                } else if ((exitCode ?? 1) !== 0) {
+                  activeRun.pendingResult = {
+                    exitCode: exitCode ?? 1,
+                    runtimeError: new AppError('command_failed', `SteamCMD process exited unexpectedly (code ${exitCode ?? 1})`)
+                  }
+                } else {
+                  activeRun.pendingResult = {
+                    exitCode: 1,
+                    runtimeError: new AppError('auth', 'Steam login failed. Check credentials or guard method.')
+                  }
                 }
               } else {
-                activeRun.pendingResult = {
-                  exitCode: 1,
-                  runtimeError: new AppError('auth', 'Steam login failed. Check credentials or guard method.')
+                const parsedWorkshopFailure = parseWorkshopRunFailure(activeRun.lines, phase)
+                if (parsedWorkshopFailure) {
+                  activeRun.pendingResult = { exitCode: exitCode ?? 1 }
+                } else if ((exitCode ?? 0) === 0) {
+                  activeRun.pendingResult = { exitCode: 0 }
+                } else {
+                  activeRun.pendingResult = { exitCode: exitCode ?? 1 }
                 }
               }
             }
@@ -875,6 +899,18 @@ export class SteamCmdProcessSession {
     if (!processHandle) {
       return
     }
+
+    const activeRun = this.activeInteractiveRun?.runId === runId ? this.activeInteractiveRun : null
+    if (activeRun) {
+      const cancelError = new RunCancelledError()
+      this.rejectPendingSteamGuard(runId, cancelError)
+      activeRun.pendingResult = {
+        exitCode: 1,
+        runtimeError: cancelError
+      }
+      this.finishActiveRun(activeRun)
+    }
+
     processHandle.kill('SIGTERM')
     this.deps.emitRunEvent({ runId, ts: Date.now(), type: 'run_cancelled', phase: 'cancelled' })
   }
