@@ -3,13 +3,13 @@
  * Responsibility: Handles login/logout/guard flows, advanced settings persistence, profile loading, and run-event auth state updates.
  */
 import { computed, reactive, ref } from 'vue'
-import type { AdvancedSettings, RunEvent } from '@shared/contracts'
+import type { RunEvent } from '@shared/contracts'
 import type {
-  AdvancedSettingsState,
   AuthIssue,
   LoginFormState,
   SteamGuardPromptType
 } from '../types/ui'
+import { useAdvancedSettings } from './useAdvancedSettings'
 
 export interface ApiFailure {
   message: string
@@ -35,9 +35,6 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   const isLoginSubmitting = ref(false)
   const statusMessage = ref<string>('')
   const authIssue = ref<AuthIssue | null>(null)
-  const isSteamCmdDetected = ref(false)
-  const isAdvancedOptionsOpen = ref(false)
-  const installLogPath = ref('')
   const accountPersonaName = ref<string>('')
   const accountProfileImageUrl = ref<string | null>(null)
 
@@ -47,23 +44,6 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     rememberUsername: true,
     rememberAuth: false
   })
-
-  const advancedSettings = reactive<AdvancedSettingsState>({
-    webApiEnabled: false,
-    webApiKey: '',
-    hasWebApiKey: false,
-    secureStorageAvailable: true,
-    steamCmdManualPath: '',
-    steamCmdInstalled: false,
-    steamCmdSource: 'missing',
-    isSaving: false,
-    statusMessage: ''
-  })
-
-  const isAuthenticated = computed(() => loginState.value === 'signed_in')
-  const canAccessMods = computed(() => loginState.value === 'signed_in')
-  const accountDisplayName = computed(() => accountPersonaName.value || loginForm.username.trim() || 'Steam account')
-  const loginHeaderStatusMessage = computed(() => statusMessage.value || (isSteamCmdDetected.value ? 'SteamCMD found ✓' : ''))
 
   function normalizeError(error: unknown): ApiFailure {
     const fallback: ApiFailure = {
@@ -116,6 +96,32 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       code: maybe.code ?? fallback.code
     }
   }
+
+  const {
+    isSteamCmdDetected,
+    isAdvancedOptionsOpen,
+    installLogPath,
+    advancedSettings,
+    setWebApiKey,
+    setSteamCmdManualPath,
+    toggleAdvancedOptions,
+    ensureSteamCmdInstalled,
+    openInstallLog,
+    loadAdvancedSettings,
+    pickSteamCmdManualPath,
+    saveAdvancedSettings,
+    clearSavedWebApiKey
+  } = useAdvancedSettings({
+    normalizeError,
+    setStatusMessage: (message) => {
+      statusMessage.value = message
+    }
+  })
+
+  const isAuthenticated = computed(() => loginState.value === 'signed_in')
+  const canAccessMods = computed(() => loginState.value === 'signed_in')
+  const accountDisplayName = computed(() => accountPersonaName.value || loginForm.username.trim() || 'Steam account')
+  const loginHeaderStatusMessage = computed(() => statusMessage.value || (isSteamCmdDetected.value ? 'SteamCMD found ✓' : ''))
 
   function toAuthIssue(error: ApiFailure): AuthIssue {
     const message = error.message.toLowerCase()
@@ -206,82 +212,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     isWebApiKeyPeek.value = value
   }
 
-  function setWebApiKey(value: string): void {
-    advancedSettings.webApiKey = value
-  }
-
-  function setSteamCmdManualPath(value: string): void {
-    advancedSettings.steamCmdManualPath = value
-  }
-
-  function toggleAdvancedOptions(): void {
-    isAdvancedOptionsOpen.value = !isAdvancedOptionsOpen.value
-  }
-
   function setSteamGuardCode(value: string): void {
     steamGuardCode.value = value
-  }
-
-  function applyAdvancedSettings(payload: AdvancedSettings): void {
-    advancedSettings.webApiEnabled = payload.webApiEnabled
-    advancedSettings.hasWebApiKey = payload.hasWebApiKey
-    advancedSettings.secureStorageAvailable = payload.secureStorageAvailable
-    advancedSettings.steamCmdManualPath = payload.steamCmdManualPath ?? ''
-    advancedSettings.steamCmdInstalled = payload.steamCmdInstalled === true
-    advancedSettings.steamCmdSource = payload.steamCmdSource
-  }
-
-  async function ensureSteamCmdInstalled(): Promise<void> {
-    isSteamCmdDetected.value = false
-    statusMessage.value = 'Checking SteamCMD installation...'
-    try {
-      const payload = await window.workshop.ensureSteamCmdInstalled()
-      isSteamCmdDetected.value = true
-      advancedSettings.steamCmdInstalled = true
-      advancedSettings.steamCmdSource = payload.source
-      installLogPath.value = ''
-      if (payload.source === 'manual') {
-        advancedSettings.steamCmdManualPath = payload.executablePath
-      }
-      statusMessage.value = 'SteamCMD is ready.'
-    } catch (error) {
-      const parsed = normalizeError(error)
-      isSteamCmdDetected.value = false
-      advancedSettings.steamCmdInstalled = false
-      statusMessage.value = `Install error (${parsed.code}): ${parsed.message}`
-      await loadInstallLogPath()
-    }
-  }
-
-  async function loadInstallLogPath(): Promise<void> {
-    try {
-      const payload = await window.workshop.getInstallLog()
-      installLogPath.value = payload.path
-    } catch (error) {
-      installLogPath.value = ''
-    }
-  }
-
-  async function openInstallLog(): Promise<void> {
-    if (installLogPath.value.trim().length === 0) {
-      await loadInstallLogPath()
-    }
-
-    const targetPath = installLogPath.value.trim()
-    if (!targetPath) {
-      statusMessage.value = 'SteamCMD install log path is not available yet.'
-      return
-    }
-
-    try {
-      const result = await window.workshop.openPath({ path: targetPath })
-      if (result.error) {
-        statusMessage.value = `Open install log failed: ${result.error}`
-      }
-    } catch (error) {
-      const parsed = normalizeError(error)
-      statusMessage.value = `Open install log failed (${parsed.code}): ${parsed.message}`
-    }
   }
 
   async function refreshRememberedLoginState(): Promise<void> {
@@ -294,81 +226,6 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     hasPersistedStoredSession.value = hasStoredAuth
     if (loginForm.rememberAuth) {
       loginForm.rememberUsername = true
-    }
-  }
-
-  async function loadAdvancedSettings(): Promise<void> {
-    try {
-      const payload = await window.workshop.getAdvancedSettings()
-      applyAdvancedSettings(payload)
-    } catch (error) {
-      const parsed = normalizeError(error)
-      advancedSettings.statusMessage = `Advanced options load failed (${parsed.code}): ${parsed.message}`
-    }
-  }
-
-  async function pickSteamCmdManualPath(): Promise<void> {
-    try {
-      const path = await window.workshop.pickSteamCmdExecutable()
-      if (!path) {
-        return
-      }
-      advancedSettings.steamCmdManualPath = path
-      advancedSettings.statusMessage = 'SteamCMD executable selected. Save Advanced Options to apply it.'
-    } catch (error) {
-      const parsed = normalizeError(error)
-      advancedSettings.statusMessage = `SteamCMD path selection failed (${parsed.code}): ${parsed.message}`
-    }
-  }
-
-  async function saveAdvancedSettings(): Promise<void> {
-    if (advancedSettings.isSaving) {
-      return
-    }
-
-    try {
-      advancedSettings.isSaving = true
-      advancedSettings.statusMessage = ''
-      const normalizedKey = advancedSettings.webApiKey.trim()
-      const implicitEnable = normalizedKey.length > 0 ? true : advancedSettings.webApiEnabled
-      const payload = await window.workshop.saveAdvancedSettings({
-        webApiEnabled: implicitEnable,
-        webApiKey: normalizedKey.length > 0 ? normalizedKey : undefined,
-        steamCmdManualPath: advancedSettings.steamCmdManualPath
-      })
-      applyAdvancedSettings(payload)
-      isSteamCmdDetected.value = payload.steamCmdInstalled
-      statusMessage.value = payload.steamCmdInstalled ? 'SteamCMD is ready.' : 'SteamCMD executable is not configured yet.'
-      advancedSettings.webApiKey = ''
-      advancedSettings.statusMessage = 'Advanced options saved.'
-    } catch (error) {
-      const parsed = normalizeError(error)
-      advancedSettings.statusMessage = `Advanced options save failed (${parsed.code}): ${parsed.message}`
-    } finally {
-      advancedSettings.isSaving = false
-    }
-  }
-
-  async function clearSavedWebApiKey(): Promise<void> {
-    if (advancedSettings.isSaving) {
-      return
-    }
-
-    try {
-      advancedSettings.isSaving = true
-      advancedSettings.statusMessage = ''
-      const payload = await window.workshop.saveAdvancedSettings({
-        webApiEnabled: advancedSettings.webApiEnabled,
-        clearWebApiKey: true
-      })
-      applyAdvancedSettings(payload)
-      advancedSettings.webApiKey = ''
-      advancedSettings.statusMessage = 'Saved Web API key removed.'
-    } catch (error) {
-      const parsed = normalizeError(error)
-      advancedSettings.statusMessage = `Web API key removal failed (${parsed.code}): ${parsed.message}`
-    } finally {
-      advancedSettings.isSaving = false
     }
   }
 
@@ -617,6 +474,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
           : 'Steam Guard code required. Enter the code to continue.'
       }
     }
+
     if (event.line && /steam guard mobile authenticator/i.test(event.line)) {
       steamGuardSessionId.value = event.runId
       steamGuardPromptType.value = 'steam_guard_mobile'
@@ -624,6 +482,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         ? 'Saved session requires Steam Guard approval. Approve on your phone now.'
         : 'Steam Guard mobile approval needed. Approve on your phone now.'
     }
+
     if (event.line && /auth(?:entication)?\s*code|guard code|two-factor/i.test(event.line)) {
       steamGuardSessionId.value = event.runId
       steamGuardPromptType.value = 'steam_guard_code'
@@ -631,6 +490,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         ? 'Saved session requires Steam Guard code. Enter code to continue.'
         : 'Steam Guard code required. Enter the code to continue.'
     }
+
     if (
       event.line &&
       /waiting for compat in post-logon|waiting for user info|logged in ok|login complete|successfully logged/i.test(event.line)
@@ -639,6 +499,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       steamGuardPromptType.value = 'steam_guard_approved'
       statusMessage.value = 'Steam Guard approved. Finalizing sign in...'
     }
+
     if (
       event.line &&
       /waiting for confirmation/i.test(event.line) &&
@@ -648,6 +509,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       steamGuardPromptType.value = 'steam_guard_mobile'
       statusMessage.value = 'Steam Guard mobile approval pending. Check your Steam phone app.'
     }
+
     if (event.type === 'run_finished' && event.phase === 'login') {
       steamGuardSessionId.value = null
       steamGuardCode.value = ''
@@ -655,6 +517,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       authIssue.value = null
       isStoredSessionLoginAttempt.value = false
     }
+
     if (event.type === 'run_failed' && event.phase === 'login') {
       steamGuardCode.value = ''
       steamGuardPromptType.value = 'none'

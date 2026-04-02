@@ -1,12 +1,11 @@
 /**
  * Overview: Electron main-process entrypoint for app startup, window lifecycle, and IPC wiring.
- * Responsibility: Bootstraps runtime/storage services, 
+ * Responsibility: Bootstraps runtime/storage services,
  * configures platform-specific behavior, and handles renderer requests for SteamCMD workflows and filesystem actions.
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron'
-import { dirname, extname, join } from 'node:path'
-import { access, copyFile, mkdir, readFile, readdir } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { app, BrowserWindow, dialog, Menu, shell } from 'electron'
+import { extname } from 'node:path'
+import { mkdir, readFile } from 'node:fs/promises'
 import { IPC_CHANNELS } from '@shared/ipc'
 import type {
   AdvancedSettings,
@@ -25,9 +24,12 @@ import { resolveSteamCmdPlatformProfile } from '@backend/services/steamcmd-platf
 import { SteamCmdRuntimeService } from '@backend/services/steamcmd-runtime-service'
 import { getAppPaths } from '@backend/services/path-provider'
 import { listContentFolderFiles } from '@backend/services/content-folder-scanner'
+import { createMainWindow } from './main-window'
+import { decryptSecret, encryptSecret, isSecureStorageAvailable } from './secret-store'
+import { handleIpc } from './ipc-helpers'
+import { configureStableUserDataPath, migrateLegacyUserData } from './user-data-migration'
 
 let mainWindow: BrowserWindow | null = null
-const STABLE_USER_DATA_DIR_NAME = 'workshop-manager'
 
 if (process.env['ELECTRON_VERBOSE_LOGS'] !== '1') {
   // Hide noisy Chromium internal stderr lines (for example atom_cache copy/paste warnings).
@@ -44,97 +46,7 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('name', 'workshop-manager')
 }
 
-function configureStableUserDataPath(): string {
-  const stablePath = join(app.getPath('appData'), STABLE_USER_DATA_DIR_NAME)
-  app.setPath('userData', stablePath)
-  return stablePath
-}
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await access(path)
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function copyMissingTree(sourceDir: string, targetDir: string): Promise<void> {
-  await mkdir(targetDir, { recursive: true })
-  const entries = await readdir(sourceDir, { withFileTypes: true })
-  for (const entry of entries) {
-    const sourcePath = join(sourceDir, entry.name)
-    const targetPath = join(targetDir, entry.name)
-    if (entry.isDirectory()) {
-      await copyMissingTree(sourcePath, targetPath)
-      continue
-    }
-    if (!entry.isFile()) {
-      continue
-    }
-    if (await pathExists(targetPath)) {
-      continue
-    }
-    await mkdir(dirname(targetPath), { recursive: true })
-    await copyFile(sourcePath, targetPath)
-  }
-}
-
-async function migrateLegacyUserData(stableUserDataPath: string): Promise<void> {
-  const appDataPath = app.getPath('appData')
-  const legacyCandidates = [
-    join(appDataPath, 'Workshop Manager', 'workshop-manager'),
-    join(appDataPath, 'steam-workshop-mod-manager', 'workshop-manager'),
-    join(appDataPath, 'Workshop Manager'),
-    join(appDataPath, 'steam-workshop-mod-manager')
-  ].filter((candidate) => candidate !== stableUserDataPath)
-  for (const legacyPath of legacyCandidates) {
-    if (!(await pathExists(legacyPath))) {
-      continue
-    }
-    await copyMissingTree(legacyPath, stableUserDataPath)
-  }
-}
-
 const stableUserDataPath = configureStableUserDataPath()
-
-function resolvePreloadPath(): string {
-  const jsPath = join(__dirname, '../preload/index.js')
-  if (existsSync(jsPath)) {
-    return jsPath
-  }
-  return join(__dirname, '../preload/index.mjs')
-}
-
-function resolveWindowIconPath(): string | undefined {
-  const iconCandidates =
-    process.platform === 'win32'
-      ? ['app-icon.ico', 'app-icon.normalized.png', 'app-icon.png']
-      : ['app-icon.normalized.png', 'app-icon.png', 'app-icon.icns']
-  const candidateDirs = new Set<string>()
-  candidateDirs.add(join(process.cwd(), 'resources', 'img'))
-  candidateDirs.add(join(app.getAppPath(), 'resources', 'img'))
-  candidateDirs.add(join(__dirname, '../resources', 'img'))
-  candidateDirs.add(join(__dirname, '../../resources', 'img'))
-  candidateDirs.add(join(process.cwd(), 'resources'))
-  candidateDirs.add(join(app.getAppPath(), 'resources'))
-  candidateDirs.add(join(__dirname, '../resources'))
-  candidateDirs.add(join(__dirname, '../../resources'))
-  const publicDir = process.env['VITE_PUBLIC']
-  if (publicDir) {
-    candidateDirs.add(publicDir)
-  }
-
-  for (const dir of candidateDirs) {
-    for (const iconName of iconCandidates) {
-      const iconPath = join(dir, iconName)
-      if (existsSync(iconPath)) {
-        return iconPath
-      }
-    }
-  }
-  return undefined
-}
 
 function toImageMimeType(path: string): string {
   const ext = extname(path).toLowerCase()
@@ -145,89 +57,17 @@ function toImageMimeType(path: string): string {
   return 'application/octet-stream'
 }
 
-function toPlainError(error: unknown): { message: string; code: string } {
-  if (error instanceof AppError) {
-    return { message: error.message, code: error.code }
+async function showOpenDialog(
+  dialogOptions: Electron.OpenDialogOptions
+): Promise<Electron.OpenDialogReturnValue> {
+  if (mainWindow) {
+    return await dialog.showOpenDialog(mainWindow, dialogOptions)
   }
-  if (error instanceof Error) {
-    return { message: error.message, code: 'command_failed' }
-  }
-  return { message: 'Unknown error', code: 'command_failed' }
-}
-
-function toIpcError(error: unknown): Error {
-  const plain = toPlainError(error)
-  const wrapped = new Error(`[${plain.code}] ${plain.message}`)
-  ;(wrapped as Error & { code?: string }).code = plain.code
-  return wrapped
-}
-
-function isSecureStorageAvailable(): boolean {
-  try {
-    return safeStorage.isEncryptionAvailable()
-  } catch {
-    return false
-  }
-}
-
-function encryptSecret(value: string): string {
-  if (!isSecureStorageAvailable()) {
-    throw new AppError(
-      'command_failed',
-      'Secure storage is unavailable on this system. Steam Web API key cannot be saved securely.'
-    )
-  }
-  return safeStorage.encryptString(value).toString('base64')
-}
-
-function decryptSecret(value: string): string {
-  if (!isSecureStorageAvailable()) {
-    throw new AppError(
-      'command_failed',
-      'Secure storage is unavailable on this system. Saved Steam Web API key cannot be unlocked.'
-    )
-  }
-  try {
-    return safeStorage.decryptString(Buffer.from(value, 'base64'))
-  } catch {
-    throw new AppError(
-      'command_failed',
-      'Saved Steam Web API key is unreadable. Re-enter it in Advanced Options.'
-    )
-  }
+  return await dialog.showOpenDialog(dialogOptions)
 }
 
 async function createWindow(): Promise<void> {
-  const iconPath = resolveWindowIconPath()
-  mainWindow = new BrowserWindow({
-    width: 1050,
-    height: 750,
-    minWidth: 780,
-    minHeight: 560,
-    autoHideMenuBar: true,
-    icon: iconPath,
-    // Prevent white flashes during resize before renderer repaint completes.
-    backgroundColor: '#171a21',
-    webPreferences: {
-      preload: resolvePreloadPath(),
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true
-    }
-  })
-
-  if (iconPath) {
-    mainWindow.setIcon(iconPath)
-    if (process.platform === 'darwin' && app.dock) {
-      app.dock.setIcon(nativeImage.createFromPath(iconPath))
-    }
-  }
-
-  if (process.env['ELECTRON_RENDERER_URL']) {
-    await mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    await mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  mainWindow = await createMainWindow()
 }
 
 app.whenReady().then(async () => {
@@ -324,108 +164,80 @@ app.whenReady().then(async () => {
     mainWindow.webContents.send(IPC_CHANNELS.runEvent, event)
   })
 
-  ipcMain.handle(IPC_CHANNELS.ensureSteamCmdInstalled, async () => {
-    try {
-      return await installManager.ensureInstalled()
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.ensureSteamCmdInstalled, async () => {
+    return await installManager.ensureInstalled()
   })
 
-  ipcMain.handle(IPC_CHANNELS.getAppVersion, async () => {
+  handleIpc(IPC_CHANNELS.getAppVersion, async () => {
     return { version: app.getVersion() }
   })
 
-  ipcMain.handle(IPC_CHANNELS.login, async (_event, payload: LoginInput) => {
-    try {
-      const useStoredAuth = payload.useStoredAuth === true
-      const rememberAuth = payload.rememberAuth === true
-      const rememberUsername = payload.rememberUsername === true || rememberAuth
-      await profileStore.setRememberedLoginState({
-        rememberedUsername: rememberUsername ? payload.username : undefined,
-        rememberAuth
-      })
-      const state = await runtimeService.login(payload.username, payload.password, useStoredAuth)
-      // Stored session needs username next launch, so keep username when rememberAuth is enabled.
-      await profileStore.setRememberedLoginState({
-        rememberedUsername: rememberUsername ? payload.username : undefined,
-        rememberAuth
-      })
-      return {
-        ...state,
-        rememberedUsername: rememberUsername ? payload.username : undefined
-      }
-    } catch (error) {
-      throw toIpcError(error)
+  handleIpc(IPC_CHANNELS.login, async (payload: LoginInput) => {
+    const useStoredAuth = payload.useStoredAuth === true
+    const rememberAuth = payload.rememberAuth === true
+    const rememberUsername = payload.rememberUsername === true || rememberAuth
+    await profileStore.setRememberedLoginState({
+      rememberedUsername: rememberUsername ? payload.username : undefined,
+      rememberAuth
+    })
+    const state = await runtimeService.login(payload.username, payload.password, useStoredAuth)
+    // Stored session needs username next launch, so keep username when rememberAuth is enabled.
+    await profileStore.setRememberedLoginState({
+      rememberedUsername: rememberUsername ? payload.username : undefined,
+      rememberAuth
+    })
+    return {
+      ...state,
+      rememberedUsername: rememberUsername ? payload.username : undefined
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.quitApp, async () => {
+  handleIpc(IPC_CHANNELS.quitApp, async () => {
     app.quit()
     return { ok: true }
   })
 
-  ipcMain.handle(IPC_CHANNELS.logout, async () => {
+  handleIpc(IPC_CHANNELS.logout, async () => {
     // UI sign-out should not invalidate remembered SteamCMD session.
     runtimeService.logout()
     return { ok: true }
   })
 
-  ipcMain.handle(IPC_CHANNELS.clearStoredSession, async () => {
-    try {
-      // Explicit clear must invalidate SteamCMD cached auth.
-      runtimeService.logout({ clearStoredAuth: true })
-      await profileStore.setRememberAuth(false)
-      return { ok: true }
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.clearStoredSession, async () => {
+    // Explicit clear must invalidate SteamCMD cached auth.
+    runtimeService.logout({ clearStoredAuth: true })
+    await profileStore.setRememberAuth(false)
+    return { ok: true }
   })
 
-  ipcMain.handle(IPC_CHANNELS.submitSteamGuardCode, async (_event, payload: SteamGuardInput) => {
-    try {
-      runtimeService.submitSteamGuardCode(payload.sessionId, payload.code)
-      return { ok: true }
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.submitSteamGuardCode, async (payload: SteamGuardInput) => {
+    runtimeService.submitSteamGuardCode(payload.sessionId, payload.code)
+    return { ok: true }
   })
 
-  ipcMain.handle(IPC_CHANNELS.uploadMod, async (_event, payload: UploadInput) => {
-    try {
-      return await runtimeService.upload(payload.draft, 'upload')
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.uploadMod, async (payload: UploadInput) => {
+    return await runtimeService.upload(payload.draft, 'upload')
   })
 
-  ipcMain.handle(IPC_CHANNELS.updateMod, async (_event, payload: UploadInput) => {
-    try {
-      return await runtimeService.upload(payload.draft, 'update')
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.updateMod, async (payload: UploadInput) => {
+    return await runtimeService.upload(payload.draft, 'update')
   })
 
-  ipcMain.handle(IPC_CHANNELS.updateVisibility, async (_event, payload: VisibilityUpdateInput) => {
-    try {
-      return await runtimeService.upload(
-        {
-          appId: payload.appId,
-          publishedFileId: payload.publishedFileId,
-          contentFolder: '',
-          previewFile: '',
-          title: '',
-          visibility: payload.visibility
-        },
-        'visibility'
-      )
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.updateVisibility, async (payload: VisibilityUpdateInput) => {
+    return await runtimeService.upload(
+      {
+        appId: payload.appId,
+        publishedFileId: payload.publishedFileId,
+        contentFolder: '',
+        previewFile: '',
+        title: '',
+        visibility: payload.visibility
+      },
+      'visibility'
+    )
   })
 
-  ipcMain.handle(IPC_CHANNELS.getProfiles, async () => {
+  handleIpc(IPC_CHANNELS.getProfiles, async () => {
     const rememberedUsername = await profileStore.getRememberedUsername()
     const rememberAuth = await profileStore.getRememberAuth()
     const shouldCheckStoredAuth = rememberAuth && Boolean(rememberedUsername?.trim())
@@ -437,162 +249,122 @@ app.whenReady().then(async () => {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.getAdvancedSettings, async () => {
-    try {
-      return await getAdvancedSettings()
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.getAdvancedSettings, async () => {
+    return await getAdvancedSettings()
   })
 
-  ipcMain.handle(IPC_CHANNELS.getInstallLog, async () => {
-    try {
-      return await installManager.getInstallLog()
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.getInstallLog, async () => {
+    return await installManager.getInstallLog()
   })
 
-  ipcMain.handle(IPC_CHANNELS.saveAdvancedSettings, async (_event, payload: SaveAdvancedSettingsInput) => {
-    try {
-      let nextWebApiEnabled = payload.webApiEnabled === true
-      const previousSteamCmdManualPath = await profileStore.getSteamCmdManualPath()
-      const previousSteamCmdManualPathValue = previousSteamCmdManualPath?.trim() ?? ''
-      let nextEncryptedWebApiKey = await profileStore.getWebApiKeyEncrypted()
-      let nextSteamCmdManualPath = previousSteamCmdManualPath
+  handleIpc(IPC_CHANNELS.saveAdvancedSettings, async (payload: SaveAdvancedSettingsInput) => {
+    let nextWebApiEnabled = payload.webApiEnabled === true
+    const previousSteamCmdManualPath = await profileStore.getSteamCmdManualPath()
+    const previousSteamCmdManualPathValue = previousSteamCmdManualPath?.trim() ?? ''
+    let nextEncryptedWebApiKey = await profileStore.getWebApiKeyEncrypted()
+    let nextSteamCmdManualPath = previousSteamCmdManualPath
 
-      if (payload.clearWebApiKey === true) {
-        nextEncryptedWebApiKey = undefined
-        nextWebApiEnabled = false
+    if (payload.clearWebApiKey === true) {
+      nextEncryptedWebApiKey = undefined
+      nextWebApiEnabled = false
+    }
+
+    const normalizedKey = payload.webApiKey?.trim()
+    if (normalizedKey && normalizedKey.length > 0) {
+      nextEncryptedWebApiKey = encryptSecret(normalizedKey)
+      nextWebApiEnabled = true
+    }
+
+    if (payload.steamCmdManualPath !== undefined) {
+      const normalizedSteamCmdPath = payload.steamCmdManualPath.trim()
+      nextSteamCmdManualPath = normalizedSteamCmdPath.length > 0 ? normalizedSteamCmdPath : undefined
+    }
+
+    installManager.setManualExecutablePath(nextSteamCmdManualPath)
+
+    const nextSteamCmdManualPathValue = nextSteamCmdManualPath?.trim() ?? ''
+    if (nextSteamCmdManualPath && nextSteamCmdManualPathValue !== previousSteamCmdManualPathValue) {
+      const installStatus = await installManager.getStatus()
+      if (!installStatus.installed || installStatus.source !== 'manual') {
+        installManager.setManualExecutablePath(previousSteamCmdManualPath)
+        throw new AppError('install', 'Selected SteamCMD path is not a usable executable.')
       }
-
-      const normalizedKey = payload.webApiKey?.trim()
-      if (normalizedKey && normalizedKey.length > 0) {
-        nextEncryptedWebApiKey = encryptSecret(normalizedKey)
-        nextWebApiEnabled = true
-      }
-
-      if (payload.steamCmdManualPath !== undefined) {
-        const normalizedSteamCmdPath = payload.steamCmdManualPath.trim()
-        nextSteamCmdManualPath = normalizedSteamCmdPath.length > 0 ? normalizedSteamCmdPath : undefined
-      }
-
-      installManager.setManualExecutablePath(nextSteamCmdManualPath)
-
-      const nextSteamCmdManualPathValue = nextSteamCmdManualPath?.trim() ?? ''
-      if (nextSteamCmdManualPath && nextSteamCmdManualPathValue !== previousSteamCmdManualPathValue) {
-        const installStatus = await installManager.getStatus()
-        if (!installStatus.installed || installStatus.source !== 'manual') {
-          installManager.setManualExecutablePath(previousSteamCmdManualPath)
-          throw new AppError('install', 'Selected SteamCMD path is not a usable executable.')
-        }
-      }
-
-      await profileStore.setAdvancedSettingsState({
-        webApiEnabled: nextWebApiEnabled,
-        webApiKeyEncrypted: nextEncryptedWebApiKey,
-        steamCmdManualPath: nextSteamCmdManualPath
-      })
-
-      return await getAdvancedSettings()
-    } catch (error) {
-      throw toIpcError(error)
     }
+
+    await profileStore.setAdvancedSettingsState({
+      webApiEnabled: nextWebApiEnabled,
+      webApiKeyEncrypted: nextEncryptedWebApiKey,
+      steamCmdManualPath: nextSteamCmdManualPath
+    })
+
+    return await getAdvancedSettings()
   })
 
-  ipcMain.handle(IPC_CHANNELS.saveProfile, async (_event, payload: { profile: ModProfile }) => {
-    try {
-      return await profileStore.saveProfile(payload.profile)
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.saveProfile, async (payload: { profile: ModProfile }) => {
+    return await profileStore.saveProfile(payload.profile)
   })
 
-  ipcMain.handle(IPC_CHANNELS.deleteProfile, async (_event, payload: { profileId: string }) => {
-    try {
-      await profileStore.deleteProfile(payload.profileId)
-      return { ok: true }
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.deleteProfile, async (payload: { profileId: string }) => {
+    await profileStore.deleteProfile(payload.profileId)
+    return { ok: true }
   })
 
-  ipcMain.handle(IPC_CHANNELS.getRunLogs, async () => {
+  handleIpc(IPC_CHANNELS.getRunLogs, async () => {
     return await runLogStore.list()
   })
 
-  ipcMain.handle(IPC_CHANNELS.getRunLog, async (_event, payload: { runId: string }) => {
+  handleIpc(IPC_CHANNELS.getRunLog, async (payload: { runId: string }) => {
     return await runLogStore.get(payload.runId)
   })
 
-  ipcMain.handle(IPC_CHANNELS.getCurrentProfile, async () => {
-    try {
-      return await runtimeService.getCurrentProfile()
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.getCurrentProfile, async () => {
+    return await runtimeService.getCurrentProfile()
   })
 
-  ipcMain.handle(IPC_CHANNELS.getMyWorkshopItems, async (_event, payload: { appId?: string }) => {
-    try {
-      const encryptedKey = await profileStore.getWebApiKeyEncrypted()
-      const storedWebApiEnabled = await profileStore.getWebApiEnabled()
-      const resolvedKey = await resolveSavedWebApiKey()
-      const allowWebApi = storedWebApiEnabled && resolvedKey.hasUsableKey
-      const webApiAccess =
-        allowWebApi
-          ? 'active'
-          : encryptedKey?.trim()
-            ? 'configured_unavailable'
-            : 'disabled'
-      if (storedWebApiEnabled !== allowWebApi) {
-        await profileStore.setWebApiEnabled(allowWebApi)
-      }
-
-      return await runtimeService.getMyWorkshopItems(payload.appId, allowWebApi ? resolvedKey.key : undefined, {
-        allowWebApi,
-        webApiAccess
-      })
-    } catch (error) {
-      throw toIpcError(error)
+  handleIpc(IPC_CHANNELS.getMyWorkshopItems, async (payload: { appId?: string }) => {
+    const encryptedKey = await profileStore.getWebApiKeyEncrypted()
+    const storedWebApiEnabled = await profileStore.getWebApiEnabled()
+    const resolvedKey = await resolveSavedWebApiKey()
+    const allowWebApi = storedWebApiEnabled && resolvedKey.hasUsableKey
+    const webApiAccess =
+      allowWebApi
+        ? 'active'
+        : encryptedKey?.trim()
+          ? 'configured_unavailable'
+          : 'disabled'
+    if (storedWebApiEnabled !== allowWebApi) {
+      await profileStore.setWebApiEnabled(allowWebApi)
     }
+
+    return await runtimeService.getMyWorkshopItems(payload.appId, allowWebApi ? resolvedKey.key : undefined, {
+      allowWebApi,
+      webApiAccess
+    })
   })
 
-  ipcMain.handle(IPC_CHANNELS.listContentFolderFiles, async (_event, payload: { folderPath: string }) => {
-    try {
-      return await listContentFolderFiles(payload.folderPath)
-    } catch (error) {
-      throw toIpcError(error)
-    }
+  handleIpc(IPC_CHANNELS.listContentFolderFiles, async (payload: { folderPath: string }) => {
+    return await listContentFolderFiles(payload.folderPath)
   })
 
-  ipcMain.handle(IPC_CHANNELS.openPath, async (_event, payload: { path: string }) => {
-    try {
-      const targetPath = payload.path?.trim()
-      if (!targetPath) {
-        throw new AppError('validation', 'Path is required')
-      }
-      const openError = await shell.openPath(targetPath)
-      return openError ? { ok: true, error: openError } : { ok: true }
-    } catch (error) {
-      throw toIpcError(error)
+  handleIpc(IPC_CHANNELS.openPath, async (payload: { path: string }) => {
+    const targetPath = payload.path?.trim()
+    if (!targetPath) {
+      throw new AppError('validation', 'Path is required')
     }
+    const openError = await shell.openPath(targetPath)
+    return openError ? { ok: true, error: openError } : { ok: true }
   })
 
-  ipcMain.handle(IPC_CHANNELS.openExternal, async (_event, payload: { url: string }) => {
-    try {
-      const targetUrl = payload.url?.trim()
-      if (!targetUrl) {
-        throw new AppError('validation', 'URL is required')
-      }
-      await shell.openExternal(targetUrl)
-      return { ok: true }
-    } catch (error) {
-      throw toIpcError(error)
+  handleIpc(IPC_CHANNELS.openExternal, async (payload: { url: string }) => {
+    const targetUrl = payload.url?.trim()
+    if (!targetUrl) {
+      throw new AppError('validation', 'URL is required')
     }
+    await shell.openExternal(targetUrl)
+    return { ok: true }
   })
 
-  ipcMain.handle(IPC_CHANNELS.getLocalImagePreview, async (_event, payload: { path: string }) => {
+  handleIpc(IPC_CHANNELS.getLocalImagePreview, async (payload: { path: string }) => {
     const targetPath = payload.path?.trim()
     if (!targetPath) {
       return undefined
@@ -607,45 +379,31 @@ app.whenReady().then(async () => {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.pickFolder, async () => {
-    const result = mainWindow
-      ? await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] })
-      : await dialog.showOpenDialog({ properties: ['openDirectory'] })
+  handleIpc(IPC_CHANNELS.pickFolder, async () => {
+    const result = await showOpenDialog({ properties: ['openDirectory'] })
     return result.filePaths[0]
   })
 
-  ipcMain.handle(IPC_CHANNELS.pickFile, async () => {
-    const result = mainWindow
-      ? await dialog.showOpenDialog(mainWindow, {
-          properties: ['openFile'],
-          filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
-        })
-      : await dialog.showOpenDialog({
-          properties: ['openFile'],
-          filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
-        })
+  handleIpc(IPC_CHANNELS.pickFile, async () => {
+    const result = await showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+    })
     return result.filePaths[0]
   })
 
-  ipcMain.handle(IPC_CHANNELS.pickSteamCmdExecutable, async () => {
-    const dialogOptions: Electron.OpenDialogOptions = {
+  handleIpc(IPC_CHANNELS.pickSteamCmdExecutable, async () => {
+    const result = await showOpenDialog({
       title: 'Select SteamCMD executable',
       properties: ['openFile']
-    }
-    const result = mainWindow
-      ? await dialog.showOpenDialog(mainWindow, dialogOptions)
-      : await dialog.showOpenDialog(dialogOptions)
+    })
     return result.filePaths[0]
   })
 
-  ipcMain.handle(IPC_CHANNELS.pickFiles, async () => {
-    const result = mainWindow
-      ? await dialog.showOpenDialog(mainWindow, {
-          properties: ['openFile', 'multiSelections']
-        })
-      : await dialog.showOpenDialog({
-          properties: ['openFile', 'multiSelections']
-        })
+  handleIpc(IPC_CHANNELS.pickFiles, async () => {
+    const result = await showOpenDialog({
+      properties: ['openFile', 'multiSelections']
+    })
     return result.filePaths
   })
 

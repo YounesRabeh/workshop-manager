@@ -75,6 +75,29 @@ interface SteamCmdProcessSessionDeps {
   onSessionInvalidated: () => void
 }
 
+interface PreparedRunContext {
+  executablePath: string
+  timeoutMs: number
+  phase: RunPhase
+  persistLogs: boolean
+  emitRunEvents: boolean
+}
+
+interface ActiveRunConfig {
+  runId: string
+  phase: RunPhase
+  command: string
+  emitRunEvents: boolean
+  persistLogs: boolean
+  emitOutputEvents: boolean
+  timeout: ReturnType<typeof setTimeout>
+  writeInput: (value: string) => void
+  resolve: (value: { lines: string[]; exitCode: number }) => void
+  reject: (error: Error) => void
+  commandDispatched?: boolean
+  waitForPromptBeforeDispatch?: boolean
+}
+
 function formatRunMeta(message: string): string {
   return `[RUN_META] ${message}`
 }
@@ -177,6 +200,99 @@ export class SteamCmdProcessSession {
     }, 2_500)
   }
 
+  private buildChildProcessOptions() {
+    return {
+      cwd: this.deps.runtimeDir,
+      stdio: 'pipe' as const,
+      shell: this.platformBehavior.useShellHost,
+      windowsHide: this.platformBehavior.hideWindowsConsole
+    }
+  }
+
+  private invalidatePersistentSession(): void {
+    this.persistentProcess = null
+    this.persistentPromptReady = false
+    this.deps.onSessionInvalidated()
+  }
+
+  private async prepareRunContext(
+    runId: string,
+    options: SessionRunOptions,
+    modeSuffix = ''
+  ): Promise<PreparedRunContext> {
+    const phase = options.phase as RunPhase
+    const timeoutMs = options.timeoutMs ?? 5 * 60_000
+    const executablePath = await this.deps.steamCmdExecutablePath()
+    const persistLogs = options.persistLogs !== false
+    const emitRunEvents = options.emitRunEvents !== false
+
+    await mkdir(this.deps.runtimeDir, { recursive: true })
+    if (persistLogs) {
+      await this.deps.runLogStore.create(runId)
+    }
+    if (emitRunEvents) {
+      this.deps.emitRunEvent({ runId, ts: Date.now(), type: 'run_started', phase })
+    }
+    if (persistLogs) {
+      const modeLabel = modeSuffix.length > 0 ? ` ${modeSuffix}` : ''
+      await this.deps.runLogStore.appendLine(
+        runId,
+        formatRunMeta(`started phase=${phase} timeoutMs=${timeoutMs} executable=${executablePath}${modeLabel}`)
+      )
+    }
+
+    return {
+      executablePath,
+      timeoutMs,
+      phase,
+      persistLogs,
+      emitRunEvents
+    }
+  }
+
+  private createRunTimeout(
+    runId: string,
+    timeoutMs: number,
+    persistLogs: boolean,
+    timeoutMeta: string,
+    onTimeout: () => void
+  ): ReturnType<typeof setTimeout> {
+    return setTimeout(() => {
+      if (persistLogs) {
+        this.deps.runLogStore
+          .appendLine(runId, formatRunMeta(timeoutMeta))
+          .catch(() => undefined)
+      }
+      onTimeout()
+    }, timeoutMs)
+  }
+
+  private createActiveRun(config: ActiveRunConfig): ActiveInteractiveRun {
+    return {
+      runId: config.runId,
+      phase: config.phase,
+      command: config.command,
+      commandDispatched: config.commandDispatched ?? false,
+      waitForPromptBeforeDispatch: config.waitForPromptBeforeDispatch ?? false,
+      promptDispatchFallback: null,
+      loginProgressRetry: null,
+      loginProgressObserved: false,
+      loginDispatchAttempts: 0,
+      emitRunEvents: config.emitRunEvents,
+      persistLogs: config.persistLogs,
+      writeInput: config.writeInput,
+      lines: [],
+      emitOutputEvents: config.emitOutputEvents,
+      timeout: config.timeout,
+      settleTimeout: null,
+      lineQueue: Promise.resolve(),
+      pendingResult: null,
+      guardMobilePromptSent: false,
+      resolve: config.resolve,
+      reject: config.reject
+    }
+  }
+
   private async ensurePersistentProcess(
     executablePath?: string,
     startupArgs: string[] = []
@@ -186,12 +302,7 @@ export class SteamCmdProcessSession {
     }
 
     const resolvedExecutablePath = executablePath ?? (await this.deps.steamCmdExecutablePath())
-    const child = spawn(resolvedExecutablePath, startupArgs, {
-      cwd: this.deps.runtimeDir,
-      stdio: 'pipe',
-      shell: this.platformBehavior.useShellHost,
-      windowsHide: this.platformBehavior.hideWindowsConsole
-    })
+    const child = spawn(resolvedExecutablePath, startupArgs, this.buildChildProcessOptions())
     this.persistentProcess = child
     this.persistentPromptReady = false
     this.stdoutBuffer = ''
@@ -208,8 +319,7 @@ export class SteamCmdProcessSession {
       if (activeRun) {
         this.failActiveRun(activeRun, new AppError('command_failed', `SteamCMD spawn failed: ${error.message}`))
       }
-      this.persistentProcess = null
-      this.deps.onSessionInvalidated()
+      this.invalidatePersistentSession()
     })
     child.once('close', (exitCode) => {
       const trailingStdout = this.stdoutBuffer.trim()
@@ -231,9 +341,7 @@ export class SteamCmdProcessSession {
         )
       }
 
-      this.persistentProcess = null
-      this.persistentPromptReady = false
-      this.deps.onSessionInvalidated()
+      this.invalidatePersistentSession()
     })
 
     return child
@@ -514,76 +622,47 @@ export class SteamCmdProcessSession {
     options: SessionRunOptions
   ): Promise<{ lines: string[]; exitCode: number }> {
     const phase = options.phase as RunPhase
-    const timeoutMs = options.timeoutMs ?? 5 * 60_000
     const command = this.buildInteractiveCommand(args, phase)
 
     return await this.enqueueCommand(async () => {
-      const executablePath = await this.deps.steamCmdExecutablePath()
+      const context = await this.prepareRunContext(runId, options)
       const waitForPromptBeforeDispatch =
         phase === 'login' &&
         this.persistentProcess === null &&
         this.platformBehavior.waitForPromptBeforeInteractiveLogin
-      await mkdir(this.deps.runtimeDir, { recursive: true })
-      const persistLogs = options.persistLogs !== false
-      const emitRunEvents = options.emitRunEvents !== false
-      if (persistLogs) {
-        await this.deps.runLogStore.create(runId)
-      }
-      if (emitRunEvents) {
-        this.deps.emitRunEvent({ runId, ts: Date.now(), type: 'run_started', phase })
-      }
-      await this.ensurePersistentProcess(executablePath)
-
-      if (persistLogs) {
-        await this.deps.runLogStore.appendLine(
-          runId,
-          formatRunMeta(
-            `started phase=${phase} timeoutMs=${timeoutMs} executable=${executablePath}`
-          )
-        )
-      }
+      await this.ensurePersistentProcess(context.executablePath)
 
       return await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          if (persistLogs) {
-            this.deps.runLogStore
-              .appendLine(runId, formatRunMeta(`timeout reached after ${timeoutMs}ms, restarting SteamCMD process`))
-              .catch(() => undefined)
-          }
+        const timeout = this.createRunTimeout(
+          runId,
+          context.timeoutMs,
+          context.persistLogs,
+          `timeout reached after ${context.timeoutMs}ms, restarting SteamCMD process`,
+          () => {
           const activeRun = this.activeInteractiveRun
           if (activeRun?.runId === runId) {
-            this.failActiveRun(activeRun, new AppError('timeout', `SteamCMD run exceeded timeout (${timeoutMs}ms)`))
+              this.failActiveRun(activeRun, new AppError('timeout', `SteamCMD run exceeded timeout (${context.timeoutMs}ms)`))
           }
           this.persistentProcess?.kill('SIGTERM')
-          this.persistentProcess = null
-          this.deps.onSessionInvalidated()
-        }, timeoutMs)
+            this.invalidatePersistentSession()
+          },
+        )
 
-        const activeRun: ActiveInteractiveRun = {
+        const activeRun = this.createActiveRun({
           runId,
           phase,
           command,
-          commandDispatched: false,
-          waitForPromptBeforeDispatch,
-          promptDispatchFallback: null,
-          loginProgressRetry: null,
-          loginProgressObserved: false,
-          loginDispatchAttempts: 0,
-          emitRunEvents,
-          persistLogs,
+          emitRunEvents: context.emitRunEvents,
+          persistLogs: context.persistLogs,
+          emitOutputEvents: options.emitOutputEvents === true,
+          timeout,
           writeInput: (value: string) => {
             this.writeInteractiveInput(value)
           },
-          lines: [],
-          emitOutputEvents: options.emitOutputEvents === true,
-          timeout,
-          settleTimeout: null,
-          lineQueue: Promise.resolve(),
-          pendingResult: null,
-          guardMobilePromptSent: false,
           resolve,
-          reject
-        }
+          reject,
+          waitForPromptBeforeDispatch
+        })
 
         this.activeInteractiveRun = activeRun
         if (this.persistentProcess) {
@@ -598,7 +677,7 @@ export class SteamCmdProcessSession {
               if (this.activeInteractiveRun !== activeRun || activeRun.commandDispatched) {
                 return
               }
-              if (persistLogs) {
+              if (context.persistLogs) {
                 void this.deps.runLogStore
                   .appendLine(
                     runId,
@@ -622,83 +701,49 @@ export class SteamCmdProcessSession {
     options: SessionRunOptions
   ): Promise<{ lines: string[]; exitCode: number }> {
     const phase = options.phase as RunPhase
-    const timeoutMs = options.timeoutMs ?? 5 * 60_000
 
     return await this.enqueueCommand(async () => {
       if (this.persistentProcess) {
         throw new AppError('command_failed', 'SteamCMD persistent session is already active')
       }
 
-      const executablePath = await this.deps.steamCmdExecutablePath()
-      const persistLogs = options.persistLogs !== false
-      const emitRunEvents = options.emitRunEvents !== false
-
-      await mkdir(this.deps.runtimeDir, { recursive: true })
-      if (persistLogs) {
-        await this.deps.runLogStore.create(runId)
-      }
-      if (emitRunEvents) {
-        this.deps.emitRunEvent({ runId, ts: Date.now(), type: 'run_started', phase })
-      }
-      if (persistLogs) {
-        await this.deps.runLogStore.appendLine(
-          runId,
-          formatRunMeta(
-            `started phase=${phase} timeoutMs=${timeoutMs} executable=${executablePath} mode=persistent-startup`
-          )
-        )
-      }
+      const context = await this.prepareRunContext(runId, options, 'mode=persistent-startup')
 
       return await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          if (persistLogs) {
-            this.deps.runLogStore
-              .appendLine(
-                runId,
-                formatRunMeta(`timeout reached after ${timeoutMs}ms, terminating persistent SteamCMD startup`)
-              )
-              .catch(() => undefined)
-          }
-
+        const timeout = this.createRunTimeout(
+          runId,
+          context.timeoutMs,
+          context.persistLogs,
+          `timeout reached after ${context.timeoutMs}ms, terminating persistent SteamCMD startup`,
+          () => {
           const activeRun = this.activeInteractiveRun
           if (activeRun?.runId === runId) {
-            this.failActiveRun(activeRun, new AppError('timeout', `SteamCMD run exceeded timeout (${timeoutMs}ms)`))
+              this.failActiveRun(activeRun, new AppError('timeout', `SteamCMD run exceeded timeout (${context.timeoutMs}ms)`))
           }
           this.persistentProcess?.kill('SIGTERM')
-          this.persistentProcess = null
-          this.persistentPromptReady = false
-          this.deps.onSessionInvalidated()
-        }, timeoutMs)
+            this.invalidatePersistentSession()
+          }
+        )
 
-        const activeRun: ActiveInteractiveRun = {
+        const activeRun = this.createActiveRun({
           runId,
           phase,
           command: startupArgs.join(' '),
-          commandDispatched: true,
-          waitForPromptBeforeDispatch: false,
-          promptDispatchFallback: null,
-          loginProgressRetry: null,
-          loginProgressObserved: false,
-          loginDispatchAttempts: 0,
-          emitRunEvents,
-          persistLogs,
+          emitRunEvents: context.emitRunEvents,
+          persistLogs: context.persistLogs,
+          emitOutputEvents: options.emitOutputEvents === true,
+          timeout,
           writeInput: (value: string) => {
             this.writeInteractiveInput(value)
           },
-          lines: [],
-          emitOutputEvents: options.emitOutputEvents === true,
-          timeout,
-          settleTimeout: null,
-          lineQueue: Promise.resolve(),
-          pendingResult: null,
-          guardMobilePromptSent: false,
           resolve,
-          reject
-        }
+          reject,
+          commandDispatched: true
+        })
 
         this.activeInteractiveRun = activeRun
 
-        void this.ensurePersistentProcess(executablePath, startupArgs)
+        void this.ensurePersistentProcess(context.executablePath, startupArgs)
           .then((child) => {
             this.activeRuns.set(runId, child)
           })
@@ -720,75 +765,42 @@ export class SteamCmdProcessSession {
     options: SessionRunOptions
   ): Promise<{ lines: string[]; exitCode: number }> {
     const phase = options.phase as RunPhase
-    const timeoutMs = options.timeoutMs ?? 5 * 60_000
 
     return await this.enqueueCommand(async () => {
-      const executablePath = await this.deps.steamCmdExecutablePath()
-      const persistLogs = options.persistLogs !== false
-      const emitRunEvents = options.emitRunEvents !== false
-
-      await mkdir(this.deps.runtimeDir, { recursive: true })
-      if (persistLogs) {
-        await this.deps.runLogStore.create(runId)
-      }
-      if (emitRunEvents) {
-        this.deps.emitRunEvent({ runId, ts: Date.now(), type: 'run_started', phase })
-      }
-      if (persistLogs) {
-        await this.deps.runLogStore.appendLine(
-          runId,
-          formatRunMeta(
-            `started phase=${phase} timeoutMs=${timeoutMs} executable=${executablePath} mode=oneshot`
-          )
-        )
-      }
+      const context = await this.prepareRunContext(runId, options, 'mode=oneshot')
 
       return await new Promise((resolve, reject) => {
-        const child = spawn(executablePath, args, {
-          cwd: this.deps.runtimeDir,
-          stdio: 'pipe',
-          shell: this.platformBehavior.useShellHost,
-          windowsHide: this.platformBehavior.hideWindowsConsole
-        })
+        const child = spawn(context.executablePath, args, this.buildChildProcessOptions())
         const buffers = { stdout: '', stderr: '' }
-        const timeout = setTimeout(() => {
-          if (persistLogs) {
-            this.deps.runLogStore
-              .appendLine(runId, formatRunMeta(`timeout reached after ${timeoutMs}ms, terminating one-shot SteamCMD process`))
-              .catch(() => undefined)
-          }
+        const timeout = this.createRunTimeout(
+          runId,
+          context.timeoutMs,
+          context.persistLogs,
+          `timeout reached after ${context.timeoutMs}ms, terminating one-shot SteamCMD process`,
+          () => {
           const activeRun = this.activeInteractiveRun
           if (activeRun?.runId === runId) {
-            this.failActiveRun(activeRun, new AppError('timeout', `SteamCMD run exceeded timeout (${timeoutMs}ms)`))
+              this.failActiveRun(activeRun, new AppError('timeout', `SteamCMD run exceeded timeout (${context.timeoutMs}ms)`))
           }
           child.kill('SIGTERM')
-        }, timeoutMs)
+          }
+        )
 
-        const activeRun: ActiveInteractiveRun = {
+        const activeRun = this.createActiveRun({
           runId,
           phase,
           command: args.join(' '),
-          commandDispatched: true,
-          waitForPromptBeforeDispatch: false,
-          promptDispatchFallback: null,
-          loginProgressRetry: null,
-          loginProgressObserved: false,
-          loginDispatchAttempts: 0,
-          emitRunEvents,
-          persistLogs,
+          emitRunEvents: context.emitRunEvents,
+          persistLogs: context.persistLogs,
+          emitOutputEvents: options.emitOutputEvents === true,
+          timeout,
           writeInput: (value: string) => {
             child.stdin.write(`${value}${this.platformBehavior.interactiveLineEnding}`)
           },
-          lines: [],
-          emitOutputEvents: options.emitOutputEvents === true,
-          timeout,
-          settleTimeout: null,
-          lineQueue: Promise.resolve(),
-          pendingResult: null,
-          guardMobilePromptSent: false,
           resolve,
-          reject
-        }
+          reject,
+          commandDispatched: true
+        })
 
         this.activeInteractiveRun = activeRun
         this.activeRuns.set(runId, child)

@@ -185,6 +185,14 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     }
   }
 
+  async function refreshWorkshopItems(afterRefresh?: (items: WorkshopItemSummary[]) => void): Promise<void> {
+    const refreshedItems = await window.workshop.getMyWorkshopItems({
+      appId: options.workshopFilterAppId.value || undefined
+    })
+    options.workshopItems.value = refreshedItems
+    afterRefresh?.(refreshedItems)
+  }
+
   async function upload(): Promise<void> {
     if (!canCreate()) {
       options.setStatusMessage(resolveCreateBlockedMessage())
@@ -206,10 +214,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
       })
 
       try {
-        const refreshedItems = await window.workshop.getMyWorkshopItems({
-          appId: options.workshopFilterAppId.value || undefined
-        })
-        options.workshopItems.value = refreshedItems
+        await refreshWorkshopItems()
         options.setStatusMessage('Upload completed successfully. Mod list refreshed.')
       } catch (refreshError) {
         const parsed = options.normalizeError(refreshError)
@@ -262,17 +267,14 @@ export function usePublishActions(options: UsePublishActionsOptions) {
       }
 
       try {
-        const refreshedItems = await window.workshop.getMyWorkshopItems({
-          appId: options.workshopFilterAppId.value || undefined
+        await refreshWorkshopItems((refreshedItems) => {
+          const refreshedItem = updatedItemId
+            ? refreshedItems.find((item) => item.publishedFileId === updatedItemId)
+            : undefined
+          if (refreshedItem) {
+            options.onSelectWorkshopItem(refreshedItem)
+          }
         })
-        options.workshopItems.value = refreshedItems
-
-        const refreshedItem = updatedItemId
-          ? refreshedItems.find((item) => item.publishedFileId === updatedItemId)
-          : undefined
-        if (refreshedItem) {
-          options.onSelectWorkshopItem(refreshedItem)
-        }
         options.setStatusMessage('Update completed successfully. Update page refreshed.')
       } catch (refreshError) {
         const parsed = options.normalizeError(refreshError)
@@ -311,7 +313,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     const targetVisibility = pendingVisibility.value
 
     try {
-      const result = await window.workshop.updateVisibility({
+      await window.workshop.updateVisibility({
         appId,
         publishedFileId,
         visibility: targetVisibility
@@ -323,7 +325,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
           ? { ...item, visibility: targetVisibility }
           : item
       )
-      options.setStatusMessage(`Visibility updated to ${visibilityLabel(targetVisibility)}: ${JSON.stringify(result)}`)
+      options.setStatusMessage(`Visibility updated to ${visibilityLabel(targetVisibility)}.`)
       options.showToast({
         tone: 'success',
         title: 'Visibility Updated',
