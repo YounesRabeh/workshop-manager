@@ -987,8 +987,8 @@ describe('App UI validation gates', () => {
     await flushPromises()
 
     expect(workshop.updateMod).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).not.toContain('Update Failed')
-    expect(wrapper.text()).not.toContain('Steam connection failed after 4 retries')
+    expect(wrapper.text()).toContain('Update Failed')
+    expect(wrapper.text()).toContain('Steam connection failed after 4 retries')
     expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Update failed. See popup.')
   })
 
@@ -1035,6 +1035,8 @@ describe('App UI validation gates', () => {
         title: 'Test Item'
       })
     })
+    expect(wrapper.text()).toContain('Update Completed')
+    expect(wrapper.text()).toContain('Workshop item update finished successfully.')
   })
 
   it('allows update when content folder is selected (preview not required)', async () => {
@@ -1201,8 +1203,8 @@ describe('App UI validation gates', () => {
     await confirmUpdateButton?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).not.toContain('Update Failed')
-    expect(wrapper.text()).not.toContain('Selected content folder is empty')
+    expect(wrapper.text()).toContain('Update Failed')
+    expect(wrapper.text()).toContain('Selected content folder is empty')
     expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Update failed. See popup.')
   })
 

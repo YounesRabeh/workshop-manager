@@ -176,13 +176,11 @@ export function usePublishActions(options: UsePublishActionsOptions) {
   function handleActionFailure(operation: 'upload' | 'update' | 'visibility', error: unknown): void {
     const parsed = options.normalizeError(error)
     options.setStatusMessage(actionFailureStatus(operation))
-    if (operation !== 'update') {
-      options.showToast({
-        tone: 'error',
-        title: actionFailureTitle(operation),
-        detail: parsed.message
-      })
-    }
+    options.showToast({
+      tone: 'error',
+      title: actionFailureTitle(operation),
+      detail: parsed.message
+    })
   }
 
   async function refreshWorkshopItems(afterRefresh?: (items: WorkshopItemSummary[]) => void): Promise<void> {
@@ -265,6 +263,15 @@ export function usePublishActions(options: UsePublishActionsOptions) {
       if (updatedItemId) {
         delete options.updateDraftCache.value[updatedItemId]
       }
+
+      options.setStatusMessage('Update completed successfully.')
+      options.showToast({
+        tone: 'success',
+        title: 'Update Completed',
+        detail: result.publishedFileId
+          ? `Published File ID: ${result.publishedFileId}`
+          : 'Workshop item update finished successfully.'
+      })
 
       try {
         await refreshWorkshopItems((refreshedItems) => {

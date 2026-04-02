@@ -6,6 +6,7 @@ import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RunLogStore } from '../../src/backend/stores/run-log-store'
 import { SteamCmdRuntimeService } from '../../src/backend/services/steamcmd-runtime-service'
+import { AppError } from '../../src/backend/utils/errors'
 
 vi.mock('node:child_process', () => {
   return {
@@ -347,6 +348,93 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     ).rejects.toThrow(
       'Steam upload timed out while sending the manifest. Retry in a minute and check network/Steam service status.'
     )
+  })
+
+  it('restores workshop auth after a timed-out update invalidates the interactive session', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-timeout-restore-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(() =>
+      createInteractiveFakeChild({
+        login: {
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        }
+      })
+    )
+
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
+    await runtime.login('alice', 'secret')
+
+    const processSession = (
+      runtime as unknown as {
+        processSession: {
+          run: ReturnType<typeof vi.fn>
+          hasPersistentProcess: ReturnType<typeof vi.fn>
+        }
+        loginState: { username: string; steamId64?: string } | null
+      }
+    ).processSession
+
+    vi.spyOn(processSession, 'hasPersistentProcess').mockReturnValue(false)
+    const runSpy = vi
+      .spyOn(processSession, 'run')
+      .mockImplementationOnce(async () => {
+        ;(runtime as unknown as { loginState: { username: string; steamId64?: string } | null }).loginState = null
+        throw new AppError('timeout', 'SteamCMD run exceeded timeout (60000ms)')
+      })
+      .mockResolvedValueOnce({
+        lines: [
+          "Logging in user 'alice' [U:1:42] to Steam Public...",
+          'Waiting for user info...OK'
+        ],
+        exitCode: 0
+      })
+      .mockResolvedValueOnce({
+        lines: ['Published File Id: 123', 'Success.'],
+        exitCode: 0
+      })
+
+    await expect(
+      runtime.upload(
+        {
+          appId: '480',
+          publishedFileId: '123',
+          contentFolder: '',
+          previewFile: '/mods/preview.png',
+          title: 'My Mod'
+        },
+        'update'
+      )
+    ).rejects.toThrow('SteamCMD run exceeded timeout (60000ms)')
+
+    await expect(
+      runtime.upload(
+        {
+          appId: '480',
+          publishedFileId: '123',
+          contentFolder: '',
+          previewFile: '/mods/preview.png',
+          title: 'My Mod'
+        },
+        'update'
+      )
+    ).resolves.toMatchObject({
+      success: true,
+      publishedFileId: '123'
+    })
+
+    expect(runSpy).toHaveBeenCalledTimes(3)
+    expect(runSpy.mock.calls[1]?.[2]).toMatchObject({
+      phase: 'login',
+      timeoutMs: 10_000
+    })
+    expect(runSpy.mock.calls[2]?.[2]).toMatchObject({
+      phase: 'update',
+      timeoutMs: 60_000
+    })
   })
 
   it('creates runtime directory before login spawn', async () => {
