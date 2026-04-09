@@ -24,6 +24,8 @@ describe('steamcmd runtime helpers', () => {
   it('detects steam guard prompt variants', () => {
     expect(isSteamGuardPrompt('Steam Guard code:')).toBe(true)
     expect(isSteamGuardPrompt('Please enter two-factor authentication code')).toBe(true)
+    expect(isSteamGuardPrompt('Please enter OTP from your email')).toBe(true)
+    expect(isSteamGuardPrompt('Enter one-time passcode to continue')).toBe(true)
     expect(isSteamGuardPrompt('Work complete')).toBe(false)
   })
 
@@ -65,6 +67,18 @@ describe('steamcmd runtime helpers', () => {
     const failure = parseSteamLoginFailure([
       'This account is protected by Steam Guard.',
       'ERROR! Invalid authentication code.'
+    ])
+
+    expect(failure).toEqual({
+      code: 'steam_guard',
+      message: 'Steam Guard code is invalid or expired. Enter a fresh code and retry.'
+    })
+  })
+
+  it('classifies invalid OTP/email code failures', () => {
+    const failure = parseSteamLoginFailure([
+      'This account is protected by Steam Guard.',
+      'ERROR! Invalid email code.'
     ])
 
     expect(failure).toEqual({

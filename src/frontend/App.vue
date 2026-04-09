@@ -78,6 +78,8 @@ const {
   isPasswordPeek,
   isWebApiKeyPeek,
   steamGuardPromptType,
+  preferredAuthMode,
+  activeChallengeMode,
   isStoredSessionLoginAttempt,
   hasPersistedStoredSession,
   isLoginSubmitting,
@@ -98,6 +100,7 @@ const {
   setLoginPassword,
   setRememberUsername,
   setRememberAuth,
+  setPreferredAuthMode,
   setPasswordPeek,
   setWebApiKeyPeek,
   setWebApiKey,
@@ -463,6 +466,8 @@ async function pickUpdatePreviewFile(): Promise<void> {
         :is-password-peek="isPasswordPeek"
         :auth-issue="authIssue"
         :steam-guard-prompt-type="steamGuardPromptType"
+        :preferred-auth-mode="preferredAuthMode"
+        :active-challenge-mode="activeChallengeMode"
         :steam-guard-code="steamGuardCode"
         :is-stored-session-login-attempt="isStoredSessionLoginAttempt"
         :can-clear-stored-session="hasPersistedStoredSession"
@@ -477,6 +482,7 @@ async function pickUpdatePreviewFile(): Promise<void> {
         @update-password="setLoginPassword"
         @update-remember-username="setRememberUsername"
         @update-remember-auth="setRememberAuth"
+        @update-preferred-auth-mode="setPreferredAuthMode"
         @set-password-peek="setPasswordPeek"
         @submit-guard-code="submitSteamGuardCode"
         @update-steam-guard-code="setSteamGuardCode"

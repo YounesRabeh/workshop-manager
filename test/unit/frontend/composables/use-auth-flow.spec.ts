@@ -4,6 +4,14 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { useAuthFlow } from '@frontend/composables/useAuthFlow'
 
 describe('useAuthFlow composable', () => {
+  type ProfilesPayload = {
+    profiles: unknown[]
+    rememberedUsername: string
+    rememberAuth: boolean
+    hasStoredAuth: boolean
+    preferredAuthMode?: 'otp' | 'steam_guard_mobile'
+  }
+
   const workshop = {
     login: vi.fn(async () => ({ ok: true })),
     logout: vi.fn(async () => ({ ok: true })),
@@ -19,11 +27,12 @@ describe('useAuthFlow composable', () => {
       content: '[log] example',
       exists: true
     })),
-    getProfiles: vi.fn(async () => ({
+    getProfiles: vi.fn<() => Promise<ProfilesPayload>>(async () => ({
       profiles: [],
       rememberedUsername: 'alice',
       rememberAuth: false,
-      hasStoredAuth: false
+      hasStoredAuth: false,
+      preferredAuthMode: 'otp'
     })),
     getAdvancedSettings: vi.fn(async () => ({
       webApiEnabled: false,
@@ -128,7 +137,8 @@ describe('useAuthFlow composable', () => {
     })
 
     expect(flow.steamGuardPromptType.value).toBe('steam_guard_code')
-    expect(flow.statusMessage.value).toContain('Steam Guard code required')
+    expect(flow.activeChallengeMode.value).toBe('otp')
+    expect(flow.statusMessage.value).toContain('OTP / Email code')
   })
 
   it('ignores steam guard-like output from non-login or stale runs', () => {
@@ -286,12 +296,120 @@ describe('useAuthFlow composable', () => {
     expect(flow.loginForm.rememberAuth).toBe(false)
   })
 
+  it('hydrates preferred auth mode from profiles payload and defaults to otp', async () => {
+    workshop.getProfiles.mockResolvedValueOnce({
+      profiles: [],
+      rememberedUsername: 'alice',
+      rememberAuth: false,
+      hasStoredAuth: false,
+      preferredAuthMode: 'steam_guard_mobile'
+    })
+
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    await flow.refreshRememberedLoginState()
+    expect(flow.preferredAuthMode.value).toBe('steam_guard_mobile')
+
+    workshop.getProfiles.mockResolvedValueOnce({
+      profiles: [],
+      rememberedUsername: 'alice',
+      rememberAuth: false,
+      hasStoredAuth: false,
+      preferredAuthMode: undefined
+    })
+    await flow.refreshRememberedLoginState()
+    expect(flow.preferredAuthMode.value).toBe('otp')
+  })
+
+  it('submits preferred auth mode with login payload', async () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.loginForm.username = 'alice'
+    flow.loginForm.password = 'secret'
+    flow.setPreferredAuthMode('steam_guard_mobile')
+    await flow.login()
+
+    expect(workshop.login).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preferredAuthMode: 'steam_guard_mobile'
+      })
+    )
+  })
+
+  it('auto-switches challenge copy when steam requests OTP while mobile is preferred', () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.setPreferredAuthMode('steam_guard_mobile')
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'steam_guard_required',
+      phase: 'login',
+      promptType: 'steam_guard_code'
+    })
+
+    expect(flow.activeChallengeMode.value).toBe('otp')
+    expect(flow.statusMessage.value).toContain('Steam requested OTP / Email code')
+  })
+
+  it('only submits OTP/email code when OTP challenge is active', async () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.setSteamGuardCode('123456')
+    await flow.submitSteamGuardCode()
+    expect(workshop.submitSteamGuardCode).not.toHaveBeenCalled()
+
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'steam_guard_required',
+      phase: 'login',
+      promptType: 'steam_guard_code'
+    })
+    flow.setSteamGuardCode('123456')
+    await flow.submitSteamGuardCode()
+    expect(workshop.submitSteamGuardCode).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps saved-session login available for the current sign-in after turning off keep-signed-in', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
       rememberedUsername: 'alice',
       rememberAuth: true,
-      hasStoredAuth: true
+      hasStoredAuth: true,
+      preferredAuthMode: 'otp'
     })
 
     const flow = useAuthFlow({
@@ -321,7 +439,8 @@ describe('useAuthFlow composable', () => {
       profiles: [],
       rememberedUsername: 'alice',
       rememberAuth: true,
-      hasStoredAuth: true
+      hasStoredAuth: true,
+      preferredAuthMode: 'otp'
     })
 
     const flow = useAuthFlow({

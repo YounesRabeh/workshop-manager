@@ -10,7 +10,7 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 
 | Screenshot 1 | Screenshot 2 |
 | --- | --- |
-| ![Workshop Manager Screenshot 1](github/photo01.png) | ![Workshop Manager Screenshot 2](github/photo02.png) |
+| ![Workshop Manager Screenshot 1](.github/photo01.png) | ![Workshop Manager Screenshot 2](.github/photo02.png) |
 
 ## What It Does
 
@@ -23,8 +23,8 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 - Keeps the Electron boundary locked down with `nodeIntegration: false`, `contextIsolation: true`, and a preload bridge
 
 > [!IMPORTANT]
-> Authentication currently supports Steam Guard flows only.
-> Email-based Steam authentication is not implemented yet.
+> Authentication supports Steam Guard mobile approvals and OTP/email-code prompts.
+> The login UI auto-detects the challenge Steam requests and adapts accordingly.
 
 ## Requirements
 

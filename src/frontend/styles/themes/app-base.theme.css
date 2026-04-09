@@ -16,9 +16,10 @@ body,
 }
 
 body {
-  background: #171a21;
-  font-family: 'IBM Plex Sans', 'Noto Sans', 'Ubuntu', 'Segoe UI', sans-serif;
-  scrollbar-color: #4f6d86 #0f1a25;
+  background: #101824;
+  font-family: 'Sora', 'IBM Plex Sans', 'Noto Sans', 'Ubuntu', sans-serif;
+  letter-spacing: 0.002em;
+  scrollbar-color: #3c5f7b #0c1520;
   scrollbar-width: thin;
 }
 
@@ -43,24 +44,35 @@ body {
 
 .steam-theme {
   --window-pad: 12px;
+  --app-surface-1: rgba(19, 32, 47, 0.88);
+  --app-surface-2: rgba(12, 22, 34, 0.94);
+  --app-border: rgba(94, 140, 173, 0.5);
+  --app-border-strong: rgba(120, 181, 220, 0.6);
+  --app-text-main: #dcebf5;
+  --app-text-dim: #9db6c8;
+  --app-accent: #57b2e6;
+  --app-accent-strong: #6ec6f7;
   min-height: 100vh;
   padding: var(--window-pad);
   background:
-    radial-gradient(120% 120% at 10% 0%, #1b2838 0%, #171a21 55%, #0f151d 100%);
-  color: #c7d5e0;
+    radial-gradient(140% 130% at -8% -12%, rgba(64, 132, 184, 0.28), transparent 48%),
+    radial-gradient(110% 110% at 108% 102%, rgba(35, 82, 122, 0.36), transparent 54%),
+    linear-gradient(115deg, #0f1a26 0%, #0b1621 46%, #08121c 100%);
+  color: var(--app-text-main);
 }
 
 .app-shell {
-  max-width: 1320px;
+  max-width: 1680px;
   margin: 0 auto;
 }
 
 :fullscreen .app-shell {
-  max-width: 1760px;
+  max-width: 1960px;
 }
 
 .app-panel {
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(8px);
+  border-radius: 16px;
 }
 
 @media (min-width: 768px) {
@@ -70,7 +82,7 @@ body {
 }
 
 .steam-theme :focus-visible {
-  outline: 2px solid #66c0f4;
+  outline: 2px solid var(--app-accent-strong);
   outline-offset: 1px;
 }
 

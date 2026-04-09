@@ -12,6 +12,8 @@ export type ErrorCode =
   | 'command_failed'
   | 'timeout'
 
+export type PreferredAuthMode = 'otp' | 'steam_guard_mobile'
+
 export interface ModProfile {
   id: string
   appId: string
@@ -102,6 +104,7 @@ export interface LoginInput {
   rememberUsername: boolean
   rememberAuth?: boolean
   useStoredAuth?: boolean
+  preferredAuthMode?: PreferredAuthMode
 }
 
 export interface AdvancedSettings {

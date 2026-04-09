@@ -3,10 +3,12 @@
  * Responsibility: Handles login/logout/guard flows, advanced settings persistence, profile loading, and run-event auth state updates.
  */
 import { computed, reactive, ref } from 'vue'
-import type { RunEvent } from '@shared/contracts'
+import type { PreferredAuthMode as SharedPreferredAuthMode, RunEvent } from '@shared/contracts'
 import type {
+  ActiveChallengeMode,
   AuthIssue,
   LoginFormState,
+  PreferredAuthMode,
   SteamGuardPromptType
 } from '../types/ui'
 import { useAdvancedSettings } from './useAdvancedSettings'
@@ -31,6 +33,10 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   const isPasswordPeek = ref(false)
   const isWebApiKeyPeek = ref(false)
   const steamGuardPromptType = ref<SteamGuardPromptType>('none')
+  const preferredAuthMode = ref<PreferredAuthMode>('otp')
+  const activeChallengeMode = ref<ActiveChallengeMode>('none')
+  const queuedOtpCode = ref('')
+  const queuedOtpRunId = ref<string | null>(null)
   const isStoredSessionLoginAttempt = ref(false)
   const hasPersistedStoredSession = ref(false)
   const canUseStoredSessionForCurrentLogin = ref(false)
@@ -128,6 +134,22 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   const accountDisplayName = computed(() => accountPersonaName.value || loginForm.username.trim() || 'Steam account')
   const loginHeaderStatusMessage = computed(() => statusMessage.value || (isSteamCmdDetected.value ? 'SteamCMD found ✓' : ''))
 
+  function normalizePreferredAuthMode(mode: SharedPreferredAuthMode | undefined): PreferredAuthMode {
+    return mode === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp'
+  }
+
+  function setChallengeState(mode: ActiveChallengeMode): void {
+    activeChallengeMode.value = mode
+    if (mode === 'otp') {
+      steamGuardPromptType.value = 'steam_guard_code'
+      return
+    }
+    if (mode === 'steam_guard_mobile') {
+      steamGuardPromptType.value = 'steam_guard_mobile'
+      return
+    }
+  }
+
   function toAuthIssue(error: ApiFailure): AuthIssue {
     const message = error.message.toLowerCase()
 
@@ -147,8 +169,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       /invalid|expired|incorrect/.test(message)
     ) {
       return {
-        title: 'Invalid Steam Guard Code',
-        detail: 'The entered Steam Guard code is invalid or expired.',
+        title: 'Invalid OTP / Email Code',
+        detail: 'The entered OTP / Email code is invalid or expired.',
         hint: 'Use a fresh code from Steam and submit again.',
         tone: 'danger'
       }
@@ -186,9 +208,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
     if (error.code === 'steam_guard') {
       return {
-        title: 'Steam Guard Required',
+        title: 'Verification Required',
         detail: error.message,
-        hint: 'Complete the Steam Guard step and retry if needed.',
+        hint: 'Complete OTP / Email code or Steam app approval, then retry if needed.',
         tone: 'info'
       }
     }
@@ -228,6 +250,10 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
   }
 
+  function setPreferredAuthMode(value: PreferredAuthMode): void {
+    preferredAuthMode.value = normalizePreferredAuthMode(value)
+  }
+
   function setPasswordPeek(value: boolean): void {
     isPasswordPeek.value = value
   }
@@ -240,11 +266,17 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     steamGuardCode.value = value
   }
 
+  function clearQueuedOtp(): void {
+    queuedOtpCode.value = ''
+    queuedOtpRunId.value = null
+  }
+
   async function refreshRememberedLoginState(): Promise<void> {
     const payload = await window.workshop.getProfiles()
     const rememberedUsername = payload.rememberedUsername?.trim() ?? ''
     loginForm.username = rememberedUsername
     loginForm.rememberUsername = rememberedUsername.length > 0
+    preferredAuthMode.value = normalizePreferredAuthMode(payload.preferredAuthMode)
     const hasStoredAuth = payload.hasStoredAuth === true
     loginForm.rememberAuth = payload.rememberAuth === true && hasStoredAuth
     hasPersistedStoredSession.value = hasStoredAuth
@@ -269,8 +301,10 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       isStoredSessionLoginAttempt.value = false
       steamGuardSessionId.value = null
       steamGuardCode.value = ''
+      clearQueuedOtp()
       activeLoginRunId.value = null
       steamGuardPromptType.value = 'none'
+      activeChallengeMode.value = 'none'
       authIssue.value = null
       statusMessage.value = 'Saved session cleared. Enter password to sign in.'
     } catch (error) {
@@ -285,6 +319,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     steamGuardSessionId.value = null
     activeLoginRunId.value = null
     steamGuardPromptType.value = 'none'
+    activeChallengeMode.value = 'none'
+    clearQueuedOtp()
     authIssue.value = null
     statusMessage.value = successMessage
     loginForm.password = ''
@@ -309,14 +345,17 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       activeLoginRunId.value = null
       steamGuardSessionId.value = null
       steamGuardCode.value = ''
+      clearQueuedOtp()
       steamGuardPromptType.value = 'waiting'
+      activeChallengeMode.value = 'none'
       statusMessage.value = 'Restoring saved Steam session...'
       await window.workshop.login({
         username: loginForm.username,
         password: '',
         rememberUsername: true,
         rememberAuth: true,
-        useStoredAuth: true
+        useStoredAuth: true,
+        preferredAuthMode: preferredAuthMode.value
       })
       await finalizeSuccessfulLogin('Signed in with saved Steam session. Loading workshop items...')
     } catch (error) {
@@ -327,7 +366,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       if (isSavedSessionFallbackError(parsed)) {
         activeLoginRunId.value = null
         steamGuardPromptType.value = 'none'
+        activeChallengeMode.value = 'none'
         steamGuardSessionId.value = null
+        clearQueuedOtp()
         authIssue.value = null
         canUseStoredSessionForCurrentLogin.value = false
         statusMessage.value = 'Saved session expired. Enter password to sign in again.'
@@ -393,16 +434,21 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       isPasswordPeek.value = false
       steamGuardSessionId.value = null
       steamGuardCode.value = ''
+      clearQueuedOtp()
       steamGuardPromptType.value = 'waiting'
+      activeChallengeMode.value = 'none'
       statusMessage.value = usingSavedSession
         ? 'Signing in with saved Steam session...'
-        : 'Signing in to Steam... If you use Steam Guard Mobile, approve on your phone now.'
+        : preferredAuthMode.value === 'steam_guard_mobile'
+          ? 'Signing in to Steam... Preferred method: Steam app approval.'
+          : 'Signing in to Steam... Preferred method: OTP / Email code.'
       await window.workshop.login({
         username: loginForm.username,
         password: usingSavedSession ? '' : loginForm.password,
         rememberUsername,
         rememberAuth,
-        useStoredAuth: usingSavedSession
+        useStoredAuth: usingSavedSession,
+        preferredAuthMode: preferredAuthMode.value
       })
       await finalizeSuccessfulLogin(
         usingSavedSession
@@ -415,8 +461,10 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         await options.onShowTimeoutLogs()
       }
       steamGuardPromptType.value = 'none'
+      activeChallengeMode.value = 'none'
       activeLoginRunId.value = null
       steamGuardSessionId.value = null
+      clearQueuedOtp()
       if (isSavedSessionFallbackError(parsed) && usingSavedSession) {
         canUseStoredSessionForCurrentLogin.value = false
         statusMessage.value = 'Saved session unavailable. Enter password to sign in again.'
@@ -442,7 +490,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     activeLoginRunId.value = null
     steamGuardSessionId.value = null
     steamGuardCode.value = ''
+    clearQueuedOtp()
     steamGuardPromptType.value = 'none'
+    activeChallengeMode.value = 'none'
     authIssue.value = null
     isStoredSessionLoginAttempt.value = false
     isPasswordPeek.value = false
@@ -468,28 +518,90 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
   }
 
-  async function submitSteamGuardCode(): Promise<void> {
+  async function submitOtpCodeToSteam(sessionId: string, code: string): Promise<void> {
+    authIssue.value = null
+    await window.workshop.submitSteamGuardCode({
+      sessionId,
+      code
+    })
+    statusMessage.value = 'OTP / Email code submitted. Waiting for Steam...'
+  }
+
+  async function submitQueuedOtpIfReady(runId: string): Promise<void> {
     if (
       steamGuardPromptType.value !== 'steam_guard_code' ||
-      !steamGuardSessionId.value ||
-      steamGuardCode.value.trim().length === 0
+      steamGuardSessionId.value !== runId ||
+      queuedOtpCode.value.trim().length === 0 ||
+      queuedOtpRunId.value !== runId
     ) {
       return
     }
 
+    const code = queuedOtpCode.value.trim()
+    clearQueuedOtp()
+    steamGuardCode.value = ''
+
     try {
-      authIssue.value = null
-      await window.workshop.submitSteamGuardCode({
-        sessionId: steamGuardSessionId.value,
-        code: steamGuardCode.value
-      })
-      statusMessage.value = 'Steam Guard code submitted. Waiting for SteamCMD...'
-      steamGuardCode.value = ''
+      await submitOtpCodeToSteam(runId, code)
     } catch (error) {
       const parsed = normalizeError(error)
-      statusMessage.value = `Steam Guard failed (${parsed.code}): ${parsed.message}`
+      statusMessage.value = `OTP / Email code failed (${parsed.code}): ${parsed.message}`
+      authIssue.value = toAuthIssue(parsed)
+      steamGuardCode.value = code
+    }
+  }
+
+  async function submitSteamGuardCode(): Promise<void> {
+    const sessionId = steamGuardSessionId.value
+    const code = steamGuardCode.value.trim()
+
+    if (!sessionId || code.length === 0) {
+      return
+    }
+
+    if (steamGuardPromptType.value !== 'steam_guard_code') {
+      if (isLoginSubmitting.value && activeChallengeMode.value === 'otp') {
+        queuedOtpCode.value = code
+        queuedOtpRunId.value = sessionId
+        steamGuardCode.value = ''
+        statusMessage.value = 'OTP / Email code saved. Waiting for Steam challenge...'
+      }
+      return
+    }
+
+    try {
+      await submitOtpCodeToSteam(sessionId, code)
+      steamGuardCode.value = ''
+      clearQueuedOtp()
+    } catch (error) {
+      const parsed = normalizeError(error)
+      statusMessage.value = `OTP / Email code failed (${parsed.code}): ${parsed.message}`
       authIssue.value = toAuthIssue(parsed)
     }
+  }
+
+  function applyOtpChallengeStatus(fromSavedSession: boolean): void {
+    setChallengeState('otp')
+    if (fromSavedSession) {
+      statusMessage.value = 'Saved session requires OTP / Email code. Enter the code to continue.'
+      return
+    }
+    statusMessage.value =
+      preferredAuthMode.value === 'steam_guard_mobile'
+        ? 'Steam requested OTP / Email code for this sign-in. Enter the code to continue.'
+        : 'OTP / Email code required. Enter the code to continue.'
+  }
+
+  function applyMobileChallengeStatus(fromSavedSession: boolean): void {
+    setChallengeState('steam_guard_mobile')
+    if (fromSavedSession) {
+      statusMessage.value = 'Saved session requires Steam app approval. Approve on your phone now.'
+      return
+    }
+    statusMessage.value =
+      preferredAuthMode.value === 'otp'
+        ? 'Steam requested mobile app approval for this sign-in. Approve in the Steam mobile app to continue.'
+        : 'Steam app approval needed. Approve on your phone now.'
   }
 
   function handleRunEvent(event: RunEvent): void {
@@ -497,11 +609,15 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       activeLoginRunId.value = event.runId
       steamGuardSessionId.value = event.runId
       steamGuardCode.value = ''
+      clearQueuedOtp()
       steamGuardPromptType.value = 'waiting'
+      activeChallengeMode.value = preferredAuthMode.value === 'otp' ? 'otp' : 'none'
       authIssue.value = null
       statusMessage.value = isStoredSessionLoginAttempt.value
         ? 'Checking saved Steam session...'
-        : 'Signing in to Steam...'
+        : preferredAuthMode.value === 'otp'
+          ? 'Sign-in request sent. Enter OTP / Email code to continue.'
+          : 'Signing in to Steam...'
     }
 
     if (event.phase !== 'login' || event.runId !== activeLoginRunId.value) {
@@ -511,32 +627,22 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     if (event.type === 'steam_guard_required') {
       steamGuardSessionId.value = event.runId
       if (event.promptType === 'steam_guard_mobile') {
-        steamGuardPromptType.value = 'steam_guard_mobile'
-        statusMessage.value = isStoredSessionLoginAttempt.value
-          ? 'Saved session requires Steam Guard approval. Approve on your phone now.'
-          : 'Steam Guard mobile approval needed. Approve on your phone now.'
+        applyMobileChallengeStatus(isStoredSessionLoginAttempt.value)
       } else {
-        steamGuardPromptType.value = 'steam_guard_code'
-        statusMessage.value = isStoredSessionLoginAttempt.value
-          ? 'Saved session requires Steam Guard code. Enter code to continue.'
-          : 'Steam Guard code required. Enter the code to continue.'
+        applyOtpChallengeStatus(isStoredSessionLoginAttempt.value)
+        void submitQueuedOtpIfReady(event.runId)
       }
     }
 
     if (event.line && /steam guard mobile authenticator/i.test(event.line)) {
       steamGuardSessionId.value = event.runId
-      steamGuardPromptType.value = 'steam_guard_mobile'
-      statusMessage.value = isStoredSessionLoginAttempt.value
-        ? 'Saved session requires Steam Guard approval. Approve on your phone now.'
-        : 'Steam Guard mobile approval needed. Approve on your phone now.'
+      applyMobileChallengeStatus(isStoredSessionLoginAttempt.value)
     }
 
-    if (event.line && /auth(?:entication)?\s*code|guard code|two-factor/i.test(event.line)) {
+    if (event.line && /auth(?:entication)?\s*code|guard code|two-factor|otp|email code|one-time/i.test(event.line)) {
       steamGuardSessionId.value = event.runId
-      steamGuardPromptType.value = 'steam_guard_code'
-      statusMessage.value = isStoredSessionLoginAttempt.value
-        ? 'Saved session requires Steam Guard code. Enter code to continue.'
-        : 'Steam Guard code required. Enter the code to continue.'
+      applyOtpChallengeStatus(isStoredSessionLoginAttempt.value)
+      void submitQueuedOtpIfReady(event.runId)
     }
 
     if (
@@ -545,7 +651,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     ) {
       steamGuardSessionId.value = event.runId
       steamGuardPromptType.value = 'steam_guard_approved'
-      statusMessage.value = 'Steam Guard approved. Finalizing sign in...'
+      activeChallengeMode.value = 'none'
+      statusMessage.value = 'Verification approved. Finalizing sign in...'
     }
 
     if (
@@ -554,15 +661,16 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       steamGuardPromptType.value !== 'steam_guard_approved'
     ) {
       steamGuardSessionId.value = event.runId
-      steamGuardPromptType.value = 'steam_guard_mobile'
-      statusMessage.value = 'Steam Guard mobile approval pending. Check your Steam phone app.'
+      applyMobileChallengeStatus(isStoredSessionLoginAttempt.value)
     }
 
     if (event.type === 'run_finished' && event.phase === 'login') {
       activeLoginRunId.value = null
       steamGuardSessionId.value = null
       steamGuardCode.value = ''
+      clearQueuedOtp()
       steamGuardPromptType.value = 'none'
+      activeChallengeMode.value = 'none'
       authIssue.value = null
       isStoredSessionLoginAttempt.value = false
     }
@@ -570,7 +678,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     if (event.type === 'run_failed' && event.phase === 'login') {
       activeLoginRunId.value = null
       steamGuardCode.value = ''
+      clearQueuedOtp()
       steamGuardPromptType.value = 'none'
+      activeChallengeMode.value = 'none'
       steamGuardSessionId.value = null
       isStoredSessionLoginAttempt.value = false
     }
@@ -578,7 +688,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     if (event.type === 'run_cancelled' && event.phase === 'login') {
       activeLoginRunId.value = null
       steamGuardCode.value = ''
+      clearQueuedOtp()
       steamGuardPromptType.value = 'none'
+      activeChallengeMode.value = 'none'
       steamGuardSessionId.value = null
       isStoredSessionLoginAttempt.value = false
     }
@@ -591,6 +703,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     isPasswordPeek,
     isWebApiKeyPeek,
     steamGuardPromptType,
+    preferredAuthMode,
+    activeChallengeMode,
     isStoredSessionLoginAttempt,
     hasPersistedStoredSession,
     isLoginSubmitting,
@@ -614,6 +728,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     setLoginPassword,
     setRememberUsername,
     setRememberAuth,
+    setPreferredAuthMode,
     setPasswordPeek,
     setWebApiKeyPeek,
     setWebApiKey,

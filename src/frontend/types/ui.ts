@@ -4,6 +4,8 @@
  * and publish/filter UI contracts used across frontend components/composables.
  */
 export type AuthIssueTone = 'danger' | 'warning' | 'info'
+export type PreferredAuthMode = 'otp' | 'steam_guard_mobile'
+export type ActiveChallengeMode = 'none' | 'otp' | 'steam_guard_mobile'
 
 export interface AuthIssue {
   title: string

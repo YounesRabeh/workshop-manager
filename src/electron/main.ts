@@ -180,15 +180,18 @@ app.whenReady().then(async () => {
     const useStoredAuth = payload.useStoredAuth === true
     const rememberAuth = payload.rememberAuth === true
     const rememberUsername = payload.rememberUsername === true || rememberAuth
+    const preferredAuthMode = payload.preferredAuthMode === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp'
     await profileStore.setRememberedLoginState({
       rememberedUsername: rememberUsername ? payload.username : undefined,
-      rememberAuth
+      rememberAuth,
+      preferredAuthMode
     })
     const state = await runtimeService.login(payload.username, payload.password, useStoredAuth)
     // Stored session needs username next launch, so keep username when rememberAuth is enabled.
     await profileStore.setRememberedLoginState({
       rememberedUsername: rememberUsername ? payload.username : undefined,
-      rememberAuth
+      rememberAuth,
+      preferredAuthMode
     })
     return {
       ...state,
@@ -244,12 +247,14 @@ app.whenReady().then(async () => {
   handleIpc(IPC_CHANNELS.getProfiles, async () => {
     const rememberedUsername = await profileStore.getRememberedUsername()
     const rememberAuth = await profileStore.getRememberAuth()
+    const preferredAuthMode = await profileStore.getPreferredAuthMode()
     const shouldCheckStoredAuth = rememberAuth && Boolean(rememberedUsername?.trim())
     return {
       profiles: await profileStore.getProfiles(),
       rememberedUsername,
       rememberAuth,
-      hasStoredAuth: shouldCheckStoredAuth ? await runtimeService.hasStoredAuthFor(rememberedUsername) : false
+      hasStoredAuth: shouldCheckStoredAuth ? await runtimeService.hasStoredAuthFor(rememberedUsername) : false,
+      preferredAuthMode
     }
   })
 

@@ -19,6 +19,7 @@ describe('profile and run-log persistence', () => {
     })
     await store.setRememberedUsername('alice')
     await store.setRememberAuth(true)
+    await store.setPreferredAuthMode('steam_guard_mobile')
     await store.setWebApiEnabled(true)
     await store.setWebApiKeyEncrypted('encrypted-key')
     await store.setSteamCmdManualPath('/tools/steamcmd.sh')
@@ -32,6 +33,7 @@ describe('profile and run-log persistence', () => {
     expect(profiles).toHaveLength(1)
     expect((await store.getRememberedUsername()) ?? '').toBe('alice')
     expect(await store.getRememberAuth()).toBe(true)
+    expect(await store.getPreferredAuthMode()).toBe('steam_guard_mobile')
     expect(await store.getWebApiEnabled()).toBe(true)
     expect(await store.getWebApiKeyEncrypted()).toBe('encrypted-key')
     expect(await store.getSteamCmdManualPath()).toBe('/tools/steamcmd.sh')
@@ -58,6 +60,13 @@ describe('profile and run-log persistence', () => {
     expect(JSON.parse(await readFile(dbPath, 'utf8'))).toEqual({ profiles: [] })
   })
 
+  it('defaults preferred auth mode to otp when not yet stored', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'profile-store-default-auth-mode-'))
+    const store = new ProfileStore(join(root, 'profiles.json'))
+
+    expect(await store.getPreferredAuthMode()).toBe('otp')
+  })
+
   it('serializes concurrent profile and preference updates without dropping fields', async () => {
     const root = await mkdtemp(join(tmpdir(), 'profile-store-concurrent-'))
     const dbPath = join(root, 'profiles.json')
@@ -73,7 +82,8 @@ describe('profile and run-log persistence', () => {
       }),
       store.setRememberedLoginState({
         rememberedUsername: 'TheYuyuBoy',
-        rememberAuth: true
+        rememberAuth: true,
+        preferredAuthMode: 'steam_guard_mobile'
       }),
       store.setAdvancedSettingsState({
         webApiEnabled: true,
@@ -90,6 +100,7 @@ describe('profile and run-log persistence', () => {
     expect(await store.getProfiles()).toHaveLength(1)
     expect(await store.getRememberedUsername()).toBe('TheYuyuBoy')
     expect(await store.getRememberAuth()).toBe(true)
+    expect(await store.getPreferredAuthMode()).toBe('steam_guard_mobile')
     expect(await store.getWebApiEnabled()).toBe(true)
     expect(await store.getWebApiKeyEncrypted()).toBe('encrypted-key')
     expect(await store.getSteamCmdManualPath()).toBe('/tools/steamcmd.sh')

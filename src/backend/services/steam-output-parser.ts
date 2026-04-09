@@ -15,7 +15,9 @@ const INVALID_STEAM_ACCOUNT_ID = 0n
 const INVALID_STEAM_ID64 = STEAM_ID64_BASE.toString()
 
 export function isSteamGuardPrompt(line: string): boolean {
-  return /two-factor|auth(?:entication)?\s*code|guard code|steam guard code/i.test(line)
+  return /two-factor|auth(?:entication)?\s*code|guard code|steam guard code|\botp\b|one[-\s]?time\s*(?:code|passcode)|email\s*(?:otp|code)/i.test(
+    line
+  )
 }
 
 export function isSteamGuardMobilePrompt(line: string): boolean {
@@ -46,7 +48,7 @@ export function parseSteamLoginFailure(lines: string[]): LoginFailure | undefine
   }
 
   if (
-    /invalid auth(?:entication)? code|incorrect auth(?:entication)? code|guard code.*(invalid|incorrect)|two-factor.*(invalid|incorrect)|accountlogondeniedneedtwofactor/i.test(
+    /invalid auth(?:entication)? code|incorrect auth(?:entication)? code|invalid email\s*code|incorrect email\s*code|expired email\s*code|invalid\s*otp|incorrect\s*otp|expired\s*otp|guard code.*(invalid|incorrect|expired)|two-factor.*(invalid|incorrect|expired)|otp.*(invalid|incorrect|expired)|email\s*code.*(invalid|incorrect|expired)|one[-\s]?time\s*(?:code|passcode).*(invalid|incorrect|expired)|accountlogondeniedneedtwofactor/i.test(
       joined
     )
   ) {
@@ -392,7 +394,7 @@ export function isLoginSuccessLine(line: string): boolean {
 
 export function isLoginProgressLine(line: string): boolean {
   return (
-    /logging in user|waiting for user info|waiting for confirmation|steam guard|two-factor|auth(?:entication)?\s*code|login failure|failed to log on|cached credentials not found|no cached credentials|logged in ok|login complete|successfully logged/i.test(
+    /logging in user|waiting for user info|waiting for confirmation|steam guard|two-factor|auth(?:entication)?\s*code|\botp\b|one[-\s]?time\s*(?:code|passcode)|email\s*(?:otp|code)|login failure|failed to log on|cached credentials not found|no cached credentials|logged in ok|login complete|successfully logged/i.test(
       line
     )
   )

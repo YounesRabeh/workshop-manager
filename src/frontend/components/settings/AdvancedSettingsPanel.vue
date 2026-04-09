@@ -21,6 +21,7 @@ const props = withDefaults(defineProps<{
   showSteamCmdSection?: boolean
   showWebApiSection?: boolean
   webApiSectionPlacement?: 'before_timeouts' | 'after_timeouts'
+  layoutPreset?: 'default' | 'api_timeout_path'
 }>(), {
   kicker: 'Advanced Developer Options',
   summary: 'Configure a custom SteamCMD path, optional Steam Web API access, and SteamCMD timeout behavior for this device.',
@@ -28,7 +29,8 @@ const props = withDefaults(defineProps<{
   timeoutScope: 'all',
   showSteamCmdSection: true,
   showWebApiSection: true,
-  webApiSectionPlacement: 'before_timeouts'
+  webApiSectionPlacement: 'before_timeouts',
+  layoutPreset: 'default'
 })
 
 const emit = defineEmits<{
@@ -175,10 +177,7 @@ const timeoutCardCopy = computed(() => {
 const timeoutBadgeLabel = computed(() => props.timeoutScope === 'login_only' ? 'LOGIN' : 'RUNTIME')
 const usesSingleTimeoutColumn = computed(() => props.timeoutScope === 'login_only')
 const placesWebApiAfterTimeouts = computed(() => {
-  return (
-    props.showWebApiSection &&
-    (props.timeoutScope === 'login_only' || props.webApiSectionPlacement === 'after_timeouts')
-  )
+  return props.showWebApiSection && props.webApiSectionPlacement === 'after_timeouts'
 })
 const isLoginTimeoutDisabled = computed(() => {
   return isTimeoutDisabled(props.advancedSettings.loginTimeoutMs)
@@ -208,7 +207,7 @@ function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string
 </script>
 
 <template>
-  <div class="advanced-panel">
+  <div class="advanced-panel" :class="{ 'advanced-panel-api-timeout-path': props.layoutPreset === 'api_timeout_path' }">
     <div class="advanced-header">
       <div>
         <p class="advanced-kicker">{{ props.kicker }}</p>
@@ -217,7 +216,10 @@ function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string
     </div>
 
     <div class="advanced-card-grid mt-4">
-      <section v-if="props.showSteamCmdSection" class="advanced-card">
+      <section
+        v-if="props.showSteamCmdSection && props.layoutPreset !== 'api_timeout_path'"
+        class="advanced-card advanced-card-steamcmd"
+      >
         <div class="advanced-card-header">
           <div>
             <h3 class="advanced-card-title">SteamCMD Executable</h3>
@@ -260,7 +262,7 @@ function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string
         </div>
       </section>
 
-      <section v-if="props.showWebApiSection && !placesWebApiAfterTimeouts" class="advanced-card">
+      <section v-if="props.showWebApiSection && !placesWebApiAfterTimeouts" class="advanced-card advanced-card-webapi">
         <div class="advanced-card-header">
           <div>
             <h3 class="advanced-card-title">Steam Web API Key</h3>
@@ -304,7 +306,7 @@ function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string
         <p v-if="advancedSettings.hasWebApiKey" class="advanced-meta advanced-meta-success">Saved key detected and ready to use.</p>
       </section>
 
-      <section class="advanced-card">
+      <section class="advanced-card advanced-card-timeouts">
         <div class="advanced-card-header">
           <div>
             <h3 class="advanced-card-title">SteamCMD Timeouts</h3>
@@ -394,7 +396,7 @@ function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string
         </div>
       </section>
 
-      <section v-if="props.showWebApiSection && placesWebApiAfterTimeouts" class="advanced-card">
+      <section v-if="props.showWebApiSection && placesWebApiAfterTimeouts" class="advanced-card advanced-card-webapi">
         <div class="advanced-card-header">
           <div>
             <h3 class="advanced-card-title">Steam Web API Key</h3>
@@ -436,6 +438,52 @@ function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string
           Clear the key field to save SteamCMD path changes without secure storage.
         </p>
         <p v-if="advancedSettings.hasWebApiKey" class="advanced-meta advanced-meta-success">Saved key detected and ready to use.</p>
+      </section>
+
+      <section
+        v-if="props.showSteamCmdSection && props.layoutPreset === 'api_timeout_path'"
+        class="advanced-card advanced-card-steamcmd"
+      >
+        <div class="advanced-card-header">
+          <div>
+            <h3 class="advanced-card-title">SteamCMD Executable</h3>
+            <p class="advanced-card-copy">{{ steamCmdHint }}</p>
+          </div>
+          <span class="advanced-badge" :class="steamCmdStatusClass">{{ steamCmdStatusLabel }}</span>
+        </div>
+
+        <p v-if="advancedSettings.steamCmdManualPath.trim()" class="advanced-path-preview">
+          {{ advancedSettings.steamCmdManualPath }}
+        </p>
+        <p v-else class="advanced-path-placeholder">No manual path saved. The app will use its managed install when available.</p>
+
+        <label class="advanced-label mt-4">SteamCMD Executable Path</label>
+        <div class="advanced-path-row">
+          <input
+            :value="advancedSettings.steamCmdManualPath"
+            placeholder="Path to executable"
+            autocomplete="off"
+            class="login-input advanced-input"
+            @input="onSteamCmdManualPathInput"
+          />
+        </div>
+        <div class="advanced-path-actions">
+          <button
+            type="button"
+            class="login-peek advanced-inline-button"
+            @click="emit('pick-steamcmd-manual-path')"
+          >
+            Browse
+          </button>
+          <button
+            type="button"
+            class="login-peek advanced-inline-button disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="!canClearSteamCmdPath"
+            @click="emit('update-steamcmd-manual-path', '')"
+          >
+            Clear Path
+          </button>
+        </div>
       </section>
     </div>
 

@@ -4,13 +4,14 @@
  */
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join, parse } from 'node:path'
-import type { ModProfile } from '@shared/contracts'
+import type { ModProfile, PreferredAuthMode } from '@shared/contracts'
 import type { SteamCmdTimeoutSettings } from '@shared/runtime-settings'
 import { normalizeSteamCmdTimeoutSettings } from '@shared/runtime-settings'
 
 interface ProfileDb {
   rememberedUsername?: string
   rememberAuth?: boolean
+  preferredAuthMode?: PreferredAuthMode
   webApiEnabled?: boolean
   webApiKeyEncrypted?: string
   steamCmdManualPath?: string
@@ -50,6 +51,7 @@ function normalizeDb(parsed: unknown): ProfileDb {
     profiles: record.profiles,
     rememberedUsername: record.rememberedUsername,
     rememberAuth: record.rememberAuth,
+    preferredAuthMode: normalizePreferredAuthMode(record.preferredAuthMode),
     webApiEnabled: record.webApiEnabled,
     webApiKeyEncrypted: record.webApiKeyEncrypted,
     steamCmdManualPath: record.steamCmdManualPath,
@@ -57,6 +59,13 @@ function normalizeDb(parsed: unknown): ProfileDb {
     storedSessionTimeoutMs: record.storedSessionTimeoutMs,
     workshopTimeoutMs: record.workshopTimeoutMs
   }
+}
+
+function normalizePreferredAuthMode(value: unknown): PreferredAuthMode | undefined {
+  if (value === 'otp' || value === 'steam_guard_mobile') {
+    return value
+  }
+  return undefined
 }
 
 export class ProfileStore {
@@ -164,19 +173,32 @@ export class ProfileStore {
     return db.rememberAuth === true
   }
 
+  async getPreferredAuthMode(): Promise<PreferredAuthMode> {
+    const db = await this.readDb()
+    return db.preferredAuthMode === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp'
+  }
+
   async setRememberAuth(enabled: boolean): Promise<void> {
     await this.updateDb(async (db) => {
       db.rememberAuth = enabled
     })
   }
 
+  async setPreferredAuthMode(mode: PreferredAuthMode): Promise<void> {
+    await this.updateDb(async (db) => {
+      db.preferredAuthMode = mode
+    })
+  }
+
   async setRememberedLoginState(input: {
     rememberedUsername: string | undefined
     rememberAuth: boolean
+    preferredAuthMode?: PreferredAuthMode
   }): Promise<void> {
     await this.updateDb(async (db) => {
       db.rememberedUsername = input.rememberedUsername
       db.rememberAuth = input.rememberAuth
+      db.preferredAuthMode = normalizePreferredAuthMode(input.preferredAuthMode) ?? 'otp'
     })
   }
 

@@ -7,10 +7,12 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import AdvancedSettingsPanel from './settings/AdvancedSettingsPanel.vue'
 import type {
+  ActiveChallengeMode,
   AdvancedSettingsState,
   AuthIssue,
   AuthIssueTone,
   LoginFormState,
+  PreferredAuthMode,
   SteamGuardPromptType
 } from '../types/ui'
 import { moveFocusWithVerticalArrows, toggleCheckboxOrRadioOnEnter } from '../events/keyboard-events'
@@ -23,6 +25,8 @@ const props = defineProps<{
   isPasswordPeek: boolean
   authIssue: AuthIssue | null
   steamGuardPromptType: SteamGuardPromptType
+  preferredAuthMode: PreferredAuthMode
+  activeChallengeMode: ActiveChallengeMode
   steamGuardCode: string
   isStoredSessionLoginAttempt: boolean
   canClearStoredSession: boolean
@@ -40,6 +44,7 @@ const emit = defineEmits<{
   (e: 'update-password', value: string): void
   (e: 'update-remember-username', value: boolean): void
   (e: 'update-remember-auth', value: boolean): void
+  (e: 'update-preferred-auth-mode', value: PreferredAuthMode): void
   (e: 'set-password-peek', value: boolean): void
   (e: 'submit-guard-code'): void
   (e: 'update-steam-guard-code', value: string): void
@@ -95,6 +100,11 @@ function onRememberAuthChange(event: Event): void {
   emit('update-remember-auth', target?.checked ?? false)
 }
 
+function onPreferredAuthModeChange(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit('update-preferred-auth-mode', target?.value === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp')
+}
+
 const canSubmitLogin = computed(() => {
   const hasUsername = props.loginForm.username.trim().length > 0
   const hasPassword = props.loginForm.password.trim().length > 0
@@ -128,6 +138,72 @@ const missingStoredSessionHint = computed(() => {
 
 const shouldShowInstallLogButton = computed(() => {
   return /install error/i.test(props.statusMessage) || props.installLogPath.trim().length > 0
+})
+
+const isOtpChallengeActive = computed(() => props.activeChallengeMode === 'otp')
+const isMobileChallengeActive = computed(() => props.activeChallengeMode === 'steam_guard_mobile')
+const shouldShowOtpEntry = computed(() => {
+  const preferredOtpPending =
+    props.preferredAuthMode === 'otp' &&
+    props.isLoginSubmitting &&
+    props.steamGuardPromptType !== 'steam_guard_mobile' &&
+    props.steamGuardPromptType !== 'steam_guard_approved'
+  return isOtpChallengeActive.value || preferredOtpPending
+})
+const canSubmitOtpCode = computed(() => {
+  return shouldShowOtpEntry.value && props.steamGuardCode.trim().length > 0
+})
+
+const otpSubmitLabel = computed(() => {
+  if (!isOtpChallengeActive.value && props.isLoginSubmitting) {
+    return 'Save OTP / Email code'
+  }
+  return 'Submit OTP / Email code'
+})
+
+const securityStatusTitle = computed(() => {
+  if (props.steamGuardPromptType === 'steam_guard_approved') {
+    return 'Verification approved'
+  }
+  if (isOtpChallengeActive.value) {
+    return 'OTP / Email code required'
+  }
+  if (isMobileChallengeActive.value) {
+    return 'Steam app approval required'
+  }
+  if (props.steamGuardPromptType === 'waiting' || props.isLoginSubmitting) {
+    return 'Waiting for Steam verification'
+  }
+  return props.preferredAuthMode === 'steam_guard_mobile' ? 'Preferred: Steam app approval' : 'Preferred: OTP / Email code'
+})
+
+const securityStatusCopy = computed(() => {
+  if (props.steamGuardPromptType === 'steam_guard_approved') {
+    return 'Steam accepted your verification. Finalizing sign-in now.'
+  }
+  if (isOtpChallengeActive.value) {
+    return 'Enter the OTP / Email code sent by Steam to continue.'
+  }
+  if (isMobileChallengeActive.value) {
+    return 'Open Steam on your phone and approve this sign-in request.'
+  }
+  if (props.steamGuardPromptType === 'waiting' || props.isLoginSubmitting) {
+    if (props.preferredAuthMode === 'otp') {
+      return 'Sign-in request sent. You can enter OTP / Email code now and we will submit it when Steam requests it.'
+    }
+    return 'Steam may request OTP / Email code or mobile approval based on account settings.'
+  }
+  return 'Choose your preferred method below. Steam might still request the other method for this sign-in.'
+})
+
+const securityCardClass = computed(() => {
+  if (props.steamGuardPromptType === 'steam_guard_approved') {
+    return 'login-security-card-success'
+  }
+  if (isOtpChallengeActive.value || isMobileChallengeActive.value || props.steamGuardPromptType === 'waiting') {
+    return 'login-security-card-warning'
+  }
+  return 'login-security-card-neutral'
 })
 
 const usernameInputRef = ref<HTMLInputElement | null>(null)
@@ -233,177 +309,226 @@ watch(
 
 <template>
   <section class="fade-in login-shell">
-    <div class="login-panel">
-      <header>
-        <p class="login-kicker text-[16px] font-extrabold tracking-[0.18em] text-sky-500">WORKSHOP MANAGER</p>
-        <h1 class="text-4xl font-extrabold tracking-tight text-slate-900">Sign in</h1>
-        <p class="mt-2 text-sm text-slate-600">Use your Steam account to unlock mod management.</p>
-        <p v-if="statusMessage" class="login-status">{{ statusMessage }}</p>
-        <button
-          v-if="shouldShowInstallLogButton"
-          type="button"
-          class="login-peek mt-3 rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
-          @click="emit('open-install-log')"
-        >
-          Open Log File
-        </button>
-      </header>
-
-      <form class="mt-5" @submit.prevent="emit('submit-login')">
-        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Account name</label>
-        <input
-          ref="usernameInputRef"
-          :value="loginForm.username"
-          class="login-input mt-1 w-full rounded border border-slate-300 px-3 py-2"
-          @keydown="onLoginControlArrowKey($event, 0)"
-          @input="onUsernameInput"
-        />
-
-        <label class="mt-3 block text-xs font-semibold uppercase tracking-wide text-slate-500">Password</label>
-        <div class="mt-1 flex items-center gap-2">
-          <input
-            ref="passwordInputRef"
-            :value="loginForm.password"
-            :type="isPasswordPeek ? 'text' : 'password'"
-            :placeholder="passwordPlaceholder"
-            autocomplete="current-password"
-            class="login-input w-full rounded border border-slate-300 px-3 py-2"
-            @keydown="onLoginControlArrowKey($event, 1)"
-            @input="onPasswordInput"
-          />
-          <button
-            type="button"
-            class="login-peek rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
-            :aria-pressed="isPasswordPeek ? 'true' : 'false'"
-            @click="emit('set-password-peek', !isPasswordPeek)"
-          >
-            {{ isPasswordPeek ? 'Hide' : 'Show' }}
-          </button>
+    <div class="login-layout">
+      <aside class="login-hero">
+        <div class="login-hero-inner">
+          <p class="login-kicker">WORKSHOP MANAGER</p>
+          <h1 class="login-hero-title">Secure Steam Sign-in</h1>
+          <p class="login-hero-copy">Choose OTP / Email code or Steam app approval and continue.</p>
         </div>
+        <p class="login-disclaimer">* Not an official Steam product • v{{ appVersion || 'dev' }}</p>
+      </aside>
 
-        <label class="mt-3 flex items-center gap-2 text-sm text-slate-700">
-          <input
-            ref="rememberUsernameRef"
-            :checked="loginForm.rememberUsername"
-            type="checkbox"
-            @keydown="onLoginControlArrowKey($event, 2)"
-            @change="onRememberUsernameChange"
-          />
-          Remember account name
-        </label>
-
-        <label class="mt-2 flex items-center gap-2 text-sm text-slate-700">
-          <input
-            ref="rememberAuthRef"
-            :checked="loginForm.rememberAuth"
-            type="checkbox"
-            @keydown="onLoginControlArrowKey($event, 3)"
-            @change="onRememberAuthChange"
-          />
-          Keep me signed in on this device
-        </label>
-        <p class="mt-1 text-[11px] text-slate-500">
-          Uses SteamCMD cached login session. Password is never stored by this app.
-        </p>
-        <p v-if="missingStoredSessionHint" class="mt-1 text-[11px] text-slate-500">
-          {{ missingStoredSessionHint }}
-        </p>
-        <button
-          type="button"
-          class="login-peek mt-2 w-full rounded border border-slate-300 px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="isLoginSubmitting || !canClearStoredSession"
-          @click="emit('clear-stored-session')"
-        >
-          Clear saved session
-        </button>
-        <button
-          type="button"
-          class="login-peek mt-3 w-full rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
-          @click="emit('toggle-advanced-options')"
-        >
-          {{ isAdvancedOptionsOpen ? 'Hide Advanced Options' : 'Advanced Developer Options' }}
-        </button>
-
-        <AdvancedSettingsPanel
-          v-if="isAdvancedOptionsOpen"
-          class="mt-3"
-          :advanced-settings="advancedSettings"
-          :is-web-api-key-peek="isWebApiKeyPeek"
-          :timeout-scope="timeoutScope"
-          web-api-section-placement="after_timeouts"
-          summary="Configure a custom SteamCMD path, optional Steam Web API access, and the Steam login timeout for this device."
-          @update-web-api-key="emit('update-web-api-key', $event)"
-          @update-steamcmd-manual-path="emit('update-steamcmd-manual-path', $event)"
-          @update-login-timeout-ms="emit('update-login-timeout-ms', $event)"
-          @update-stored-session-timeout-ms="emit('update-stored-session-timeout-ms', $event)"
-          @update-workshop-timeout-ms="emit('update-workshop-timeout-ms', $event)"
-          @pick-steamcmd-manual-path="emit('pick-steamcmd-manual-path')"
-          @set-web-api-key-peek="emit('set-web-api-key-peek', $event)"
-          @save-advanced-settings="emit('save-advanced-settings')"
-          @clear-web-api-key="emit('clear-web-api-key')"
-        />
-
-        <button
-          ref="submitButtonRef"
-          type="submit"
-          class="login-submit mt-5 w-full rounded px-3 py-2 text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="!canSubmitLogin"
-          @keydown="onLoginControlArrowKey($event, 4)"
-        >
-          {{ submitLabel }}
-        </button>
-        <div class="mt-3 flex justify-center">
+      <div class="login-panel">
+        <header class="login-header">
+          <h2 class="login-title">Sign in</h2>
+          <p class="login-subtitle">Use your Steam account to unlock mod management.</p>
+          <p v-if="statusMessage" class="login-status">{{ statusMessage }}</p>
           <button
+            v-if="shouldShowInstallLogButton"
             type="button"
-            class="login-quit w-[168px] rounded border border-slate-300 px-3 py-2 text-xs font-semibold"
-            @click="emit('quit-app')"
+            class="login-peek mt-3 rounded px-3 py-2 text-xs font-semibold"
+            @click="emit('open-install-log')"
           >
-            Quit
+            Open Log File
           </button>
-        </div>
-      </form>
+        </header>
 
-      <div
-        v-if="authIssue"
-        class="login-note mt-4 px-3 py-3 text-sm"
-        :class="authIssueClasses(authIssue.tone)"
-      >
-        <p class="font-semibold">{{ authIssue.title }}</p>
-        <p class="mt-1">{{ authIssue.detail }}</p>
-        <p v-if="authIssue.hint" class="mt-1 text-xs opacity-90">{{ authIssue.hint }}</p>
-      </div>
+        <form class="login-form mt-5" @submit.prevent="emit('submit-login')">
+          <div class="login-primary-grid">
+            <section class="login-block">
+              <p class="login-block-title">Credentials</p>
+              <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Account name</label>
+              <input
+                ref="usernameInputRef"
+                :value="loginForm.username"
+                class="login-input mt-1 w-full rounded px-3 py-2"
+                @keydown="onLoginControlArrowKey($event, 0)"
+                @input="onUsernameInput"
+              />
 
-      <div
-        v-if="isLoginSubmitting || steamGuardPromptType !== 'none'"
-        class="login-guard mt-4 px-3 py-3"
-        :class="steamGuardPromptType === 'steam_guard_approved' ? 'login-guard-success' : ''"
-      >
-        <p class="text-sm font-medium" :class="steamGuardPromptType === 'steam_guard_approved' ? 'login-guard-title-success' : 'text-amber-800'">Steam Guard</p>
-        <p v-if="steamGuardPromptType === 'waiting'" class="mt-1 text-sm text-amber-900">
-          {{
-            isStoredSessionLoginAttempt
-              ? 'Checking saved Steam session. Steam Guard may be required to continue.'
-              : 'Waiting for Steam login challenge...'
-          }}
-        </p>
-        <p v-else-if="steamGuardPromptType === 'steam_guard_mobile'" class="mt-1 text-sm text-amber-900">
-          {{
-            isStoredSessionLoginAttempt
-              ? 'Saved session requires approval in the Steam mobile app.'
-              : 'Approve this sign in in the Steam mobile app.'
-          }}
-        </p>
-        <form v-else-if="steamGuardPromptType === 'steam_guard_code'" class="mt-2" @submit.prevent="emit('submit-guard-code')">
-          <input :value="steamGuardCode" class="login-input w-full rounded border border-amber-300 px-2 py-1" @input="onSteamGuardInput" />
-          <button type="submit" class="login-submit mt-2 w-full rounded px-2 py-2 text-sm font-semibold text-white">Submit code</button>
+              <label class="mt-3 block text-xs font-semibold uppercase tracking-wide text-slate-500">Password</label>
+              <div class="mt-1 flex items-center gap-2">
+                <input
+                  ref="passwordInputRef"
+                  :value="loginForm.password"
+                  :type="isPasswordPeek ? 'text' : 'password'"
+                  :placeholder="passwordPlaceholder"
+                  autocomplete="current-password"
+                  class="login-input w-full rounded px-3 py-2"
+                  @keydown="onLoginControlArrowKey($event, 1)"
+                  @input="onPasswordInput"
+                />
+                <button
+                  type="button"
+                  class="login-peek rounded px-3 py-2 text-xs font-semibold"
+                  :aria-pressed="isPasswordPeek ? 'true' : 'false'"
+                  @click="emit('set-password-peek', !isPasswordPeek)"
+                >
+                  {{ isPasswordPeek ? 'Hide' : 'Show' }}
+                </button>
+              </div>
+            </section>
+
+            <section class="login-block">
+              <p class="login-block-title">Security</p>
+              <p class="login-block-copy">Choose your preferred method. Steam may request a different one for this login.</p>
+              <div class="login-mode-grid" role="radiogroup" aria-label="Preferred verification mode">
+                <label class="login-mode-option">
+                  <input
+                    type="radio"
+                    name="preferred-auth-mode"
+                    value="otp"
+                    :checked="preferredAuthMode === 'otp'"
+                    @keydown="toggleCheckboxOrRadioOnEnter($event)"
+                    @change="onPreferredAuthModeChange"
+                  />
+                  <span>
+                    <strong>OTP / Email code</strong>
+                    <small>Best for code-based verification prompts.</small>
+                  </span>
+                </label>
+                <label class="login-mode-option">
+                  <input
+                    type="radio"
+                    name="preferred-auth-mode"
+                    value="steam_guard_mobile"
+                    :checked="preferredAuthMode === 'steam_guard_mobile'"
+                    @keydown="toggleCheckboxOrRadioOnEnter($event)"
+                    @change="onPreferredAuthModeChange"
+                  />
+                  <span>
+                    <strong>Steam app approval</strong>
+                    <small>Best if you approve sign-ins in Steam Mobile.</small>
+                  </span>
+                </label>
+              </div>
+
+              <div class="login-security-card mt-3 px-3 py-3" :class="securityCardClass">
+                <p class="text-sm font-semibold">{{ securityStatusTitle }}</p>
+                <p class="mt-1 text-xs">{{ securityStatusCopy }}</p>
+
+                <div v-if="shouldShowOtpEntry" class="mt-3">
+                  <label class="block text-[11px] font-semibold uppercase tracking-[0.08em]">OTP / Email code</label>
+                  <input
+                    :value="steamGuardCode"
+                    class="login-input mt-1 w-full rounded px-2 py-2"
+                    @keydown.enter.prevent="emit('submit-guard-code')"
+                    @input="onSteamGuardInput"
+                  />
+                  <button
+                    type="button"
+                    class="login-submit mt-2 w-full rounded px-2 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="!canSubmitOtpCode"
+                    @click="emit('submit-guard-code')"
+                  >
+                    {{ otpSubmitLabel }}
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="login-secondary-grid">
+            <section class="login-block">
+              <p class="login-block-title">Session</p>
+              <label class="mt-1 flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  ref="rememberUsernameRef"
+                  :checked="loginForm.rememberUsername"
+                  type="checkbox"
+                  @keydown="onLoginControlArrowKey($event, 2)"
+                  @change="onRememberUsernameChange"
+                />
+                Remember account name
+              </label>
+
+              <label class="mt-2 flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  ref="rememberAuthRef"
+                  :checked="loginForm.rememberAuth"
+                  type="checkbox"
+                  @keydown="onLoginControlArrowKey($event, 3)"
+                  @change="onRememberAuthChange"
+                />
+                Keep me signed in on this device
+              </label>
+              <p class="mt-1 text-[11px] text-slate-500">
+                Uses SteamCMD cached login session. Password is never stored by this app.
+              </p>
+              <p v-if="missingStoredSessionHint" class="mt-1 text-[11px] text-slate-500">
+                {{ missingStoredSessionHint }}
+              </p>
+              <button
+                type="button"
+                class="login-peek mt-2 w-full rounded px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="isLoginSubmitting || !canClearStoredSession"
+                @click="emit('clear-stored-session')"
+              >
+                Clear saved session
+              </button>
+            </section>
+
+            <section class="login-block login-actions-block">
+              <button
+                ref="submitButtonRef"
+                type="submit"
+                class="login-submit w-full rounded px-3 py-2 text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!canSubmitLogin"
+                @keydown="onLoginControlArrowKey($event, 4)"
+              >
+                {{ submitLabel }}
+              </button>
+
+              <button
+                type="button"
+                class="login-peek mt-3 w-full rounded px-3 py-2 text-xs font-semibold"
+                @click="emit('toggle-advanced-options')"
+              >
+                {{ isAdvancedOptionsOpen ? 'Hide Advanced Options' : 'Advanced Developer Options' }}
+              </button>
+
+              <button
+                type="button"
+                class="login-quit mt-3 w-full rounded px-3 py-2 text-xs font-semibold"
+                @click="emit('quit-app')"
+              >
+                Quit
+              </button>
+            </section>
+          </div>
+
+          <AdvancedSettingsPanel
+            v-if="isAdvancedOptionsOpen"
+            class="mt-3"
+            :advanced-settings="advancedSettings"
+            :is-web-api-key-peek="isWebApiKeyPeek"
+            :timeout-scope="timeoutScope"
+            web-api-section-placement="before_timeouts"
+            layout-preset="api_timeout_path"
+            summary="Advanced login setup: Web API key, SteamCMD timeouts, and executable path."
+            @update-web-api-key="emit('update-web-api-key', $event)"
+            @update-steamcmd-manual-path="emit('update-steamcmd-manual-path', $event)"
+            @update-login-timeout-ms="emit('update-login-timeout-ms', $event)"
+            @update-stored-session-timeout-ms="emit('update-stored-session-timeout-ms', $event)"
+            @update-workshop-timeout-ms="emit('update-workshop-timeout-ms', $event)"
+            @pick-steamcmd-manual-path="emit('pick-steamcmd-manual-path')"
+            @set-web-api-key-peek="emit('set-web-api-key-peek', $event)"
+            @save-advanced-settings="emit('save-advanced-settings')"
+            @clear-web-api-key="emit('clear-web-api-key')"
+          />
         </form>
-        <p v-else-if="steamGuardPromptType === 'steam_guard_approved'" class="mt-1 text-sm login-guard-text-success">
-          Approval received. Finalizing sign in...
-        </p>
-        <p v-else class="mt-1 text-sm text-amber-900">Waiting for Steam response...</p>
+
+        <div
+          v-if="authIssue"
+          class="login-note mt-4 px-3 py-3 text-sm"
+          :class="authIssueClasses(authIssue.tone)"
+        >
+          <p class="font-semibold">{{ authIssue.title }}</p>
+          <p class="mt-1">{{ authIssue.detail }}</p>
+          <p v-if="authIssue.hint" class="mt-1 text-xs opacity-90">{{ authIssue.hint }}</p>
+        </div>
       </div>
     </div>
-
-    <p class="login-disclaimer">* Not an official Steam product • v{{ appVersion || 'dev' }}</p>
   </section>
 </template>

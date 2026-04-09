@@ -11,6 +11,7 @@ import type {
   LoginInput,
   ModProfile,
   PersistedRunLog,
+  PreferredAuthMode,
   RunEvent,
   RunResult,
   SaveAdvancedSettingsInput,
@@ -37,6 +38,7 @@ export interface WorkshopApi {
     rememberedUsername?: string
     rememberAuth?: boolean
     hasStoredAuth?: boolean
+    preferredAuthMode?: PreferredAuthMode
   }>
   getAdvancedSettings: () => Promise<AdvancedSettings>
   getInstallLog: () => Promise<InstallLogSnapshot>

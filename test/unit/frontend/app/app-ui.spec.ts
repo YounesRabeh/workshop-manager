@@ -20,7 +20,13 @@ const workshop = {
   uploadMod: vi.fn(async () => ({ runId: 'r1', success: true, publishedFileId: undefined as string | undefined })),
   updateMod: vi.fn(async () => ({ runId: 'r2', success: true })),
   updateVisibility: vi.fn(async () => ({ runId: 'r3', success: true })),
-  getProfiles: vi.fn(async () => ({ profiles: [], rememberedUsername: 'alice', rememberAuth: false, hasStoredAuth: false })),
+  getProfiles: vi.fn(async () => ({
+    profiles: [],
+    rememberedUsername: 'alice',
+    rememberAuth: false,
+    hasStoredAuth: false,
+    preferredAuthMode: 'otp'
+  })),
   getAdvancedSettings: vi.fn(async () => ({
     webApiEnabled: false,
     hasWebApiKey: false,
@@ -87,7 +93,7 @@ const workshop = {
   pickFolder: vi.fn(async () => '/mods'),
   pickFile: vi.fn(async () => '/mods/preview.png'),
   pickSteamCmdExecutable: vi.fn(async () => '/tools/steamcmd.sh'),
-  onRunEvent: vi.fn(() => () => undefined)
+  onRunEvent: vi.fn((_: (event: unknown) => void) => () => undefined)
 }
 
 describe('App UI validation gates', () => {
@@ -290,12 +296,92 @@ describe('App UI validation gates', () => {
     expect(wrapper.find('input[type="password"]').exists()).toBe(true)
   })
 
+  it('renders preferred verification mode selector and submits chosen mode', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const mobileModeRadio = wrapper.find('input[type="radio"][value="steam_guard_mobile"]')
+    expect(mobileModeRadio.exists()).toBe(true)
+    await mobileModeRadio.setValue(true)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(workshop.login).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preferredAuthMode: 'steam_guard_mobile'
+      })
+    )
+  })
+
+  it('shows OTP/email security card when Steam requests code verification', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const runEventListener = workshop.onRunEvent.mock.calls[0]?.[0] as
+      | ((event: { runId: string; ts: number; type: string; phase?: string; promptType?: string }) => void)
+      | undefined
+    expect(runEventListener).toBeDefined()
+
+    runEventListener?.({
+      runId: 'login-run',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    runEventListener?.({
+      runId: 'login-run',
+      ts: Date.now(),
+      type: 'steam_guard_required',
+      phase: 'login',
+      promptType: 'steam_guard_code'
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('OTP / Email code required')
+    expect(wrapper.text()).toContain('Submit OTP / Email code')
+  })
+
+  it('shows mobile approval copy when Steam requests app confirmation', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const runEventListener = workshop.onRunEvent.mock.calls[0]?.[0] as
+      | ((event: { runId: string; ts: number; type: string; phase?: string; promptType?: string }) => void)
+      | undefined
+    expect(runEventListener).toBeDefined()
+
+    runEventListener?.({
+      runId: 'login-run',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    runEventListener?.({
+      runId: 'login-run',
+      ts: Date.now(),
+      type: 'steam_guard_required',
+      phase: 'login',
+      promptType: 'steam_guard_mobile'
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Steam app approval required')
+    expect(wrapper.text()).toContain('Open Steam on your phone and approve this sign-in request.')
+  })
+
   it('clears saved session from login panel', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
       rememberedUsername: 'alice',
       rememberAuth: true,
-      hasStoredAuth: true
+      hasStoredAuth: true,
+      preferredAuthMode: 'otp'
     })
 
     const wrapper = mount(App)
@@ -330,7 +416,8 @@ describe('App UI validation gates', () => {
       profiles: [],
       rememberedUsername: 'alice',
       rememberAuth: true,
-      hasStoredAuth: true
+      hasStoredAuth: true,
+      preferredAuthMode: 'otp'
     })
 
     const wrapper = mount(App)
@@ -462,7 +549,8 @@ describe('App UI validation gates', () => {
       profiles: [],
       rememberedUsername: 'alice',
       rememberAuth: true,
-      hasStoredAuth: true
+      hasStoredAuth: true,
+      preferredAuthMode: 'otp'
     })
 
     const wrapper = mount(App)
@@ -496,7 +584,8 @@ describe('App UI validation gates', () => {
       profiles: [],
       rememberedUsername: 'alice',
       rememberAuth: true,
-      hasStoredAuth: true
+      hasStoredAuth: true,
+      preferredAuthMode: 'otp'
     })
 
     const wrapper = mount(App)
@@ -772,10 +861,32 @@ describe('App UI validation gates', () => {
 
     const cardTitles = wrapper.findAll('.advanced-card-title').map((node) => node.text().trim())
     expect(cardTitles).toEqual([
-      'SteamCMD Executable',
+      'Steam Web API Key',
       'SteamCMD Timeouts',
-      'Steam Web API Key'
+      'SteamCMD Executable'
     ])
+  })
+
+  it('shows OTP entry immediately after sign-in request when OTP mode is selected', async () => {
+    workshop.login.mockImplementationOnce(async () => await new Promise(() => undefined))
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const otpModeRadio = wrapper.find('input[type="radio"][value="otp"]')
+    expect(otpModeRadio.exists()).toBe(true)
+    await otpModeRadio.setValue(true)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Save OTP / Email code')
+    expect(wrapper.text()).toContain('Sign-in request sent. You can enter OTP / Email code now')
   })
 
   it('can disable the login timeout from the login advanced options panel', async () => {
