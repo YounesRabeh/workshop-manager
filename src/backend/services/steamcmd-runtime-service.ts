@@ -23,9 +23,11 @@ import { AppError, isRunCancelledError } from '@backend/utils/errors'
 import { RunLogStore } from '@backend/stores/run-log-store'
 import {
   isSteamGuardPrompt,
+  isSteamGuardMobilePrompt,
   parseSteamLoginFailure,
   parseWorkshopRunFailure,
   isBenignSteamLatencyWarning,
+  isLoginSuccessLine,
   isWorkshopSuccessLine,
   extractWorkshopFileIdsFromHtml,
   normalizeWorkshopItems,
@@ -72,6 +74,11 @@ function errorMessage(error: unknown): string {
     return error.message
   }
   return 'unknown error'
+}
+
+function tempOtpRuntimeLog(message: string, details?: Record<string, unknown>): void {
+  const suffix = details ? ` ${JSON.stringify(details)}` : ''
+  process.stderr.write(`[TEMP OTP] ${message}${suffix}\n`)
 }
 
 export {
@@ -212,6 +219,15 @@ export class SteamCmdRuntimeService extends EventEmitter {
     const runId = createRunId()
     const args = this.processSession.buildLoginArgs(normalizedUsername, password, useStoredAuth)
     const timeoutMs = resolveLoginTimeoutMs(useStoredAuth, this.timeoutSettings)
+    tempOtpRuntimeLog('runtime login start', {
+      runId,
+      username: normalizedUsername,
+      passwordLength: password.trim().length,
+      useStoredAuth,
+      timeoutMs,
+      hasPersistentProcess: this.processSession.hasPersistentProcess(),
+      lastAuthenticatedUsername: this.lastAuthenticatedState?.username ?? null
+    })
 
     if (
       useStoredAuth &&
@@ -219,6 +235,10 @@ export class SteamCmdRuntimeService extends EventEmitter {
       this.lastAuthenticatedState?.username === normalizedUsername &&
       this.processSession.isIdle()
     ) {
+      tempOtpRuntimeLog('runtime login reusing active persistent session', {
+        runId,
+        username: normalizedUsername
+      })
       this.loginState = {
         username: this.lastAuthenticatedState.username,
         steamId64: this.lastAuthenticatedState.steamId64
@@ -248,6 +268,15 @@ export class SteamCmdRuntimeService extends EventEmitter {
           timeoutMs,
           emitOutputEvents: true
         })
+    tempOtpRuntimeLog('runtime login command finished', {
+      runId,
+      exitCode: result.exitCode,
+      lineCount: result.lines.length,
+      sawCachedCredentials: result.lines.some((line) => /logging in using cached credentials/i.test(line)),
+      sawSteamGuardPrompt: result.lines.some((line) => isSteamGuardPrompt(line)),
+      sawMobilePrompt: result.lines.some((line) => isSteamGuardMobilePrompt(line)),
+      sawSuccessCheckpoint: result.lines.some((line) => isLoginSuccessLine(line))
+    })
     const parsedFailure = parseSteamLoginFailure(result.lines)
 
     if (result.exitCode !== 0 || parsedFailure) {
@@ -378,7 +407,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
         if (/logging in using cached credentials/i.test(joined)) {
           return true
         }
-        if (/waiting for confirmation|steam guard mobile authenticator|auth(?:entication)?\s*code|two-factor/i.test(joined)) {
+        if (lines.some((line) => isSteamGuardMobilePrompt(line) || isSteamGuardPrompt(line))) {
           return true
         }
 
@@ -423,6 +452,12 @@ export class SteamCmdRuntimeService extends EventEmitter {
   }
 
   submitSteamGuardCode(sessionId: string, code: string): void {
+    process.stderr.write(
+      `[TEMP OTP] runtime submitSteamGuardCode request ${JSON.stringify({
+        sessionId,
+        codeLength: code.trim().length
+      })}\n`
+    )
     this.processSession.submitSteamGuardCode(sessionId, code)
   }
 

@@ -363,6 +363,33 @@ describe('useAuthFlow composable', () => {
     expect(flow.statusMessage.value).toContain('Steam requested OTP / Email code')
   })
 
+  it('detects OTP challenge from steamcmd usage output format while mobile is preferred', () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.setPreferredAuthMode('steam_guard_mobile')
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'stdout',
+      phase: 'login',
+      line: 'login <username> [<password>] [<Steam guard code>]'
+    })
+
+    expect(flow.activeChallengeMode.value).toBe('otp')
+    expect(flow.statusMessage.value).toContain('Steam requested OTP / Email code')
+  })
+
   it('marks verification approved when post-approval login progress arrives without explicit OK suffix', () => {
     const flow = useAuthFlow({
       onShowTimeoutLogs: vi.fn(async () => undefined),
@@ -424,6 +451,45 @@ describe('useAuthFlow composable', () => {
     flow.setSteamGuardCode('123456')
     await flow.submitSteamGuardCode()
     expect(workshop.submitSteamGuardCode).toHaveBeenCalledTimes(1)
+  })
+
+  it('queues OTP entered before login run id is available and submits when challenge arrives', async () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.isLoginSubmitting.value = true
+    flow.setPreferredAuthMode('otp')
+    flow.setSteamGuardCode('123456')
+    await flow.submitSteamGuardCode()
+
+    expect(workshop.submitSteamGuardCode).not.toHaveBeenCalled()
+    expect(flow.steamGuardCode.value).toBe('')
+    expect(flow.statusMessage.value).toContain('Waiting for login session')
+
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'steam_guard_required',
+      phase: 'login',
+      promptType: 'steam_guard_code'
+    })
+
+    await vi.waitFor(() => {
+      expect(workshop.submitSteamGuardCode).toHaveBeenCalledWith({
+        sessionId: 'r1',
+        code: '123456'
+      })
+    })
   })
 
   it('keeps saved-session login available for the current sign-in after turning off keep-signed-in', async () => {

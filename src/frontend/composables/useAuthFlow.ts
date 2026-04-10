@@ -83,7 +83,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     steamGuardPromptType,
     activeChallengeMode,
     setSteamGuardCode,
-    clearQueuedOtp,
+    bindQueuedOtpToRun,
     resetSteamGuardState,
     submitQueuedOtpIfReady,
     submitSteamGuardCode,
@@ -322,8 +322,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     if (event.type === 'run_started' && event.phase === 'login') {
       activeLoginRunId.value = event.runId
       steamGuardSessionId.value = event.runId
-      steamGuardCode.value = ''
-      clearQueuedOtp()
+      bindQueuedOtpToRun(event.runId)
       steamGuardPromptType.value = 'waiting'
       activeChallengeMode.value = isStoredSessionLoginAttempt.value
         ? 'none'
@@ -357,7 +356,12 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       applyMobileChallengeStatus(isStoredSessionLoginAttempt.value)
     }
 
-    if (event.line && /auth(?:entication)?\s*code|guard code|two-factor|otp|email code|one-time/i.test(event.line)) {
+    if (
+      event.line &&
+      /auth(?:entication)?\s*code|guard code|two-factor|otp|email code|one-time|login\s*<username>\s*\[<password>\]\s*\[<[^>\r\n]*code[^>\r\n]*>\]/i.test(
+        event.line
+      )
+    ) {
       steamGuardSessionId.value = event.runId
       applyOtpChallengeStatus(isStoredSessionLoginAttempt.value)
       void submitQueuedOtpIfReady(event.runId)
@@ -365,7 +369,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
     if (
       event.line &&
-      /waiting for compat in post-logon(?:.*ok)?|waiting for user info(?:.*ok)?|logged in ok|login complete|successfully logged/i.test(
+      /logging in user .* to steam public\.\.\.ok|waiting for client config(?:.*ok)?|waiting for compat in post-logon(?:.*ok)?|waiting for user info(?:.*ok)?|logged in ok|login complete|successfully logged/i.test(
         event.line
       )
     ) {

@@ -13,10 +13,18 @@ export interface LoginFailure {
 const STEAM_ID64_BASE = 76561197960265728n
 const INVALID_STEAM_ACCOUNT_ID = 0n
 const INVALID_STEAM_ID64 = STEAM_ID64_BASE.toString()
+const STEAM_GUARD_USAGE_PATTERN =
+  /\blogin\s*<username>\s*\[<password>\]\s*\[<[^>\r\n]*(?:steam\s*guard|guard|auth(?:entication)?|two[-\s]?factor|otp|email|code)[^>\r\n]*>\]/i
+
+export function isSteamGuardLoginUsagePrompt(line: string): boolean {
+  return STEAM_GUARD_USAGE_PATTERN.test(line)
+}
 
 export function isSteamGuardPrompt(line: string): boolean {
-  return /two-factor|auth(?:entication)?\s*code|guard code|steam guard code|\botp\b|one[-\s]?time\s*(?:code|passcode)|email\s*(?:otp|code)/i.test(
-    line
+  return (
+    /two-factor|auth(?:entication)?\s*code|guard code|steam guard code|\botp\b|one[-\s]?time\s*(?:code|passcode)|email\s*(?:otp|code)/i.test(
+      line
+    ) || isSteamGuardLoginUsagePrompt(line)
   )
 }
 
@@ -387,16 +395,15 @@ export function extractXmlTagValue(xml: string, tag: string): string | undefined
 }
 
 export function isLoginSuccessLine(line: string): boolean {
-  return /waiting for user info(?:.*ok)?|waiting for compat in post-logon(?:.*ok)?|logged in ok|login complete|successfully logged/i.test(
+  return /logging in user .* to steam public\.\.\.ok|waiting for client config(?:.*ok)?|waiting for user info(?:.*ok)?|waiting for compat in post-logon(?:.*ok)?|logged in ok|login complete|successfully logged/i.test(
     line
   )
 }
 
 export function isLoginProgressLine(line: string): boolean {
   return (
-    /logging in user|waiting for user info|waiting for confirmation|steam guard|two-factor|auth(?:entication)?\s*code|\botp\b|one[-\s]?time\s*(?:code|passcode)|email\s*(?:otp|code)|login failure|failed to log on|cached credentials not found|no cached credentials|logged in ok|login complete|successfully logged/i.test(
-      line
-    )
+    /logging in user|waiting for client config|waiting for user info|waiting for confirmation|steam guard|two-factor|auth(?:entication)?\s*code|\botp\b|one[-\s]?time\s*(?:code|passcode)|email\s*(?:otp|code)|login failure|failed to log on|cached credentials not found|no cached credentials|logged in ok|login complete|successfully logged/i.test(line) ||
+    STEAM_GUARD_USAGE_PATTERN.test(line)
   )
 }
 

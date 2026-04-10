@@ -532,6 +532,62 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(persisted[0]?.lines.join('\n')).toContain('Waiting for confirmation on your Steam Guard Mobile Authenticator...')
   })
 
+  it('accepts Windows one-shot login success when output reaches waiting for client config', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-client-config-login-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+      if (args.join(' ') === '+login alice secret +quit') {
+        return createOneShotFakeChild({
+          lines: [
+            "Logging in using username/password.",
+            "Logging in user 'alice' to Steam Public...OK",
+            'Waiting for client config...OK'
+          ],
+          closeCode: 0
+        })
+      }
+
+      throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+    })
+
+    const runtime = new SteamCmdRuntimeService(
+      async () => 'C:\\steamcmd\\steamcmd.exe',
+      store,
+      join(root, 'runtime'),
+      'windows'
+    )
+
+    await expect(runtime.login('alice', 'secret')).resolves.toEqual(expect.objectContaining({ sessionId: expect.any(String) }))
+    expect(spawn).toHaveBeenCalledTimes(1)
+  })
+
+  it('accepts Windows one-shot login success when login user line ends with OK', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-user-ok-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+      if (args.join(' ') === '+login alice secret +quit') {
+        return createOneShotFakeChild({
+          lines: ["Logging in user 'alice' to Steam Public...OK"],
+          closeCode: 0
+        })
+      }
+
+      throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+    })
+
+    const runtime = new SteamCmdRuntimeService(
+      async () => 'C:\\steamcmd\\steamcmd.exe',
+      store,
+      join(root, 'runtime'),
+      'windows'
+    )
+
+    await expect(runtime.login('alice', 'secret')).resolves.toEqual(expect.objectContaining({ sessionId: expect.any(String) }))
+    expect(spawn).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps Windows login state available for workshop fetches after a one-shot login', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-workshop-fetch-'))
     const store = new RunLogStore(join(root, 'runs'))
@@ -865,6 +921,63 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(() => runtime.submitSteamGuardCode(sessionId, '12345')).toThrow(
       'No Steam Guard prompt is currently waiting for this session'
     )
+  })
+
+  it('submits Steam Guard code as a login command when SteamCMD shows usage prompt format', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-guard-usage-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    let childRef:
+      | (EventEmitter & {
+          stdout: PassThrough
+          stderr: PassThrough
+          stdin: PassThrough
+          commands: string[]
+          kill: () => void
+        })
+      | undefined
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      childRef = createInteractiveFakeChild({
+        login: {
+          lines: [
+            'Usage:',
+            '\tlogin <username> [<password>] [<Steam guard code>]',
+            'Steam>'
+          ]
+        }
+      })
+      return childRef
+    })
+
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
+    let sessionId = ''
+    let guardPromptSeen = false
+
+    runtime.on('run-event', (event) => {
+      if (event.type === 'run_started' && event.phase === 'login') {
+        sessionId = event.runId
+      }
+      if (event.type === 'steam_guard_required' && event.phase === 'login') {
+        guardPromptSeen = true
+      }
+    })
+
+    const loginPromise = runtime.login('alice', 'secret')
+
+    await vi.waitFor(() => {
+      expect(guardPromptSeen).toBe(true)
+      expect(sessionId).not.toBe('')
+    })
+
+    runtime.submitSteamGuardCode(sessionId, '12345')
+
+    await vi.waitFor(() => {
+      const loginCommands = childRef?.commands.filter((command) => command.startsWith('login ')) ?? []
+      expect(loginCommands).toContain('login alice secret 12345')
+    })
+
+    runtime.cancelRun(sessionId)
+    await expect(loginPromise).rejects.toThrow('SteamCMD run cancelled by user.')
   })
 
   it('fails Windows bad credentials login without attempting a second bootstrap', async () => {

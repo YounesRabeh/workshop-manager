@@ -5,9 +5,11 @@
  */
 import { AppError } from '@backend/utils/errors'
 import {
+  escapeInteractiveArg,
   isBenignSteamLatencyWarning,
   isLoginSuccessLine,
   isLoginProgressLine,
+  isSteamGuardLoginUsagePrompt,
   isSteamGuardMobilePrompt,
   isSteamGuardMobileTimeout,
   isSteamGuardPrompt,
@@ -30,6 +32,11 @@ interface SteamCmdOutputProcessorDeps {
   onDispatchCommandIfReady: (activeRun: ActiveInteractiveRun) => void
   onFailActiveRun: (activeRun: ActiveInteractiveRun, error: Error) => void
   onScheduleActiveRunSettle: (activeRun: ActiveInteractiveRun) => void
+}
+
+function tempOtpDebug(message: string, details?: Record<string, unknown>): void {
+  const suffix = details ? ` ${JSON.stringify(details)}` : ''
+  process.stderr.write(`[TEMP OTP] ${message}${suffix}\n`)
 }
 
 function isSteamPromptLine(line: string): boolean {
@@ -192,6 +199,15 @@ class SteamCmdOutputProcessor {
           isSteamGuardPrompt(normalizedLine) &&
           this.deps.state.pendingSteamGuard.has(activeRun.runId) === false
         ) {
+          const shouldSubmitLoginCommandWithGuardCode =
+            isSteamGuardLoginUsagePrompt(normalizedLine) && activeRun.command.startsWith('login ')
+
+          tempOtpDebug('Steam Guard prompt detected', {
+            runId: activeRun.runId,
+            promptLine: normalizedLine,
+            submissionMode: shouldSubmitLoginCommandWithGuardCode ? 'login_with_code' : 'code_only'
+          })
+
           if (activeRun.emitRunEvents) {
             this.deps.logger.emit({
               runId: activeRun.runId,
@@ -208,11 +224,33 @@ class SteamCmdOutputProcessor {
               reject: guardReject
             })
           })
+          tempOtpDebug('Pending Steam Guard challenge registered', {
+            runId: activeRun.runId,
+            pendingCount: this.deps.state.pendingSteamGuard.size
+          })
 
           try {
             const guardCode = await guardPromise
-            activeRun.writeInput(guardCode)
+            tempOtpDebug('Steam Guard code received for submission', {
+              runId: activeRun.runId,
+              codeLength: guardCode.length
+            })
+            if (shouldSubmitLoginCommandWithGuardCode) {
+              if (activeRun.persistLogs) {
+                this.deps.logger.appendLineNoThrow(
+                  activeRun.runId,
+                  this.deps.logger.formatRunMeta('steam guard usage prompt detected; submitting login command with guard code')
+                )
+              }
+              activeRun.writeInput(`${activeRun.command} ${escapeInteractiveArg(guardCode)}`)
+            } else {
+              activeRun.writeInput(guardCode)
+            }
           } catch (error) {
+            tempOtpDebug('Steam Guard submission failed in output processor', {
+              runId: activeRun.runId,
+              error: error instanceof Error ? error.message : String(error)
+            })
             this.deps.onFailActiveRun(
               activeRun,
               error instanceof Error ? error : new AppError('steam_guard', 'Steam Guard submission failed')
@@ -220,6 +258,10 @@ class SteamCmdOutputProcessor {
             return
           } finally {
             this.deps.state.pendingSteamGuard.delete(activeRun.runId)
+            tempOtpDebug('Pending Steam Guard challenge cleared', {
+              runId: activeRun.runId,
+              pendingCount: this.deps.state.pendingSteamGuard.size
+            })
           }
         }
 

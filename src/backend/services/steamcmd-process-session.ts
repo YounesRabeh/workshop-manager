@@ -421,10 +421,28 @@ export class SteamCmdProcessSession {
   }
 
   submitSteamGuardCode(sessionId: string, code: string): void {
+    process.stderr.write(
+      `[TEMP OTP] submitSteamGuardCode called ${JSON.stringify({
+        sessionId,
+        codeLength: code.trim().length,
+        pendingPromptExists: this.state.pendingSteamGuard.has(sessionId),
+        pendingPromptCount: this.state.pendingSteamGuard.size
+      })}\n`
+    )
     const pending = this.state.pendingSteamGuard.get(sessionId)
     if (!pending) {
+      process.stderr.write(
+        `[TEMP OTP] submitSteamGuardCode rejected: no pending prompt for session ${JSON.stringify({
+          sessionId
+        })}\n`
+      )
       throw new AppError('steam_guard', 'No Steam Guard prompt is currently waiting for this session')
     }
+    process.stderr.write(
+      `[TEMP OTP] submitSteamGuardCode resolving pending prompt ${JSON.stringify({
+        sessionId
+      })}\n`
+    )
     pending.resolve(code.trim())
   }
 

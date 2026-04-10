@@ -27,6 +27,14 @@ describe('steamcmd runtime helpers', () => {
     expect(isSteamGuardPrompt('Please enter two-factor authentication code')).toBe(true)
     expect(isSteamGuardPrompt('Please enter OTP from your email')).toBe(true)
     expect(isSteamGuardPrompt('Enter one-time passcode to continue')).toBe(true)
+    expect(
+      isSteamGuardPrompt(`Usage:
+login <username> [<password>] [<Steam guard code>]
+
+Steam>`)
+    ).toBe(true)
+    expect(isSteamGuardPrompt('\tlogin <username> [<password>] [<Steam guard code>]')).toBe(true)
+    expect(isSteamGuardPrompt('Usage: login <username> [<password>] [<authcode>]')).toBe(true)
     expect(isSteamGuardPrompt('Work complete')).toBe(false)
   })
 
@@ -101,8 +109,10 @@ describe('steamcmd runtime helpers', () => {
   })
 
   it('treats post-login progress lines as login success even without explicit ok suffix', () => {
+    expect(isLoginSuccessLine("Logging in user 'alice' to Steam Public...OK")).toBe(true)
     expect(isLoginSuccessLine('Waiting for user info...')).toBe(true)
     expect(isLoginSuccessLine('Waiting for compat in post-logon...')).toBe(true)
+    expect(isLoginSuccessLine('Waiting for client config...OK')).toBe(true)
   })
 
   it('uses a longer timeout for full logins than stored-session reuse', () => {
