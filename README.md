@@ -4,7 +4,7 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 
 > [!NOTE]
 > `pnpm dev`, `pnpm preview`, `pnpm test`, and `pnpm typecheck` run natively on the host.
-> All `pnpm build*` and `pnpm release` packaging commands run through Docker on Linux or Windows.
+> All `pnpm build*` and `pnpm release` packaging commands run through Docker.
 
 ## Screenshots
 

@@ -161,6 +161,14 @@ const otpSubmitLabel = computed(() => {
   return 'Submit OTP / Email code'
 })
 
+const shouldShowMobileApprovalPrompt = computed(() => {
+  const preferredMobilePending =
+    props.preferredAuthMode === 'steam_guard_mobile' &&
+    props.isLoginSubmitting &&
+    props.steamGuardPromptType !== 'steam_guard_approved'
+  return isMobileChallengeActive.value || preferredMobilePending
+})
+
 const securityStatusTitle = computed(() => {
   if (props.steamGuardPromptType === 'steam_guard_approved') {
     return 'Verification approved'
@@ -424,6 +432,9 @@ watch(
                   >
                     {{ otpSubmitLabel }}
                   </button>
+                </div>
+                <div v-else-if="shouldShowMobileApprovalPrompt" class="login-mobile-approval-note mt-3">
+                  check the authenticator app in steam guard
                 </div>
               </div>
             </section>

@@ -889,6 +889,28 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).toContain('Sign-in request sent. You can enter OTP / Email code now')
   })
 
+  it('shows steam guard app note after sign-in request when mobile mode is selected', async () => {
+    workshop.login.mockImplementationOnce(async () => await new Promise(() => undefined))
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const mobileModeRadio = wrapper.find('input[type="radio"][value="steam_guard_mobile"]')
+    expect(mobileModeRadio.exists()).toBe(true)
+    await mobileModeRadio.setValue(true)
+    await flushPromises()
+
+    const username = wrapper.find('input')
+    const password = wrapper.find('input[type="password"]')
+    await username.setValue('alice')
+    await password.setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('check the authenticator app in steam guard')
+    expect(wrapper.text()).not.toContain('Save OTP / Email code')
+  })
+
   it('can disable the login timeout from the login advanced options panel', async () => {
     const wrapper = mount(App)
     await flushPromises()
