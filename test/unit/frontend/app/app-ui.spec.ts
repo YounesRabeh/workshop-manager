@@ -371,8 +371,8 @@ describe('App UI validation gates', () => {
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Auth received')
-    expect(wrapper.text()).toContain('Open Steam on your phone and approve this sign-in request.')
+    expect(wrapper.text()).toContain('Signing in ...')
+    expect(wrapper.text()).toContain('Auth request approved. Finalizing sign-in now.')
     expect(wrapper.text()).not.toContain('CHECK YOUR STEAM GUARD APP')
   })
 

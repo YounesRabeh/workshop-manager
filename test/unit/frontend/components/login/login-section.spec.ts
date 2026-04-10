@@ -41,6 +41,7 @@ function mountLoginSection(
   return mount(LoginSection, {
     props: {
       statusMessage: 'SteamCMD found',
+      loginHeaderStatusMessage: 'SteamCMD found',
       appVersion: '1.2.3',
       isLoginSubmitting: false,
       loginForm: createLoginForm(),

@@ -1,23 +1,22 @@
 /**
  * Overview: Manages frontend authentication state and Steam session interactions.
- * Responsibility: Handles login/logout/guard flows, advanced settings persistence, profile loading, and run-event auth state updates.
+ * Responsibility: Handles login/logout orchestration, Steam Guard run-event updates,
+ * advanced settings integration points, and profile loading through focused sub-composables.
  */
-import { computed, reactive, ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { PreferredAuthMode as SharedPreferredAuthMode, RunEvent } from '@shared/contracts'
 import { logError, normalizeError as normalizeSharedError } from '@shared/api-error-utils'
 import type {
-  ActiveChallengeMode,
   AuthIssue,
-  LoginFormState,
-  PreferredAuthMode,
-  SteamGuardPromptType
+  PreferredAuthMode
 } from '../types/ui'
 import { useStoredSessionManagement } from './useStoredSessionManagement'
+import { useAuthErrorUtils } from './useAuthErrorUtils'
+import { useLoginForm } from './useLoginForm'
+import { useSteamGuard } from './useSteamGuard'
+import { useSteamProfile } from './useSteamProfile'
 
-export interface ApiFailure {
-  message: string
-  code: string
-}
+export type { ApiFailure } from './useAuthErrorUtils'
 
 interface UseAuthFlowOptions {
   onShowTimeoutLogs: () => Promise<void>
@@ -30,27 +29,11 @@ interface UseAuthFlowOptions {
 export function useAuthFlow(options: UseAuthFlowOptions) {
   const loginState = ref<'signed_out' | 'signed_in'>('signed_out')
   const activeLoginRunId = ref<string | null>(null)
-  const steamGuardSessionId = ref<string | null>(null)
-  const steamGuardCode = ref('')
-  const isPasswordPeek = ref(false)
-  const steamGuardPromptType = ref<SteamGuardPromptType>('none')
   const preferredAuthMode = ref<PreferredAuthMode>('otp')
-  const activeChallengeMode = ref<ActiveChallengeMode>('none')
-  const queuedOtpCode = ref('')
-  const queuedOtpRunId = ref<string | null>(null)
   const isStoredSessionLoginAttempt = ref(false)
   const isLoginSubmitting = ref(false)
   const statusMessage = ref<string>('')
   const authIssue = ref<AuthIssue | null>(null)
-  const accountPersonaName = ref<string>('')
-  const accountProfileImageUrl = ref<string | null>(null)
-
-  const loginForm = reactive<LoginFormState>({
-    username: '',
-    password: '',
-    rememberUsername: true,
-    rememberAuth: false
-  })
 
   const {
     hasPersistedStoredSession,
@@ -61,186 +44,73 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     clearStoredSession: clearStoredSessionPersistedState
   } = useStoredSessionManagement()
 
-  function parseAndLogError(context: string, error: unknown): ApiFailure {
-    const parsed = normalizeSharedError(error)
-    logError(context, parsed)
-    return {
-      message: parsed.message,
-      code: parsed.code
-    }
+  function normalizePreferredAuthMode(mode: SharedPreferredAuthMode | undefined): PreferredAuthMode {
+    return mode === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp'
   }
 
-  function normalizeError(error: unknown): ApiFailure {
-    const parsed = normalizeSharedError(error)
-    return {
-      message: parsed.message,
-      code: parsed.code
-    }
-  }
+  const {
+    loginForm,
+    isPasswordPeek,
+    setLoginUsername,
+    setLoginPassword,
+    setRememberUsername,
+    setRememberAuth,
+    setPasswordPeek,
+    refreshRememberedLoginState
+  } = useLoginForm({
+    applyRememberedProfileState,
+    onPreferredAuthModeLoaded: (mode) => {
+      preferredAuthMode.value = mode
+    },
+    normalizePreferredAuthMode
+  })
+
+  const {
+    parseAndLogError,
+    normalizeError,
+    toAuthIssue,
+    isSavedSessionFallbackError,
+    handleSteamCmdMissingStatus
+  } = useAuthErrorUtils({
+    statusMessage,
+    authIssue,
+    onSteamCmdPathRequired: options.onSteamCmdPathRequired
+  })
+
+  const {
+    steamGuardSessionId,
+    steamGuardCode,
+    steamGuardPromptType,
+    activeChallengeMode,
+    setSteamGuardCode,
+    clearQueuedOtp,
+    resetSteamGuardState,
+    submitQueuedOtpIfReady,
+    submitSteamGuardCode,
+    applyOtpChallengeStatus,
+    applyMobileChallengeStatus
+  } = useSteamGuard({
+    preferredAuthMode,
+    isLoginSubmitting,
+    statusMessage,
+    authIssue,
+    parseAndLogError,
+    toAuthIssue
+  })
+
+  const {
+    accountPersonaName,
+    accountProfileImageUrl,
+    refreshCurrentProfile,
+    clearProfile
+  } = useSteamProfile()
 
   const isAuthenticated = computed(() => loginState.value === 'signed_in')
   const canAccessMods = computed(() => loginState.value === 'signed_in')
   const accountDisplayName = computed(() => accountPersonaName.value || loginForm.username.trim() || 'Steam account')
 
-  function normalizePreferredAuthMode(mode: SharedPreferredAuthMode | undefined): PreferredAuthMode {
-    return mode === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp'
-  }
-
-  function setChallengeState(mode: ActiveChallengeMode): void {
-    activeChallengeMode.value = mode
-    if (mode === 'otp') {
-      steamGuardPromptType.value = 'steam_guard_code'
-      return
-    }
-    if (mode === 'steam_guard_mobile') {
-      steamGuardPromptType.value = 'steam_guard_mobile'
-      return
-    }
-  }
-
-  function toAuthIssue(error: ApiFailure): AuthIssue {
-    const message = error.message.toLowerCase()
-
-    if (
-      /username or password|invalidpassword|incorrect password|invalid password|account name or password/.test(message)
-    ) {
-      return {
-        title: 'Wrong Credentials',
-        detail: 'Wrong username or password. Try again.',
-        hint: 'Check account name and password, then sign in again.',
-        tone: 'danger'
-      }
-    }
-
-    if (
-      error.code === 'steam_guard' &&
-      /invalid|expired|incorrect/.test(message)
-    ) {
-      return {
-        title: 'Invalid OTP / Email Code',
-        detail: 'The entered OTP / Email code is invalid or expired.',
-        hint: 'Use a fresh code from Steam and submit again.',
-        tone: 'danger'
-      }
-    }
-
-    if (
-      error.code === 'steam_guard' &&
-      /timed out|timeout|confirmation/.test(message)
-    ) {
-      return {
-        title: 'Steam Guard Confirmation Timed Out',
-        detail: 'Steam did not receive confirmation in time.',
-        hint: 'Approve the login immediately in the Steam mobile app, then retry.',
-        tone: 'warning'
-      }
-    }
-
-    if (/too many|rate limit|try again later|temporarily blocked|captcha/.test(message)) {
-      return {
-        title: 'Too Many Login Attempts',
-        detail: 'Steam temporarily blocked login attempts.',
-        hint: 'Wait a few minutes before retrying.',
-        tone: 'warning'
-      }
-    }
-
-    if (/network|service|failed to connect|unable to connect|no connection/.test(message)) {
-      return {
-        title: 'Steam Connection Issue',
-        detail: 'Steam services or network connection failed during login.',
-        hint: 'Check internet connection and retry.',
-        tone: 'warning'
-      }
-    }
-
-    if (error.code === 'steam_guard') {
-      return {
-        title: 'Verification Required',
-        detail: error.message,
-        hint: 'Complete OTP / Email code or Steam app approval, then retry if needed.',
-        tone: 'info'
-      }
-    }
-
-    return {
-      title: 'Login Failed',
-      detail: error.message,
-      hint: 'Review the message and try again.',
-      tone: 'danger'
-    }
-  }
-
-  function isSavedSessionFallbackError(error: ApiFailure): boolean {
-    return error.code === 'auth' || error.code === 'timeout' || error.code === 'command_failed'
-  }
-
-  function isSteamCmdMissingConfigurationMessage(message: string): boolean {
-    return (
-      /steamcmd/i.test(message) &&
-      /(not found|not configured|missing|no such file|cannot find|executable|path)/i.test(message)
-    )
-  }
-
-  function handleSteamCmdMissingStatus(message: string): boolean {
-    if (!isSteamCmdMissingConfigurationMessage(message)) {
-      return false
-    }
-
-    options.onSteamCmdPathRequired?.()
-    statusMessage.value = 'SteamCMD not found. Advanced options opened. Add the SteamCMD executable path.'
-    authIssue.value = null
-    return true
-  }
-
-  function setLoginUsername(value: string): void {
-    loginForm.username = value
-  }
-
-  function setLoginPassword(value: string): void {
-    loginForm.password = value
-  }
-
-  function setRememberUsername(value: boolean): void {
-    loginForm.rememberUsername = value || loginForm.rememberAuth
-  }
-
-  function setRememberAuth(value: boolean): void {
-    loginForm.rememberAuth = value
-    if (value) {
-      loginForm.rememberUsername = true
-    }
-  }
-
   function setPreferredAuthMode(value: PreferredAuthMode): void {
     preferredAuthMode.value = normalizePreferredAuthMode(value)
-  }
-
-  function setPasswordPeek(value: boolean): void {
-    isPasswordPeek.value = value
-  }
-
-  function setSteamGuardCode(value: string): void {
-    steamGuardCode.value = value
-  }
-
-  function clearQueuedOtp(): void {
-    queuedOtpCode.value = ''
-    queuedOtpRunId.value = null
-  }
-
-  async function refreshRememberedLoginState(): Promise<void> {
-    const payload = await window.workshop.getProfiles()
-    const rememberedUsername = payload.rememberedUsername?.trim() ?? ''
-    loginForm.username = rememberedUsername
-    loginForm.rememberUsername = rememberedUsername.length > 0
-    preferredAuthMode.value = normalizePreferredAuthMode(payload.preferredAuthMode)
-    const hasStoredAuth = payload.hasStoredAuth === true
-    loginForm.rememberAuth = payload.rememberAuth === true && hasStoredAuth
-    applyRememberedProfileState(hasStoredAuth)
-    if (loginForm.rememberAuth) {
-      loginForm.rememberUsername = true
-    }
   }
 
   async function clearStoredSession(): Promise<void> {
@@ -254,12 +124,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       loginForm.password = ''
       isPasswordPeek.value = false
       isStoredSessionLoginAttempt.value = false
-      steamGuardSessionId.value = null
-      steamGuardCode.value = ''
-      clearQueuedOtp()
       activeLoginRunId.value = null
-      steamGuardPromptType.value = 'none'
-      activeChallengeMode.value = 'none'
+      resetSteamGuardState()
       authIssue.value = null
       statusMessage.value = 'Saved session cleared. Enter password to sign in.'
     } catch (error) {
@@ -271,11 +137,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   async function finalizeSuccessfulLogin(successMessage: string): Promise<void> {
     loginState.value = 'signed_in'
     options.onHideTimeoutLogs()
-    steamGuardSessionId.value = null
     activeLoginRunId.value = null
-    steamGuardPromptType.value = 'none'
-    activeChallengeMode.value = 'none'
-    clearQueuedOtp()
+    resetSteamGuardState()
     authIssue.value = null
     statusMessage.value = successMessage
     loginForm.password = ''
@@ -297,9 +160,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       isLoginSubmitting.value = true
       isPasswordPeek.value = false
       activeLoginRunId.value = null
-      steamGuardSessionId.value = null
-      steamGuardCode.value = ''
-      clearQueuedOtp()
+      resetSteamGuardState()
       steamGuardPromptType.value = 'waiting'
       activeChallengeMode.value = 'none'
       statusMessage.value = 'Restoring saved Steam session...'
@@ -322,10 +183,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       }
       if (isSavedSessionFallbackError(parsed)) {
         activeLoginRunId.value = null
-        steamGuardPromptType.value = 'none'
-        activeChallengeMode.value = 'none'
-        steamGuardSessionId.value = null
-        clearQueuedOtp()
+        resetSteamGuardState()
         authIssue.value = null
         disableStoredSessionForCurrentLogin()
         statusMessage.value = 'Saved session expired. Enter password to sign in again.'
@@ -336,18 +194,6 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       authIssue.value = toAuthIssue(parsed)
     } finally {
       isLoginSubmitting.value = false
-    }
-  }
-
-  async function refreshCurrentProfile(): Promise<void> {
-    try {
-      const profile = await window.workshop.getCurrentProfile()
-      accountPersonaName.value = profile.personaName?.trim() || ''
-      accountProfileImageUrl.value = profile.avatarUrl?.trim() || null
-    } catch (error) {
-      logError('useAuthFlow::refreshCurrentProfile', normalizeSharedError(error))
-      accountPersonaName.value = ''
-      accountProfileImageUrl.value = null
     }
   }
 
@@ -391,9 +237,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       authIssue.value = null
       isLoginSubmitting.value = true
       isPasswordPeek.value = false
-      steamGuardSessionId.value = null
-      steamGuardCode.value = ''
-      clearQueuedOtp()
+      resetSteamGuardState()
       steamGuardPromptType.value = 'waiting'
       activeChallengeMode.value = 'none'
       statusMessage.value = usingSavedSession
@@ -419,11 +263,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       if (parsed.code === 'timeout') {
         await options.onShowTimeoutLogs()
       }
-      steamGuardPromptType.value = 'none'
-      activeChallengeMode.value = 'none'
       activeLoginRunId.value = null
-      steamGuardSessionId.value = null
-      clearQueuedOtp()
+      resetSteamGuardState()
       if (handleSteamCmdMissingStatus(parsed.message)) {
         return
       }
@@ -451,17 +292,12 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
     loginState.value = 'signed_out'
     activeLoginRunId.value = null
-    steamGuardSessionId.value = null
-    steamGuardCode.value = ''
-    clearQueuedOtp()
-    steamGuardPromptType.value = 'none'
-    activeChallengeMode.value = 'none'
+    resetSteamGuardState()
     authIssue.value = null
     isStoredSessionLoginAttempt.value = false
     isPasswordPeek.value = false
     statusMessage.value = 'Signed out.'
-    accountPersonaName.value = ''
-    accountProfileImageUrl.value = null
+    clearProfile()
     options.onHideTimeoutLogs()
     options.onSignedOut()
   }
@@ -480,92 +316,6 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       logError('useAuthFlow::quitApp', normalizeSharedError(error))
       // no-op; app may already be closing
     }
-  }
-
-  async function submitOtpCodeToSteam(sessionId: string, code: string): Promise<void> {
-    authIssue.value = null
-    await window.workshop.submitSteamGuardCode({
-      sessionId,
-      code
-    })
-    statusMessage.value = 'OTP / Email code submitted. Waiting for Steam...'
-  }
-
-  async function submitQueuedOtpIfReady(runId: string): Promise<void> {
-    if (
-      steamGuardPromptType.value !== 'steam_guard_code' ||
-      steamGuardSessionId.value !== runId ||
-      queuedOtpCode.value.trim().length === 0 ||
-      queuedOtpRunId.value !== runId
-    ) {
-      return
-    }
-
-    const code = queuedOtpCode.value.trim()
-    clearQueuedOtp()
-    steamGuardCode.value = ''
-
-    try {
-      await submitOtpCodeToSteam(runId, code)
-    } catch (error) {
-      const parsed = parseAndLogError('useAuthFlow::submitQueuedOtpIfReady', error)
-      statusMessage.value = `OTP / Email code failed (${parsed.code}): ${parsed.message}`
-      authIssue.value = toAuthIssue(parsed)
-      steamGuardCode.value = code
-    }
-  }
-
-  async function submitSteamGuardCode(): Promise<void> {
-    const sessionId = steamGuardSessionId.value
-    const code = steamGuardCode.value.trim()
-
-    if (!sessionId || code.length === 0) {
-      return
-    }
-
-    if (steamGuardPromptType.value !== 'steam_guard_code') {
-      if (isLoginSubmitting.value && activeChallengeMode.value === 'otp') {
-        queuedOtpCode.value = code
-        queuedOtpRunId.value = sessionId
-        steamGuardCode.value = ''
-        statusMessage.value = 'OTP / Email code saved. Waiting for Steam challenge...'
-      }
-      return
-    }
-
-    try {
-      await submitOtpCodeToSteam(sessionId, code)
-      steamGuardCode.value = ''
-      clearQueuedOtp()
-    } catch (error) {
-      const parsed = parseAndLogError('useAuthFlow::submitSteamGuardCode', error)
-      statusMessage.value = `OTP / Email code failed (${parsed.code}): ${parsed.message}`
-      authIssue.value = toAuthIssue(parsed)
-    }
-  }
-
-  function applyOtpChallengeStatus(fromSavedSession: boolean): void {
-    setChallengeState('otp')
-    if (fromSavedSession) {
-      statusMessage.value = 'Saved session requires OTP / Email code. Enter the code to continue.'
-      return
-    }
-    statusMessage.value =
-      preferredAuthMode.value === 'steam_guard_mobile'
-        ? 'Steam requested OTP / Email code for this sign-in. Enter the code to continue.'
-        : 'OTP / Email code required. Enter the code to continue.'
-  }
-
-  function applyMobileChallengeStatus(fromSavedSession: boolean): void {
-    setChallengeState('steam_guard_mobile')
-    if (fromSavedSession) {
-      statusMessage.value = 'Saved session requires Steam app approval. Approve on your phone now.'
-      return
-    }
-    statusMessage.value =
-      preferredAuthMode.value === 'otp'
-        ? 'Steam requested mobile app approval for this sign-in. Approve in the Steam mobile app to continue.'
-        : 'Steam app approval needed. Approve on your phone now.'
   }
 
   function handleRunEvent(event: RunEvent): void {
@@ -636,32 +386,20 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
     if (event.type === 'run_finished' && event.phase === 'login') {
       activeLoginRunId.value = null
-      steamGuardSessionId.value = null
-      steamGuardCode.value = ''
-      clearQueuedOtp()
-      steamGuardPromptType.value = 'none'
-      activeChallengeMode.value = 'none'
+      resetSteamGuardState()
       authIssue.value = null
       isStoredSessionLoginAttempt.value = false
     }
 
     if (event.type === 'run_failed' && event.phase === 'login') {
       activeLoginRunId.value = null
-      steamGuardCode.value = ''
-      clearQueuedOtp()
-      steamGuardPromptType.value = 'none'
-      activeChallengeMode.value = 'none'
-      steamGuardSessionId.value = null
+      resetSteamGuardState()
       isStoredSessionLoginAttempt.value = false
     }
 
     if (event.type === 'run_cancelled' && event.phase === 'login') {
       activeLoginRunId.value = null
-      steamGuardCode.value = ''
-      clearQueuedOtp()
-      steamGuardPromptType.value = 'none'
-      activeChallengeMode.value = 'none'
-      steamGuardSessionId.value = null
+      resetSteamGuardState()
       isStoredSessionLoginAttempt.value = false
     }
   }
