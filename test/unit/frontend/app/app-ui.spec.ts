@@ -371,8 +371,9 @@ describe('App UI validation gates', () => {
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Steam app approval request sent')
+    expect(wrapper.text()).toContain('Auth received')
     expect(wrapper.text()).toContain('Open Steam on your phone and approve this sign-in request.')
+    expect(wrapper.text()).not.toContain('CHECK YOUR STEAM GUARD APP')
   })
 
   it('clears saved session from login panel', async () => {
@@ -928,8 +929,8 @@ describe('App UI validation gates', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Waiting for Steam verification')
-    expect(wrapper.text()).toContain('Steam may request OTP / Email code or mobile approval based on account settings.')
-    expect(wrapper.text()).toContain('Check your Steam Guard app for an approval prompt.')
+    expect(wrapper.text()).toContain('Steam auth request sent.')
+    expect(wrapper.text()).toContain('CHECK YOUR STEAM GUARD APP')
     expect(wrapper.text()).not.toContain('Save OTP / Email code')
   })
 

@@ -3,7 +3,6 @@
   "include": ["src/electron/preload.ts", "src/frontend/**/*.ts", "src/frontend/**/*.vue", "src/shared/**/*.ts"],
   "compilerOptions": {
     "jsx": "preserve",
-    "ignoreDeprecations": "5.0",
     "types": ["vite/client", "vitest/globals"]
   }
 }

@@ -22,6 +22,7 @@ import { moveFocusWithVerticalArrows, toggleCheckboxOrRadioOnEnter } from '../ev
 
 const props = defineProps<{
   statusMessage: string
+  loginHeaderStatusMessage: string
   appVersion: string
   isLoginSubmitting: boolean
   loginForm: LoginFormState
@@ -211,13 +212,13 @@ const otpSubmitLabel = computed(() => {
 
 const securityStatusTitle = computed(() => {
   if (props.steamGuardPromptType === 'steam_guard_approved') {
-    return 'Verification approved'
+    return 'Auth received'
   }
   if (isOtpChallengeActive.value) {
     return 'OTP / Email code required'
   }
   if (isMobileChallengeActive.value) {
-    return 'Steam app approval request sent'
+    return 'Auth received'
   }
   if (isStoredSessionFetching.value) {
     return 'Fetching saved session'
@@ -226,6 +227,17 @@ const securityStatusTitle = computed(() => {
     return 'Waiting for Steam verification'
   }
   return props.preferredAuthMode === 'steam_guard_mobile' ? 'Preferred: Steam app approval' : 'Preferred: OTP / Email code'
+})
+
+const securityStatusCallout = computed(() => {
+  if (
+    !isStoredSessionFetching.value &&
+    (props.steamGuardPromptType === 'waiting' || props.isLoginSubmitting) &&
+    props.preferredAuthMode === 'steam_guard_mobile'
+  ) {
+    return 'CHECK YOUR STEAM GUARD APP'
+  }
+  return ''
 })
 
 const securityStatusCopy = computed(() => {
@@ -245,7 +257,7 @@ const securityStatusCopy = computed(() => {
     if (props.preferredAuthMode === 'otp') {
       return 'Sign-in request sent. You can enter OTP / Email code now and we will submit it when Steam requests it.'
     }
-    return 'Steam may request OTP / Email code or mobile approval based on account settings. Check your Steam Guard app for an approval prompt.'
+    return 'Steam auth request sent.'
   }
   return 'Choose your preferred method below. Steam might still request the other method for this sign-in.'
 })
@@ -403,8 +415,8 @@ watch(
         <header class="login-header">
           <h2 class="login-title">Sign in</h2>
           <p class="login-subtitle">Use your Steam account to unlock mod management.</p>
-          <p v-if="statusMessage" class="login-status" :class="statusClass">
-            <span>{{ statusMessage }}</span>
+          <p v-if="loginHeaderStatusMessage" class="login-status" :class="statusClass">
+            <span>{{ loginHeaderStatusMessage }}</span>
             <span class="login-status-icon" aria-hidden="true">{{ statusIcon }}</span>
           </p>
           <button
@@ -448,6 +460,7 @@ watch(
               :preferred-auth-mode="preferredAuthMode"
               :security-status-title="securityStatusTitle"
               :security-status-copy="securityStatusCopy"
+              :security-status-callout="securityStatusCallout"
               :security-card-class="securityCardClass"
               :should-show-otp-entry="shouldShowOtpEntry"
               :steam-guard-code="steamGuardCode"

@@ -6,6 +6,7 @@ defineProps<{
   preferredAuthMode: PreferredAuthMode
   securityStatusTitle: string
   securityStatusCopy: string
+  securityStatusCallout: string
   securityCardClass: string
   shouldShowOtpEntry: boolean
   steamGuardCode: string
@@ -56,8 +57,11 @@ const emit = defineEmits<{
     </div>
 
     <div class="login-security-card mt-3 px-3 py-3" :class="securityCardClass">
-      <p class="text-sm font-semibold">{{ securityStatusTitle }}</p>
-      <p class="mt-1 text-xs">{{ securityStatusCopy }}</p>
+      <p class="text-sm font-semibold">{{ securityStatusCopy }}</p>
+      <p class="mt-1 text-xs">{{ securityStatusTitle }}</p>
+      <p v-if="securityStatusCallout" class="mt-3 text-sm font-bold uppercase tracking-[0.08em]">
+        {{ securityStatusCallout }}
+      </p>
 
       <div v-if="shouldShowOtpEntry" class="mt-3">
         <label class="block text-[11px] font-semibold uppercase tracking-[0.08em]">OTP / Email code</label>

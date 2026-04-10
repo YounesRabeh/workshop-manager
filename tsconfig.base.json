@@ -8,12 +8,10 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "ignoreDeprecations": "5.0",
-    "baseUrl": ".",
     "paths": {
-      "@shared/*": ["src/shared/*"],
-      "@backend/*": ["src/backend/*"],
-      "@frontend/*": ["src/frontend/*"]
+      "@shared/*": ["./src/shared/*"],
+      "@backend/*": ["./src/backend/*"],
+      "@frontend/*": ["./src/frontend/*"]
     }
   }
 }

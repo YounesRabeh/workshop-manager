@@ -178,7 +178,17 @@ const {
 
 openAdvancedOptionsHandler = openAdvancedOptions
 
-const loginHeaderStatusMessage = computed(() => statusMessage.value || (isSteamCmdDetected.value ? 'SteamCMD found' : ''))
+const loginHeaderStatusMessage = computed(() => {
+  if (isSteamCmdDetected.value) {
+    return 'SteamCMD found'
+  }
+
+  if (/SteamCMD not found/i.test(statusMessage.value)) {
+    return 'SteamCMD not found'
+  }
+
+  return ''
+})
 
 const uiShell = useUiShell({
   flowStep,
@@ -494,7 +504,8 @@ async function pickUpdatePreviewFile(): Promise<void> {
 
     <template v-else-if="!isAuthenticated">
         <LoginSection
-        :status-message="loginHeaderStatusMessage"
+        :status-message="statusMessage"
+        :login-header-status-message="loginHeaderStatusMessage"
         :app-version="appVersion"
         :is-login-submitting="isLoginSubmitting"
         :login-form="loginForm"

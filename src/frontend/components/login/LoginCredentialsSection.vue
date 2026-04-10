@@ -67,13 +67,24 @@ const emit = defineEmits<{
     <div class="login-api-card">
       <div class="login-api-header">
         <div>
-          <p class="login-api-title">Steam Web API Key</p>
+          <p class="login-api-title">
+            Steam Web API Key
+            <span
+              class="ml-2 text-[11px] font-semibold uppercase tracking-[0.08em]"
+              :class="{
+                'text-emerald-300': webApiStatusLabel === 'Saved',
+                'text-amber-300': webApiStatusLabel === 'Unavailable',
+                'text-slate-400': webApiStatusLabel !== 'Saved' && webApiStatusLabel !== 'Unavailable'
+              }"
+            >
+              {{ webApiStatusLabel }}
+            </span>
+          </p>
           <p class="login-api-copy">
-            Optional for normal login. Needed to access non-public Workshop items (friends-only, hidden, or unlisted).
+            Add a Web API key to fully use this app, including non-public Workshop items.
           </p>
         </div>
         <div class="login-api-header-actions">
-          <span class="advanced-badge" :class="webApiStatusClass">{{ webApiStatusLabel }}</span>
           <button
             type="button"
             class="login-peek login-api-toggle rounded px-3 py-2 text-xs font-semibold"
@@ -87,6 +98,16 @@ const emit = defineEmits<{
 
       <div v-if="isApiSectionExpanded">
         <label class="advanced-label mt-3">Steam Web API Key</label>
+        <p class="mt-1 text-xs">
+          <a
+            href="https://steamcommunity.com/dev/apikey"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-[#8ed4ff] underline decoration-transparent transition-colors hover:text-[#c7ecff] hover:decoration-current"
+          >
+            Get your free Steam Web API key
+          </a>
+        </p>
         <div class="advanced-key-row">
           <input
             :type="isWebApiKeyPeek ? 'text' : 'password'"
