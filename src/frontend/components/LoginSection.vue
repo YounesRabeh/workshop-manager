@@ -105,11 +105,69 @@ function onPreferredAuthModeChange(event: Event): void {
   emit('update-preferred-auth-mode', target?.value === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp')
 }
 
+function onWebApiKeyInput(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  emit('update-web-api-key', target?.value ?? '')
+}
+
+const isApiSectionExpanded = ref(false)
+
+function toggleApiSection(): void {
+  isApiSectionExpanded.value = !isApiSectionExpanded.value
+}
+
 const canSubmitLogin = computed(() => {
   const hasUsername = props.loginForm.username.trim().length > 0
   const hasPassword = props.loginForm.password.trim().length > 0
   const canUseSavedSession = props.canUseStoredSessionForLogin && !hasPassword
   return !props.isLoginSubmitting && hasUsername && (hasPassword || canUseSavedSession)
+})
+
+const isWebApiKeySaveBlocked = computed(() => {
+  return !props.advancedSettings.secureStorageAvailable && props.advancedSettings.webApiKey.trim().length > 0
+})
+
+const canSaveWebApiKey = computed(() => {
+  return (
+    !props.advancedSettings.isSaving &&
+    !isWebApiKeySaveBlocked.value &&
+    props.advancedSettings.webApiKey.trim().length > 0
+  )
+})
+
+const canClearSavedWebApiKey = computed(() => {
+  return !props.advancedSettings.isSaving && props.advancedSettings.hasWebApiKey
+})
+
+const webApiStatusLabel = computed(() => {
+  if (props.advancedSettings.hasWebApiKey) {
+    return 'Saved'
+  }
+  if (!props.advancedSettings.secureStorageAvailable) {
+    return 'Unavailable'
+  }
+  return 'Optional'
+})
+
+const webApiStatusClass = computed(() => {
+  if (props.advancedSettings.hasWebApiKey) {
+    return 'advanced-badge-success'
+  }
+  if (!props.advancedSettings.secureStorageAvailable) {
+    return 'advanced-badge-warning'
+  }
+  return 'advanced-badge-muted'
+})
+
+const webApiStorageHint = computed(() => {
+  if (props.advancedSettings.secureStorageAvailable) {
+    return 'Saved keys are encrypted using OS secure storage.'
+  }
+  return 'Secure storage is unavailable on this system. Leave the key empty to continue without non-public item access.'
+})
+
+const apiSectionToggleLabel = computed(() => {
+  return isApiSectionExpanded.value ? 'Hide API Options' : 'Show API Options'
 })
 
 const submitLabel = computed(() => {
@@ -322,7 +380,7 @@ watch(
         <div class="login-hero-inner">
           <p class="login-kicker">WORKSHOP MANAGER</p>
           <h1 class="login-hero-title">Your Workshop Command Center</h1>
-          <p class="login-hero-copy">Manage all your workshop items from one focused workspace.</p>
+          <p class="login-hero-copy">Manage all your Steam workshop items from one focused workspace.</p>
         </div>
         <p class="login-disclaimer">* Not an official Steam product • v{{ appVersion || 'dev' }}</p>
       </aside>
@@ -375,6 +433,79 @@ watch(
                 >
                   {{ isPasswordPeek ? 'Hide' : 'Show' }}
                 </button>
+              </div>
+
+              <div class="login-api-card">
+                <div class="login-api-header">
+                  <div>
+                    <p class="login-api-title">Steam Web API Key</p>
+                    <p class="login-api-copy">
+                      Optional for normal login. Needed to access non-public Workshop items (friends-only, hidden, or unlisted).
+                    </p>
+                  </div>
+                  <div class="login-api-header-actions">
+                    <span class="advanced-badge" :class="webApiStatusClass">{{ webApiStatusLabel }}</span>
+                    <button
+                      type="button"
+                      class="login-peek login-api-toggle rounded px-3 py-2 text-xs font-semibold"
+                      :aria-expanded="isApiSectionExpanded ? 'true' : 'false'"
+                      @click="toggleApiSection"
+                    >
+                      {{ apiSectionToggleLabel }}
+                    </button>
+                  </div>
+                </div>
+
+                <div v-if="isApiSectionExpanded">
+                  <label class="advanced-label mt-3">Steam Web API Key</label>
+                  <div class="advanced-key-row">
+                    <input
+                      :type="isWebApiKeyPeek ? 'text' : 'password'"
+                      :value="advancedSettings.webApiKey"
+                      :placeholder="advancedSettings.hasWebApiKey ? 'Saved securely (enter new key to replace)' : 'Paste key...'"
+                      autocomplete="off"
+                      class="login-input advanced-input"
+                      @input="onWebApiKeyInput"
+                    />
+                    <button
+                      type="button"
+                      class="login-peek advanced-inline-button"
+                      @mouseenter="emit('set-web-api-key-peek', true)"
+                      @mouseleave="emit('set-web-api-key-peek', false)"
+                      @focus="emit('set-web-api-key-peek', true)"
+                      @blur="emit('set-web-api-key-peek', false)"
+                    >
+                      Show
+                    </button>
+                  </div>
+
+                  <p class="login-api-meta">{{ webApiStorageHint }}</p>
+                  <p v-if="isWebApiKeySaveBlocked" class="login-api-meta login-api-meta-warning">
+                    Secure storage is unavailable. Clear this field to continue without a key.
+                  </p>
+                  <p v-if="advancedSettings.hasWebApiKey" class="login-api-meta login-api-meta-success">
+                    Saved key detected and ready to use.
+                  </p>
+
+                  <div class="login-api-actions">
+                    <button
+                      type="button"
+                      class="login-submit rounded px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="!canSaveWebApiKey"
+                      @click="emit('save-advanced-settings')"
+                    >
+                      {{ advancedSettings.isSaving ? 'Saving...' : 'Save API Key' }}
+                    </button>
+                    <button
+                      type="button"
+                      class="login-peek rounded px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="!canClearSavedWebApiKey"
+                      @click="emit('clear-web-api-key')"
+                    >
+                      Clear Saved Key
+                    </button>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -514,10 +645,11 @@ watch(
             class="mt-3"
             :advanced-settings="advancedSettings"
             :is-web-api-key-peek="isWebApiKeyPeek"
+            :show-web-api-section="false"
             :timeout-scope="timeoutScope"
             web-api-section-placement="before_timeouts"
             layout-preset="api_timeout_path"
-            summary="Advanced login setup: Web API key, SteamCMD timeouts, and executable path."
+            summary="Advanced login setup: SteamCMD timeout and executable path."
             @update-web-api-key="emit('update-web-api-key', $event)"
             @update-steamcmd-manual-path="emit('update-steamcmd-manual-path', $event)"
             @update-login-timeout-ms="emit('update-login-timeout-ms', $event)"

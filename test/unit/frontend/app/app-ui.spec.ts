@@ -861,7 +861,6 @@ describe('App UI validation gates', () => {
 
     const cardTitles = wrapper.findAll('.advanced-card-title').map((node) => node.text().trim())
     expect(cardTitles).toEqual([
-      'Steam Web API Key',
       'SteamCMD Timeouts',
       'SteamCMD Executable'
     ])
@@ -907,7 +906,7 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('check the authenticator app in steam guard')
+    expect(wrapper.text()).toContain('CHECK YOUR STEAM GUARD APP')
     expect(wrapper.text()).not.toContain('Save OTP / Email code')
   })
 
@@ -953,11 +952,12 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const advancedToggle = wrapper
+    expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(false)
+    const toggleButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Advanced Developer Options'))
-    expect(advancedToggle).toBeDefined()
-    await advancedToggle?.trigger('click')
+      .find((button) => button.text().trim() === 'Show API Options')
+    expect(toggleButton).toBeDefined()
+    await toggleButton?.trigger('click')
     await flushPromises()
 
     const apiKeyInput = wrapper.find('input[placeholder="Paste key..."]')
@@ -966,7 +966,7 @@ describe('App UI validation gates', () => {
 
     const saveButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Save Advanced Options'))
+      .find((button) => button.text().trim() === 'Save API Key')
     expect(saveButton).toBeDefined()
     await saveButton?.trigger('click')
     await flushPromises()
@@ -981,6 +981,31 @@ describe('App UI validation gates', () => {
         workshopTimeoutMs: 60_000
       }
     })
+  })
+
+  it('toggles api key section visibility in credentials', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(false)
+
+    const showButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Show API Options')
+    expect(showButton).toBeDefined()
+    await showButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(true)
+
+    const hideButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Hide API Options')
+    expect(hideButton).toBeDefined()
+    await hideButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(false)
   })
 
   it('saves advanced settings with no key without enabling web api', async () => {
@@ -1013,7 +1038,7 @@ describe('App UI validation gates', () => {
     })
   })
 
-  it('clears saved web api key from advanced settings', async () => {
+  it('clears saved web api key from credentials section', async () => {
     workshop.getAdvancedSettings.mockResolvedValueOnce({
       webApiEnabled: true,
       hasWebApiKey: true,
@@ -1031,16 +1056,16 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const advancedToggle = wrapper
+    const toggleButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Advanced Developer Options'))
-    expect(advancedToggle).toBeDefined()
-    await advancedToggle?.trigger('click')
+      .find((button) => button.text().trim() === 'Show API Options')
+    expect(toggleButton).toBeDefined()
+    await toggleButton?.trigger('click')
     await flushPromises()
 
     const clearButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Clear Saved Key'))
+      .find((button) => button.text().trim() === 'Clear Saved Key')
     expect(clearButton).toBeDefined()
     await clearButton?.trigger('click')
     await flushPromises()
