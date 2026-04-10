@@ -321,8 +321,8 @@ watch(
       <aside class="login-hero">
         <div class="login-hero-inner">
           <p class="login-kicker">WORKSHOP MANAGER</p>
-          <h1 class="login-hero-title">Secure Steam Sign-in</h1>
-          <p class="login-hero-copy">Choose OTP / Email code or Steam app approval and continue.</p>
+          <h1 class="login-hero-title">Your Workshop Command Center</h1>
+          <p class="login-hero-copy">Manage all your workshop items from one focused workspace.</p>
         </div>
         <p class="login-disclaimer">* Not an official Steam product • v{{ appVersion || 'dev' }}</p>
       </aside>
@@ -434,7 +434,7 @@ watch(
                   </button>
                 </div>
                 <div v-else-if="shouldShowMobileApprovalPrompt" class="login-mobile-approval-note mt-3">
-                  check the authenticator app in steam guard
+                  <strong>CHECK YOUR STEAM GUARD APP</strong>
                 </div>
               </div>
             </section>
