@@ -373,6 +373,39 @@ describe('useAuthFlow composable', () => {
     expect(flow.statusMessage.value).toContain('Steam requested OTP / Email code')
   })
 
+  it('marks verification approved when post-approval login progress arrives without explicit OK suffix', () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'steam_guard_required',
+      phase: 'login',
+      promptType: 'steam_guard_mobile'
+    })
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'stdout',
+      phase: 'login',
+      line: 'Waiting for user info...'
+    })
+
+    expect(flow.steamGuardPromptType.value).toBe('steam_guard_approved')
+    expect(flow.statusMessage.value).toBe('Verification approved. Finalizing sign in...')
+  })
+
   it('only submits OTP/email code when OTP challenge is active', async () => {
     const flow = useAuthFlow({
       onShowTimeoutLogs: vi.fn(async () => undefined),

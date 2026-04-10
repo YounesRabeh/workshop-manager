@@ -26,10 +26,26 @@ const emit = defineEmits<{
         Developer utility for Steam Workshop uploads and updates.
       </p>
       <p class="mt-2 text-xs text-slate-400">
-        Version: <span class="font-semibold text-slate-200">v{{ props.appVersion || 'dev' }}</span>
+        Version:
+        <a
+          href="https://github.com/YounesRabeh/workshop-manager"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="font-semibold text-slate-200 hover:text-white"
+        >
+          v{{ props.appVersion || 'dev' }}
+        </a>
       </p>
       <p class="mt-1 text-xs text-slate-400">
-        Author: <span class="font-semibold text-slate-200">Younes Rabeh</span>
+        Author:
+        <a
+          href="https://github.com/YounesRabeh"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="font-semibold text-slate-200 hover:text-white"
+        >
+          Younes Rabeh
+        </a>
       </p>
       <p class="mt-3 text-xs text-slate-400">* Not an official Steam product.</p>
       <div class="mt-4 flex justify-end">

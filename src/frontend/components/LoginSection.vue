@@ -200,10 +200,20 @@ const shouldShowInstallLogButton = computed(() => {
 
 const isOtpChallengeActive = computed(() => props.activeChallengeMode === 'otp')
 const isMobileChallengeActive = computed(() => props.activeChallengeMode === 'steam_guard_mobile')
+const isStoredSessionFetching = computed(() => {
+  const isPendingState = props.steamGuardPromptType === 'waiting' || props.isLoginSubmitting
+  return (
+    props.isStoredSessionLoginAttempt &&
+    isPendingState &&
+    !isOtpChallengeActive.value &&
+    !isMobileChallengeActive.value
+  )
+})
 const shouldShowOtpEntry = computed(() => {
   const preferredOtpPending =
     props.preferredAuthMode === 'otp' &&
     props.isLoginSubmitting &&
+    !props.isStoredSessionLoginAttempt &&
     props.steamGuardPromptType !== 'steam_guard_mobile' &&
     props.steamGuardPromptType !== 'steam_guard_approved'
   return isOtpChallengeActive.value || preferredOtpPending
@@ -219,14 +229,6 @@ const otpSubmitLabel = computed(() => {
   return 'Submit OTP / Email code'
 })
 
-const shouldShowMobileApprovalPrompt = computed(() => {
-  const preferredMobilePending =
-    props.preferredAuthMode === 'steam_guard_mobile' &&
-    props.isLoginSubmitting &&
-    props.steamGuardPromptType !== 'steam_guard_approved'
-  return isMobileChallengeActive.value || preferredMobilePending
-})
-
 const securityStatusTitle = computed(() => {
   if (props.steamGuardPromptType === 'steam_guard_approved') {
     return 'Verification approved'
@@ -235,7 +237,10 @@ const securityStatusTitle = computed(() => {
     return 'OTP / Email code required'
   }
   if (isMobileChallengeActive.value) {
-    return 'Steam app approval required'
+    return 'Steam app approval request sent'
+  }
+  if (isStoredSessionFetching.value) {
+    return 'Fetching saved session'
   }
   if (props.steamGuardPromptType === 'waiting' || props.isLoginSubmitting) {
     return 'Waiting for Steam verification'
@@ -253,11 +258,14 @@ const securityStatusCopy = computed(() => {
   if (isMobileChallengeActive.value) {
     return 'Open Steam on your phone and approve this sign-in request.'
   }
+  if (isStoredSessionFetching.value) {
+    return 'Fetching saved Steam session. Steam Guard may be required if Steam requests verification.'
+  }
   if (props.steamGuardPromptType === 'waiting' || props.isLoginSubmitting) {
     if (props.preferredAuthMode === 'otp') {
       return 'Sign-in request sent. You can enter OTP / Email code now and we will submit it when Steam requests it.'
     }
-    return 'Steam may request OTP / Email code or mobile approval based on account settings.'
+    return 'Steam may request OTP / Email code or mobile approval based on account settings. Check your Steam Guard app for an approval prompt.'
   }
   return 'Choose your preferred method below. Steam might still request the other method for this sign-in.'
 })
@@ -266,7 +274,13 @@ const securityCardClass = computed(() => {
   if (props.steamGuardPromptType === 'steam_guard_approved') {
     return 'login-security-card-success'
   }
-  if (isOtpChallengeActive.value || isMobileChallengeActive.value || props.steamGuardPromptType === 'waiting') {
+  if (isMobileChallengeActive.value) {
+    return 'login-security-card-success'
+  }
+  if (isStoredSessionFetching.value) {
+    return 'login-security-card-neutral'
+  }
+  if (isOtpChallengeActive.value || props.steamGuardPromptType === 'waiting') {
     return 'login-security-card-warning'
   }
   return 'login-security-card-neutral'
@@ -389,7 +403,12 @@ watch(
         <header class="login-header">
           <h2 class="login-title">Sign in</h2>
           <p class="login-subtitle">Use your Steam account to unlock mod management.</p>
-          <p v-if="statusMessage" class="login-status">{{ statusMessage }}</p>
+          <p v-if="statusMessage" class="login-status">
+            <span v-if="/SteamCMD|ready|configured/i.test(statusMessage)" class="text-green-400">
+              ✓ {{ statusMessage }}
+            </span>
+            <span v-else>{{ statusMessage }}</span>
+          </p>
           <button
             v-if="shouldShowInstallLogButton"
             type="button"
@@ -563,9 +582,6 @@ watch(
                   >
                     {{ otpSubmitLabel }}
                   </button>
-                </div>
-                <div v-else-if="shouldShowMobileApprovalPrompt" class="login-mobile-approval-note mt-3">
-                  <strong>CHECK YOUR STEAM GUARD APP</strong>
                 </div>
               </div>
             </section>

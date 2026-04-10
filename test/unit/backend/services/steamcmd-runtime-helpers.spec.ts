@@ -14,6 +14,7 @@ import {
   resolveLoginTimeoutMs,
   steamId64FromAccountId
 } from '@backend/services/steamcmd-runtime-service'
+import { isLoginSuccessLine } from '@backend/services/steam-output-parser'
 
 describe('steamcmd runtime helpers', () => {
   it('builds workshop upload args in expected order', () => {
@@ -97,6 +98,11 @@ describe('steamcmd runtime helpers', () => {
       code: 'auth',
       message: 'Saved Steam session is not available. Enter password to sign in again.'
     })
+  })
+
+  it('treats post-login progress lines as login success even without explicit ok suffix', () => {
+    expect(isLoginSuccessLine('Waiting for user info...')).toBe(true)
+    expect(isLoginSuccessLine('Waiting for compat in post-logon...')).toBe(true)
   })
 
   it('uses a longer timeout for full logins than stored-session reuse', () => {

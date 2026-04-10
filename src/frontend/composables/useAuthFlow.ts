@@ -611,7 +611,11 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       steamGuardCode.value = ''
       clearQueuedOtp()
       steamGuardPromptType.value = 'waiting'
-      activeChallengeMode.value = preferredAuthMode.value === 'otp' ? 'otp' : 'none'
+      activeChallengeMode.value = isStoredSessionLoginAttempt.value
+        ? 'none'
+        : preferredAuthMode.value === 'otp'
+          ? 'otp'
+          : 'none'
       authIssue.value = null
       statusMessage.value = isStoredSessionLoginAttempt.value
         ? 'Checking saved Steam session...'
@@ -647,7 +651,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
     if (
       event.line &&
-      /waiting for compat in post-logon|waiting for user info|logged in ok|login complete|successfully logged/i.test(event.line)
+      /waiting for compat in post-logon(?:.*ok)?|waiting for user info(?:.*ok)?|logged in ok|login complete|successfully logged/i.test(
+        event.line
+      )
     ) {
       steamGuardSessionId.value = event.runId
       steamGuardPromptType.value = 'steam_guard_approved'

@@ -387,7 +387,7 @@ export function extractXmlTagValue(xml: string, tag: string): string | undefined
 }
 
 export function isLoginSuccessLine(line: string): boolean {
-  return /waiting for user info.*ok|waiting for compat in post-logon.*ok|logged in ok|login complete|successfully logged/i.test(
+  return /waiting for user info(?:.*ok)?|waiting for compat in post-logon(?:.*ok)?|logged in ok|login complete|successfully logged/i.test(
     line
   )
 }

@@ -371,7 +371,7 @@ describe('App UI validation gates', () => {
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Steam app approval required')
+    expect(wrapper.text()).toContain('Steam app approval request sent')
     expect(wrapper.text()).toContain('Open Steam on your phone and approve this sign-in request.')
   })
 
@@ -618,6 +618,27 @@ describe('App UI validation gates', () => {
     )
   })
 
+  it('keeps saved-session login messaging generic before any steam guard challenge is requested', async () => {
+    workshop.getProfiles.mockResolvedValueOnce({
+      profiles: [],
+      rememberedUsername: 'alice',
+      rememberAuth: true,
+      hasStoredAuth: true,
+      preferredAuthMode: 'steam_guard_mobile'
+    })
+    workshop.login.mockImplementationOnce(async () => await new Promise(() => undefined))
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Fetching saved Steam session. Steam Guard may be required if Steam requests verification.')
+    expect(wrapper.text()).not.toContain('CHECK YOUR STEAM GUARD APP')
+    expect(wrapper.text()).not.toContain('Save OTP / Email code')
+  })
+
   it('shows dedicated logs section when login times out', async () => {
     const timeoutRun = {
       runId: '1700000000000-timeout',
@@ -743,7 +764,7 @@ describe('App UI validation gates', () => {
     await aboutButton?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Version: v0.1.0')
+    expect(wrapper.text()).toMatch(/Version:\s*v0\.1\.0/)
   })
 
   it('opens the signed-in settings stage and saves timeout settings', async () => {
@@ -888,7 +909,7 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).toContain('Sign-in request sent. You can enter OTP / Email code now')
   })
 
-  it('shows steam guard app note after sign-in request when mobile mode is selected', async () => {
+  it('keeps mobile mode sign-in in generic waiting copy before steam requests a challenge', async () => {
     workshop.login.mockImplementationOnce(async () => await new Promise(() => undefined))
 
     const wrapper = mount(App)
@@ -906,7 +927,9 @@ describe('App UI validation gates', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('CHECK YOUR STEAM GUARD APP')
+    expect(wrapper.text()).toContain('Waiting for Steam verification')
+    expect(wrapper.text()).toContain('Steam may request OTP / Email code or mobile approval based on account settings.')
+    expect(wrapper.text()).toContain('Check your Steam Guard app for an approval prompt.')
     expect(wrapper.text()).not.toContain('Save OTP / Email code')
   })
 
