@@ -61,7 +61,6 @@ describe('usePublishActions composable', () => {
       updateRequirements,
       hasPendingUpdateChanges: () => options?.hasPendingUpdateChanges ?? true,
       updateDraftCache,
-      normalizeError: (error) => ({ code: 'command_failed', message: error instanceof Error ? error.message : 'error' }),
       setStatusMessage: (message) => {
         statuses.push(message)
       },

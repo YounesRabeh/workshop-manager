@@ -21,24 +21,22 @@ import {
   useDrafts
 } from './composables/useDrafts'
 import { useAuthFlow } from './composables/useAuthFlow'
+import { useAdvancedSettings } from './composables/useAdvancedSettings'
 import { useAppBootstrap } from './composables/useAppBootstrap'
 import { usePublishActions } from './composables/usePublishActions'
+import { usePublishOrchestration } from './composables/usePublishOrchestration'
 import { useUiShell } from './composables/useUiShell'
 import { useUpdateDraftCoordinator } from './composables/useUpdateDraftCoordinator'
 import { useWorkshopItems } from './composables/useWorkshopItems'
 import './styles/themes/app.theme.css'
 import './components/publish/styles/publish-section.shared.css'
-import { PublishProgressTracker } from './utils/publish-progress-tracker'
 import { formatSizeLabel } from './utils/size-format'
 import type {
-  FlowStep,
   PublishChecklistItem,
   StagedContentFile
 } from './types/ui'
 
-const flowStep = ref<FlowStep>('mods')
 const appVersion = ref('dev')
-const publishProgress = new PublishProgressTracker()
 
 const {
   createDraft,
@@ -64,19 +62,22 @@ let showTimeoutLogsHandler: () => Promise<void> = async () => undefined
 let hideTimeoutLogsHandler: () => void = () => undefined
 let signedInHandler: () => Promise<void> = async () => undefined
 let signedOutHandler: () => void = () => undefined
+let openAdvancedOptionsHandler: (() => void) | null = null
 
 const authFlow = useAuthFlow({
   onShowTimeoutLogs: async () => showTimeoutLogsHandler(),
   onHideTimeoutLogs: () => hideTimeoutLogsHandler(),
   onSignedIn: async () => signedInHandler(),
-  onSignedOut: () => signedOutHandler()
+  onSignedOut: () => signedOutHandler(),
+  onSteamCmdPathRequired: () => {
+    openAdvancedOptionsHandler?.()
+  }
 })
 
 const {
   loginState,
   steamGuardCode,
   isPasswordPeek,
-  isWebApiKeyPeek,
   steamGuardPromptType,
   preferredAuthMode,
   activeChallengeMode,
@@ -85,15 +86,11 @@ const {
   isLoginSubmitting,
   statusMessage,
   authIssue,
-  isAdvancedOptionsOpen,
-  installLogPath,
   loginForm,
-  advancedSettings,
   accountDisplayName,
   accountProfileImageUrl,
   isAuthenticated,
   canAccessMods,
-  loginHeaderStatusMessage,
   normalizeError,
   canUseStoredSessionForLogin,
   setLoginUsername,
@@ -102,22 +99,10 @@ const {
   setRememberAuth,
   setPreferredAuthMode,
   setPasswordPeek,
-  setWebApiKeyPeek,
-  setWebApiKey,
-  setSteamCmdManualPath,
-  setLoginTimeoutMs,
-  setStoredSessionTimeoutMs,
-  setWorkshopTimeoutMs,
-  toggleAdvancedOptions,
   setSteamGuardCode,
-  ensureSteamCmdInstalled,
-  openInstallLog,
   refreshRememberedLoginState,
-  loadAdvancedSettings,
-  pickSteamCmdManualPath,
-  saveAdvancedSettings,
-  clearSavedWebApiKey,
   clearStoredSession,
+  refreshCurrentProfile,
   loadAppVersion,
   login,
   signOut,
@@ -125,6 +110,75 @@ const {
   submitSteamGuardCode,
   handleRunEvent: handleAuthRunEvent
 } = authFlow
+
+const isWebApiKeyPeek = ref(false)
+
+function setWebApiKeyPeek(value: boolean): void {
+  isWebApiKeyPeek.value = value
+}
+
+let canAccessUpdateHandler: () => boolean = () => false
+let selectedWorkshopItemIdHandler: () => string = () => ''
+let updateDraftPublishedFileIdHandler: () => string = () => ''
+let setUpdateDraftPublishedFileIdHandler: (value: string) => void = () => undefined
+let signedInRefreshHandler: () => Promise<void> = async () => undefined
+let signedOutResetHandler: () => void = () => undefined
+
+const {
+  flowStep,
+  publishProgressVisible,
+  publishProgressPercent,
+  publishProgressLabel,
+  publishProgressTitle,
+  goToStep,
+  handlePublishRunEvent,
+  handleSignedIn,
+  handleSignedOut,
+  setFlowStep,
+  destroy: destroyPublishOrchestration
+} = usePublishOrchestration({
+  isAuthenticated: () => isAuthenticated.value,
+  canAccessUpdate: () => canAccessUpdateHandler(),
+  getSelectedWorkshopItemId: () => selectedWorkshopItemIdHandler(),
+  getUpdateDraftPublishedFileId: () => updateDraftPublishedFileIdHandler(),
+  setUpdateDraftPublishedFileId: (value) => {
+    setUpdateDraftPublishedFileIdHandler(value)
+  },
+  setStatusMessage: (message) => {
+    statusMessage.value = message
+  },
+  onSignedInRefresh: async () => signedInRefreshHandler(),
+  onSignedOutReset: () => signedOutResetHandler()
+})
+
+const {
+  isSteamCmdDetected,
+  isAdvancedOptionsOpen,
+  installLogPath,
+  advancedSettings,
+  setWebApiKey,
+  setSteamCmdManualPath,
+  setLoginTimeoutMs,
+  setStoredSessionTimeoutMs,
+  setWorkshopTimeoutMs,
+  toggleAdvancedOptions,
+  openAdvancedOptions,
+  ensureSteamCmdInstalled,
+  openInstallLog,
+  loadAdvancedSettings,
+  pickSteamCmdManualPath,
+  saveAdvancedSettings,
+  clearSavedWebApiKey
+} = useAdvancedSettings({
+  normalizeError,
+  setStatusMessage: (message) => {
+    statusMessage.value = message
+  }
+})
+
+openAdvancedOptionsHandler = openAdvancedOptions
+
+const loginHeaderStatusMessage = computed(() => statusMessage.value || (isSteamCmdDetected.value ? 'SteamCMD found' : ''))
 
 const uiShell = useUiShell({
   flowStep,
@@ -191,6 +245,12 @@ const onChangeWorkshopVisibilityFilter = workshopStore.onChangeWorkshopVisibilit
 const selectedWorkshopItem = workshopStore.selectedWorkshopItem
 const resetWorkshopState = workshopStore.resetWorkshopState
 const canAccessUpdate = computed(() => canAccessMods.value && selectedWorkshopItem.value !== undefined)
+canAccessUpdateHandler = () => canAccessUpdate.value
+selectedWorkshopItemIdHandler = () => selectedWorkshopItemId.value
+updateDraftPublishedFileIdHandler = () => updateDraft.publishedFileId
+setUpdateDraftPublishedFileIdHandler = (value: string) => {
+  updateDraft.publishedFileId = value
+}
 const createRequirements = computed(() => evaluateCreateRequirements(createDraft))
 const updateRequirements = computed(() => evaluateUpdateRequirements(updateDraft))
 const workshopItemsEmptyStateMessage = computed(() => {
@@ -227,7 +287,6 @@ const publishActions = usePublishActions({
   updateRequirements,
   hasPendingUpdateChanges: () => hasPendingUpdateChangesHandler(),
   updateDraftCache,
-  normalizeError,
   setStatusMessage: (message) => {
     statusMessage.value = message
   },
@@ -300,55 +359,31 @@ const createChecklist = computed<PublishChecklistItem[]>(() => {
   ]
 })
 
-const publishProgressVisible = publishProgress.visible
-const publishProgressPercent = publishProgress.percent
-const publishProgressLabel = publishProgress.label
-const publishProgressTitle = publishProgress.title
-
 showTimeoutLogsHandler = async () => {
   await uiShell.showTimeoutLogs()
 }
 hideTimeoutLogsHandler = () => {
   uiShell.showLoginLogs.value = false
 }
-signedInHandler = async () => {
-  flowStep.value = 'mods'
-  await Promise.all([loadWorkshopItems(), authFlow.refreshCurrentProfile()])
+signedInRefreshHandler = async () => {
+  await Promise.all([loadWorkshopItems(), refreshCurrentProfile()])
 }
-signedOutHandler = () => {
-  publishProgress.reset()
+signedOutResetHandler = () => {
   resetPublishActionState()
   resetWorkshopState()
   resetDraftsState()
-  flowStep.value = 'mods'
 }
+signedInHandler = handleSignedIn
+signedOutHandler = handleSignedOut
 
 function handleRunEvent(event: RunEvent): void {
   handleAuthRunEvent(event)
-  publishProgress.handleRunEvent(event)
+  handlePublishRunEvent(event)
 }
 
 onUnmounted(() => {
-  publishProgress.destroy()
+  destroyPublishOrchestration()
 })
-
-function goToStep(step: FlowStep): void {
-  if (!isAuthenticated.value) {
-    statusMessage.value = 'Login required.'
-    return
-  }
-
-  if (step === 'update' && !canAccessUpdate.value) {
-    statusMessage.value = 'Select an item from Mod List first.'
-    return
-  }
-
-  if (step === 'update' && selectedWorkshopItemId.value.trim().length > 0 && updateDraft.publishedFileId.trim().length === 0) {
-    updateDraft.publishedFileId = selectedWorkshopItemId.value
-  }
-
-  flowStep.value = step
-}
 
 function setStagedContentFilesFromFolder(mode: 'create' | 'update', contentFolder: string, files: StagedContentFile[]): void {
   setStagedFilesForMode(mode, files)
@@ -430,7 +465,7 @@ function clearUpdateWorkspace(): void {
 
 async function openSettingsStage(): Promise<void> {
   await loadAdvancedSettings()
-  flowStep.value = 'settings'
+  setFlowStep('settings')
 }
 
 async function pickUpdatePreviewFile(): Promise<void> {

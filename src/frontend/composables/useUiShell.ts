@@ -5,6 +5,7 @@
  */
 import { ref, type Ref } from 'vue'
 import type { PersistedRunLog } from '@shared/contracts'
+import { logError, normalizeError } from '@shared/api-error-utils'
 import { createAppGlobalKeyDownHandler, createAppGlobalMouseDownHandler } from '../events/keyboard-events'
 import type { FlowStep } from '../types/ui'
 
@@ -63,7 +64,8 @@ export function useUiShell(options: UseUiShellOptions) {
         selectedRun.value = payload
         return
       }
-    } catch {
+    } catch (error) {
+      logError('useUiShell::selectRun', normalizeError(error))
       // Fall through to local list fallback.
     }
 
@@ -84,7 +86,8 @@ export function useUiShell(options: UseUiShellOptions) {
       }
 
       await selectRun(nextRunId)
-    } catch {
+    } catch (error) {
+      logError('useUiShell::refreshRunLogs', normalizeError(error))
       recentRuns.value = []
       selectedRunId.value = ''
       selectedRun.value = null
@@ -107,7 +110,8 @@ export function useUiShell(options: UseUiShellOptions) {
         return
       }
       await document.exitFullscreen()
-    } catch {
+    } catch (error) {
+      logError('useUiShell::toggleFullscreen', normalizeError(error))
       options.onFullscreenFailure?.()
     }
   }

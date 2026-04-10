@@ -4,6 +4,7 @@
  */
 import { computed, reactive, ref } from 'vue'
 import type { PreferredAuthMode as SharedPreferredAuthMode, RunEvent } from '@shared/contracts'
+import { logError, normalizeError as normalizeSharedError } from '@shared/api-error-utils'
 import type {
   ActiveChallengeMode,
   AuthIssue,
@@ -11,7 +12,7 @@ import type {
   PreferredAuthMode,
   SteamGuardPromptType
 } from '../types/ui'
-import { useAdvancedSettings } from './useAdvancedSettings'
+import { useStoredSessionManagement } from './useStoredSessionManagement'
 
 export interface ApiFailure {
   message: string
@@ -23,6 +24,7 @@ interface UseAuthFlowOptions {
   onHideTimeoutLogs: () => void
   onSignedIn: () => Promise<void>
   onSignedOut: () => void
+  onSteamCmdPathRequired?: () => void
 }
 
 export function useAuthFlow(options: UseAuthFlowOptions) {
@@ -31,15 +33,12 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   const steamGuardSessionId = ref<string | null>(null)
   const steamGuardCode = ref('')
   const isPasswordPeek = ref(false)
-  const isWebApiKeyPeek = ref(false)
   const steamGuardPromptType = ref<SteamGuardPromptType>('none')
   const preferredAuthMode = ref<PreferredAuthMode>('otp')
   const activeChallengeMode = ref<ActiveChallengeMode>('none')
   const queuedOtpCode = ref('')
   const queuedOtpRunId = ref<string | null>(null)
   const isStoredSessionLoginAttempt = ref(false)
-  const hasPersistedStoredSession = ref(false)
-  const canUseStoredSessionForCurrentLogin = ref(false)
   const isLoginSubmitting = ref(false)
   const statusMessage = ref<string>('')
   const authIssue = ref<AuthIssue | null>(null)
@@ -53,87 +52,35 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     rememberAuth: false
   })
 
-  function normalizeError(error: unknown): ApiFailure {
-    const fallback: ApiFailure = {
-      message: 'Unexpected error',
-      code: 'command_failed'
-    }
+  const {
+    hasPersistedStoredSession,
+    canUseStoredSessionForLogin,
+    applyRememberedProfileState,
+    markStoredSessionFromRememberAuth,
+    disableStoredSessionForCurrentLogin,
+    clearStoredSession: clearStoredSessionPersistedState
+  } = useStoredSessionManagement()
 
-    if (!error) {
-      return fallback
-    }
-
-    const extract = (input: string): ApiFailure => {
-      const withoutIpcPrefix = input.replace(/^Error invoking remote method '[^']+':\s*/i, '').trim()
-      const normalized = withoutIpcPrefix.replace(/^Error:\s*/i, '').trim()
-      const coded = normalized.match(/^\[(validation|install|auth|steam_guard|command_failed|timeout)\]\s*(.*)$/i)
-      if (coded) {
-        return {
-          code: coded[1].toLowerCase(),
-          message: coded[2].trim() || fallback.message
-        }
-      }
-      return {
-        code: fallback.code,
-        message: normalized || fallback.message
-      }
-    }
-
-    if (error instanceof Error) {
-      return extract(error.message)
-    }
-
-    if (typeof error === 'string') {
-      return extract(error)
-    }
-
-    if (typeof error !== 'object') {
-      return fallback
-    }
-
-    const maybe = error as Partial<ApiFailure> & { cause?: unknown }
-    if (maybe.cause && typeof maybe.cause === 'object') {
-      const nested = maybe.cause as Partial<ApiFailure>
-      if (typeof nested.message === 'string' && typeof nested.code === 'string') {
-        return { message: nested.message, code: nested.code }
-      }
-    }
-
+  function parseAndLogError(context: string, error: unknown): ApiFailure {
+    const parsed = normalizeSharedError(error)
+    logError(context, parsed)
     return {
-      message: maybe.message ?? fallback.message,
-      code: maybe.code ?? fallback.code
+      message: parsed.message,
+      code: parsed.code
     }
   }
 
-  const {
-    isSteamCmdDetected,
-    isAdvancedOptionsOpen,
-    installLogPath,
-    advancedSettings,
-    setWebApiKey,
-    setSteamCmdManualPath,
-    setLoginTimeoutMs,
-    setStoredSessionTimeoutMs,
-    setWorkshopTimeoutMs,
-    toggleAdvancedOptions,
-    openAdvancedOptions,
-    ensureSteamCmdInstalled,
-    openInstallLog,
-    loadAdvancedSettings,
-    pickSteamCmdManualPath,
-    saveAdvancedSettings,
-    clearSavedWebApiKey
-  } = useAdvancedSettings({
-    normalizeError,
-    setStatusMessage: (message) => {
-      statusMessage.value = message
+  function normalizeError(error: unknown): ApiFailure {
+    const parsed = normalizeSharedError(error)
+    return {
+      message: parsed.message,
+      code: parsed.code
     }
-  })
+  }
 
   const isAuthenticated = computed(() => loginState.value === 'signed_in')
   const canAccessMods = computed(() => loginState.value === 'signed_in')
   const accountDisplayName = computed(() => accountPersonaName.value || loginForm.username.trim() || 'Steam account')
-  const loginHeaderStatusMessage = computed(() => statusMessage.value || (isSteamCmdDetected.value ? 'SteamCMD found' : ''))
 
   function normalizePreferredAuthMode(mode: SharedPreferredAuthMode | undefined): PreferredAuthMode {
     return mode === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp'
@@ -228,10 +175,6 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     return error.code === 'auth' || error.code === 'timeout' || error.code === 'command_failed'
   }
 
-  function canUseStoredSessionForLogin(): boolean {
-    return canUseStoredSessionForCurrentLogin.value
-  }
-
   function isSteamCmdMissingConfigurationMessage(message: string): boolean {
     return (
       /steamcmd/i.test(message) &&
@@ -244,7 +187,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       return false
     }
 
-    openAdvancedOptions()
+    options.onSteamCmdPathRequired?.()
     statusMessage.value = 'SteamCMD not found. Advanced options opened. Add the SteamCMD executable path.'
     authIssue.value = null
     return true
@@ -277,10 +220,6 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     isPasswordPeek.value = value
   }
 
-  function setWebApiKeyPeek(value: boolean): void {
-    isWebApiKeyPeek.value = value
-  }
-
   function setSteamGuardCode(value: string): void {
     steamGuardCode.value = value
   }
@@ -298,8 +237,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     preferredAuthMode.value = normalizePreferredAuthMode(payload.preferredAuthMode)
     const hasStoredAuth = payload.hasStoredAuth === true
     loginForm.rememberAuth = payload.rememberAuth === true && hasStoredAuth
-    hasPersistedStoredSession.value = hasStoredAuth
-    canUseStoredSessionForCurrentLogin.value = hasStoredAuth
+    applyRememberedProfileState(hasStoredAuth)
     if (loginForm.rememberAuth) {
       loginForm.rememberUsername = true
     }
@@ -311,9 +249,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
 
     try {
-      await window.workshop.clearStoredSession()
-      hasPersistedStoredSession.value = false
-      canUseStoredSessionForCurrentLogin.value = false
+      await clearStoredSessionPersistedState()
       loginForm.rememberAuth = false
       loginForm.password = ''
       isPasswordPeek.value = false
@@ -327,7 +263,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       authIssue.value = null
       statusMessage.value = 'Saved session cleared. Enter password to sign in.'
     } catch (error) {
-      const parsed = normalizeError(error)
+      const parsed = parseAndLogError('useAuthFlow::clearStoredSession', error)
       statusMessage.value = `Clear session failed (${parsed.code}): ${parsed.message}`
     }
   }
@@ -343,8 +279,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     authIssue.value = null
     statusMessage.value = successMessage
     loginForm.password = ''
-    hasPersistedStoredSession.value = loginForm.rememberAuth
-    canUseStoredSessionForCurrentLogin.value = loginForm.rememberAuth
+    markStoredSessionFromRememberAuth(loginForm.rememberAuth)
     await options.onSignedIn()
   }
 
@@ -378,7 +313,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       })
       await finalizeSuccessfulLogin('Signed in with saved Steam session. Loading workshop items...')
     } catch (error) {
-      const parsed = normalizeError(error)
+      const parsed = parseAndLogError('useAuthFlow::tryAutoLoginWithStoredSession', error)
       if (parsed.code === 'timeout') {
         await options.onShowTimeoutLogs()
       }
@@ -392,7 +327,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         steamGuardSessionId.value = null
         clearQueuedOtp()
         authIssue.value = null
-        canUseStoredSessionForCurrentLogin.value = false
+        disableStoredSessionForCurrentLogin()
         statusMessage.value = 'Saved session expired. Enter password to sign in again.'
         return
       }
@@ -409,7 +344,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       const profile = await window.workshop.getCurrentProfile()
       accountPersonaName.value = profile.personaName?.trim() || ''
       accountProfileImageUrl.value = profile.avatarUrl?.trim() || null
-    } catch {
+    } catch (error) {
+      logError('useAuthFlow::refreshCurrentProfile', normalizeSharedError(error))
       accountPersonaName.value = ''
       accountProfileImageUrl.value = null
     }
@@ -422,7 +358,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       if (version) {
         appVersionRef.value = version
       }
-    } catch {
+    } catch (error) {
+      logError('useAuthFlow::loadAppVersion', normalizeSharedError(error))
       appVersionRef.value = 'dev'
     }
   }
@@ -478,7 +415,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
           : 'Steam login successful. Loading workshop items...'
       )
     } catch (error) {
-      const parsed = normalizeError(error)
+      const parsed = parseAndLogError('useAuthFlow::login', error)
       if (parsed.code === 'timeout') {
         await options.onShowTimeoutLogs()
       }
@@ -491,7 +428,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         return
       }
       if (isSavedSessionFallbackError(parsed) && usingSavedSession) {
-        canUseStoredSessionForCurrentLogin.value = false
+        disableStoredSessionForCurrentLogin()
         statusMessage.value = 'Saved session unavailable. Enter password to sign in again.'
         authIssue.value = null
         return
@@ -507,7 +444,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   async function signOut(): Promise<void> {
     try {
       await window.workshop.logout()
-    } catch {
+    } catch (error) {
+      logError('useAuthFlow::signOut', normalizeSharedError(error))
       // keep local sign out even if backend IPC fails
     }
 
@@ -538,7 +476,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
     try {
       await window.workshop.quitApp()
-    } catch {
+    } catch (error) {
+      logError('useAuthFlow::quitApp', normalizeSharedError(error))
       // no-op; app may already be closing
     }
   }
@@ -569,7 +508,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     try {
       await submitOtpCodeToSteam(runId, code)
     } catch (error) {
-      const parsed = normalizeError(error)
+      const parsed = parseAndLogError('useAuthFlow::submitQueuedOtpIfReady', error)
       statusMessage.value = `OTP / Email code failed (${parsed.code}): ${parsed.message}`
       authIssue.value = toAuthIssue(parsed)
       steamGuardCode.value = code
@@ -599,7 +538,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       steamGuardCode.value = ''
       clearQueuedOtp()
     } catch (error) {
-      const parsed = normalizeError(error)
+      const parsed = parseAndLogError('useAuthFlow::submitSteamGuardCode', error)
       statusMessage.value = `OTP / Email code failed (${parsed.code}): ${parsed.message}`
       authIssue.value = toAuthIssue(parsed)
     }
@@ -732,7 +671,6 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     steamGuardSessionId,
     steamGuardCode,
     isPasswordPeek,
-    isWebApiKeyPeek,
     steamGuardPromptType,
     preferredAuthMode,
     activeChallengeMode,
@@ -741,17 +679,12 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     isLoginSubmitting,
     statusMessage,
     authIssue,
-    isSteamCmdDetected,
-    isAdvancedOptionsOpen,
-    installLogPath,
     loginForm,
-    advancedSettings,
     accountPersonaName,
     accountProfileImageUrl,
     isAuthenticated,
     canAccessMods,
     accountDisplayName,
-    loginHeaderStatusMessage,
     normalizeError,
     toAuthIssue,
     canUseStoredSessionForLogin,
@@ -761,21 +694,8 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     setRememberAuth,
     setPreferredAuthMode,
     setPasswordPeek,
-    setWebApiKeyPeek,
-    setWebApiKey,
-    setSteamCmdManualPath,
-    setLoginTimeoutMs,
-    setStoredSessionTimeoutMs,
-    setWorkshopTimeoutMs,
-    toggleAdvancedOptions,
     setSteamGuardCode,
-    ensureSteamCmdInstalled,
-    openInstallLog,
     refreshRememberedLoginState,
-    loadAdvancedSettings,
-    pickSteamCmdManualPath,
-    saveAdvancedSettings,
-    clearSavedWebApiKey,
     clearStoredSession,
     tryAutoLoginWithStoredSession,
     refreshCurrentProfile,

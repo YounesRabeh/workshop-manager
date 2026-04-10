@@ -4,6 +4,7 @@
  * aggregates workshop listings from Steam Web API and Community pages, and normalizes merged results.
  */
 import type { SteamProfileSummary, WorkshopItemSummary } from '@shared/contracts'
+import { normalizeError } from '@shared/api-error-utils'
 import { AppError } from '@backend/utils/errors'
 import {
   extractMaxWorkshopPage,
@@ -20,10 +21,7 @@ interface WorkshopFetchContext {
 export type WorkshopWebApiAccessState = 'active' | 'configured_unavailable' | 'disabled'
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return 'unknown error'
+  return normalizeError(error).message
 }
 
 function unresolvedIdentityMessage(

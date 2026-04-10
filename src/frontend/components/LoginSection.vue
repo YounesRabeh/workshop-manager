@@ -5,6 +5,9 @@
 -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import LoginCredentialsSection from './login/LoginCredentialsSection.vue'
+import LoginSecuritySection from './login/LoginSecuritySection.vue'
+import LoginSessionSection from './login/LoginSessionSection.vue'
 import AdvancedSettingsPanel from './settings/AdvancedSettingsPanel.vue'
 import type {
   ActiveChallengeMode,
@@ -73,43 +76,6 @@ function authIssueClasses(tone: AuthIssueTone): string {
   return 'login-note-info'
 }
 
-function onSteamGuardInput(event: Event): void {
-  const target = event.target as HTMLInputElement | null
-  emit('update-steam-guard-code', target?.value ?? '')
-}
-
-function onUsernameInput(event: Event): void {
-  const target = event.target as HTMLInputElement | null
-  emit('update-username', target?.value ?? '')
-  onCredentialInput()
-}
-
-function onPasswordInput(event: Event): void {
-  const target = event.target as HTMLInputElement | null
-  emit('update-password', target?.value ?? '')
-  onCredentialInput()
-}
-
-function onRememberUsernameChange(event: Event): void {
-  const target = event.target as HTMLInputElement | null
-  emit('update-remember-username', target?.checked ?? false)
-}
-
-function onRememberAuthChange(event: Event): void {
-  const target = event.target as HTMLInputElement | null
-  emit('update-remember-auth', target?.checked ?? false)
-}
-
-function onPreferredAuthModeChange(event: Event): void {
-  const target = event.target as HTMLInputElement | null
-  emit('update-preferred-auth-mode', target?.value === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp')
-}
-
-function onWebApiKeyInput(event: Event): void {
-  const target = event.target as HTMLInputElement | null
-  emit('update-web-api-key', target?.value ?? '')
-}
-
 const isApiSectionExpanded = ref(false)
 
 function toggleApiSection(): void {
@@ -146,7 +112,7 @@ const webApiStatusLabel = computed(() => {
   if (!props.advancedSettings.secureStorageAvailable) {
     return 'Unavailable'
   }
-  return 'Optional'
+  return '(optional)'
 })
 
 const webApiStatusClass = computed(() => {
@@ -300,24 +266,24 @@ const securityCardClass = computed(() => {
   return 'login-security-card-neutral'
 })
 
-const usernameInputRef = ref<HTMLInputElement | null>(null)
-const passwordInputRef = ref<HTMLInputElement | null>(null)
-const rememberUsernameRef = ref<HTMLInputElement | null>(null)
-const rememberAuthRef = ref<HTMLInputElement | null>(null)
-const submitButtonRef = ref<HTMLButtonElement | null>(null)
+const loginFormRef = ref<HTMLFormElement | null>(null)
 const hasUserEditedCredentials = ref(false)
 const hasAppliedDefaultFocus = ref(false)
 const lastDefaultFocusTarget = ref<number | null>(null)
 
 function getLoginControl(index: number): HTMLElement | null {
-  const orderedControls: Array<HTMLElement | null> = [
-    usernameInputRef.value,
-    passwordInputRef.value,
-    rememberUsernameRef.value,
-    rememberAuthRef.value,
-    submitButtonRef.value
+  const orderedControlSelectors = [
+    '[data-login-control="username"]',
+    '[data-login-control="password"]',
+    '[data-login-control="remember-username"]',
+    '[data-login-control="remember-auth"]',
+    '[data-login-control="submit"]'
   ]
-  return orderedControls[index] ?? null
+  const selector = orderedControlSelectors[index]
+  if (!selector) {
+    return null
+  }
+  return loginFormRef.value?.querySelector(selector) ?? null
 }
 
 function focusLoginControl(index: number): void {
@@ -359,6 +325,26 @@ function applyDefaultFocus(): void {
 
 function onCredentialInput(): void {
   hasUserEditedCredentials.value = true
+}
+
+function onUsernameInput(value: string): void {
+  onCredentialInput()
+  emit('update-username', value)
+}
+
+function onPasswordInput(value: string): void {
+  onCredentialInput()
+  emit('update-password', value)
+}
+
+function onRememberUsernameChange(value: boolean): void {
+  onCredentialInput()
+  emit('update-remember-username', value)
+}
+
+function onRememberAuthChange(value: boolean): void {
+  onCredentialInput()
+  emit('update-remember-auth', value)
 }
 
 onMounted(() => {
@@ -431,217 +417,63 @@ watch(
           </button>
         </header>
 
-        <form class="login-form mt-5" @submit.prevent="emit('submit-login')">
+        <form ref="loginFormRef" class="login-form mt-5" @submit.prevent="emit('submit-login')">
           <div class="login-primary-grid">
-            <section class="login-block">
-              <p class="login-block-title">Credentials</p>
-              <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Account name</label>
-              <input
-                ref="usernameInputRef"
-                :value="loginForm.username"
-                class="login-input mt-1 w-full rounded px-3 py-2"
-                @keydown="onLoginControlArrowKey($event, 0)"
-                @input="onUsernameInput"
-              />
+            <LoginCredentialsSection
+              :login-form="loginForm"
+              :is-password-peek="isPasswordPeek"
+              :password-placeholder="passwordPlaceholder"
+              :advanced-settings="advancedSettings"
+              :is-web-api-key-peek="isWebApiKeyPeek"
+              :is-api-section-expanded="isApiSectionExpanded"
+              :api-section-toggle-label="apiSectionToggleLabel"
+              :web-api-status-label="webApiStatusLabel"
+              :web-api-status-class="webApiStatusClass"
+              :web-api-storage-hint="webApiStorageHint"
+              :is-web-api-key-save-blocked="isWebApiKeySaveBlocked"
+              :can-save-web-api-key="canSaveWebApiKey"
+              :can-clear-saved-web-api-key="canClearSavedWebApiKey"
+              :on-control-arrow-key="onLoginControlArrowKey"
+              @update-username="onUsernameInput"
+              @update-password="onPasswordInput"
+              @set-password-peek="emit('set-password-peek', $event)"
+              @update-web-api-key="emit('update-web-api-key', $event)"
+              @toggle-api-section="toggleApiSection"
+              @set-web-api-key-peek="emit('set-web-api-key-peek', $event)"
+              @save-advanced-settings="emit('save-advanced-settings')"
+              @clear-web-api-key="emit('clear-web-api-key')"
+            />
 
-              <label class="mt-3 block text-xs font-semibold uppercase tracking-wide text-slate-500">Password</label>
-              <div class="mt-1 flex items-center gap-2">
-                <input
-                  ref="passwordInputRef"
-                  :value="loginForm.password"
-                  :type="isPasswordPeek ? 'text' : 'password'"
-                  :placeholder="passwordPlaceholder"
-                  autocomplete="current-password"
-                  class="login-input w-full rounded px-3 py-2"
-                  @keydown="onLoginControlArrowKey($event, 1)"
-                  @input="onPasswordInput"
-                />
-                <button
-                  type="button"
-                  class="login-peek rounded px-3 py-2 text-xs font-semibold"
-                  :aria-pressed="isPasswordPeek ? 'true' : 'false'"
-                  @click="emit('set-password-peek', !isPasswordPeek)"
-                >
-                  {{ isPasswordPeek ? 'Hide' : 'Show' }}
-                </button>
-              </div>
-
-              <div class="login-api-card">
-                <div class="login-api-header">
-                  <div>
-                    <p class="login-api-title">Steam Web API Key</p>
-                    <p class="login-api-copy">
-                      Optional for normal login. Needed to access non-public Workshop items (friends-only, hidden, or unlisted).
-                    </p>
-                  </div>
-                  <div class="login-api-header-actions">
-                    <span class="advanced-badge" :class="webApiStatusClass">{{ webApiStatusLabel }}</span>
-                    <button
-                      type="button"
-                      class="login-peek login-api-toggle rounded px-3 py-2 text-xs font-semibold"
-                      :aria-expanded="isApiSectionExpanded ? 'true' : 'false'"
-                      @click="toggleApiSection"
-                    >
-                      {{ apiSectionToggleLabel }}
-                    </button>
-                  </div>
-                </div>
-
-                <div v-if="isApiSectionExpanded">
-                  <label class="advanced-label mt-3">Steam Web API Key</label>
-                  <div class="advanced-key-row">
-                    <input
-                      :type="isWebApiKeyPeek ? 'text' : 'password'"
-                      :value="advancedSettings.webApiKey"
-                      :placeholder="advancedSettings.hasWebApiKey ? 'Saved securely (enter new key to replace)' : 'Paste key...'"
-                      autocomplete="off"
-                      class="login-input advanced-input"
-                      @input="onWebApiKeyInput"
-                    />
-                    <button
-                      type="button"
-                      class="login-peek advanced-inline-button"
-                      @mouseenter="emit('set-web-api-key-peek', true)"
-                      @mouseleave="emit('set-web-api-key-peek', false)"
-                      @focus="emit('set-web-api-key-peek', true)"
-                      @blur="emit('set-web-api-key-peek', false)"
-                    >
-                      Show
-                    </button>
-                  </div>
-
-                  <p class="login-api-meta">{{ webApiStorageHint }}</p>
-                  <p v-if="isWebApiKeySaveBlocked" class="login-api-meta login-api-meta-warning">
-                    Secure storage is unavailable. Clear this field to continue without a key.
-                  </p>
-                  <p v-if="advancedSettings.hasWebApiKey" class="login-api-meta login-api-meta-success">
-                    Saved key detected and ready to use.
-                  </p>
-
-                  <div class="login-api-actions">
-                    <button
-                      type="button"
-                      class="login-submit rounded px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                      :disabled="!canSaveWebApiKey"
-                      @click="emit('save-advanced-settings')"
-                    >
-                      {{ advancedSettings.isSaving ? 'Saving...' : 'Save API Key' }}
-                    </button>
-                    <button
-                      type="button"
-                      class="login-peek rounded px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-                      :disabled="!canClearSavedWebApiKey"
-                      @click="emit('clear-web-api-key')"
-                    >
-                      Clear Saved Key
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section class="login-block">
-              <p class="login-block-title">Security</p>
-              <p class="login-block-copy">Choose your preferred method. Steam may request a different one for this login.</p>
-              <div class="login-mode-grid" role="radiogroup" aria-label="Preferred verification mode">
-                <label class="login-mode-option">
-                  <input
-                    type="radio"
-                    name="preferred-auth-mode"
-                    value="otp"
-                    :checked="preferredAuthMode === 'otp'"
-                    @keydown="toggleCheckboxOrRadioOnEnter($event)"
-                    @change="onPreferredAuthModeChange"
-                  />
-                  <span>
-                    <strong>OTP / Email code</strong>
-                    <small>Best for code-based verification prompts.</small>
-                  </span>
-                </label>
-                <label class="login-mode-option">
-                  <input
-                    type="radio"
-                    name="preferred-auth-mode"
-                    value="steam_guard_mobile"
-                    :checked="preferredAuthMode === 'steam_guard_mobile'"
-                    @keydown="toggleCheckboxOrRadioOnEnter($event)"
-                    @change="onPreferredAuthModeChange"
-                  />
-                  <span>
-                    <strong>Steam app approval</strong>
-                    <small>Best if you approve sign-ins in Steam Mobile.</small>
-                  </span>
-                </label>
-              </div>
-
-              <div class="login-security-card mt-3 px-3 py-3" :class="securityCardClass">
-                <p class="text-sm font-semibold">{{ securityStatusTitle }}</p>
-                <p class="mt-1 text-xs">{{ securityStatusCopy }}</p>
-
-                <div v-if="shouldShowOtpEntry" class="mt-3">
-                  <label class="block text-[11px] font-semibold uppercase tracking-[0.08em]">OTP / Email code</label>
-                  <input
-                    :value="steamGuardCode"
-                    class="login-input mt-1 w-full rounded px-2 py-2"
-                    @keydown.enter.prevent="emit('submit-guard-code')"
-                    @input="onSteamGuardInput"
-                  />
-                  <button
-                    type="button"
-                    class="login-submit mt-2 w-full rounded px-2 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="!canSubmitOtpCode"
-                    @click="emit('submit-guard-code')"
-                  >
-                    {{ otpSubmitLabel }}
-                  </button>
-                </div>
-              </div>
-            </section>
+            <LoginSecuritySection
+              :preferred-auth-mode="preferredAuthMode"
+              :security-status-title="securityStatusTitle"
+              :security-status-copy="securityStatusCopy"
+              :security-card-class="securityCardClass"
+              :should-show-otp-entry="shouldShowOtpEntry"
+              :steam-guard-code="steamGuardCode"
+              :can-submit-otp-code="canSubmitOtpCode"
+              :otp-submit-label="otpSubmitLabel"
+              @update-preferred-auth-mode="emit('update-preferred-auth-mode', $event)"
+              @update-steam-guard-code="emit('update-steam-guard-code', $event)"
+              @submit-guard-code="emit('submit-guard-code')"
+            />
           </div>
 
           <div class="login-secondary-grid">
-            <section class="login-block">
-              <p class="login-block-title">Session</p>
-              <label class="mt-1 flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  ref="rememberUsernameRef"
-                  :checked="loginForm.rememberUsername"
-                  type="checkbox"
-                  @keydown="onLoginControlArrowKey($event, 2)"
-                  @change="onRememberUsernameChange"
-                />
-                Remember account name
-              </label>
-
-              <label class="mt-2 flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  ref="rememberAuthRef"
-                  :checked="loginForm.rememberAuth"
-                  type="checkbox"
-                  @keydown="onLoginControlArrowKey($event, 3)"
-                  @change="onRememberAuthChange"
-                />
-                Keep me signed in on this device
-              </label>
-              <p class="mt-1 text-[11px] text-slate-500">
-                Uses SteamCMD cached login session. Password is never stored by this app.
-              </p>
-              <p v-if="missingStoredSessionHint" class="mt-1 text-[11px] text-slate-500">
-                {{ missingStoredSessionHint }}
-              </p>
-              <button
-                type="button"
-                class="login-peek mt-2 w-full rounded px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="isLoginSubmitting || !canClearStoredSession"
-                @click="emit('clear-stored-session')"
-              >
-                Clear saved session
-              </button>
-            </section>
+            <LoginSessionSection
+              :login-form="loginForm"
+              :is-login-submitting="isLoginSubmitting"
+              :can-clear-stored-session="canClearStoredSession"
+              :missing-stored-session-hint="missingStoredSessionHint"
+              :on-control-arrow-key="onLoginControlArrowKey"
+              @update-remember-username="onRememberUsernameChange"
+              @update-remember-auth="onRememberAuthChange"
+              @clear-stored-session="emit('clear-stored-session')"
+            />
 
             <section class="login-block login-actions-block">
               <button
-                ref="submitButtonRef"
+                data-login-control="submit"
                 type="submit"
                 class="login-submit w-full rounded px-3 py-2 text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="!canSubmitLogin"

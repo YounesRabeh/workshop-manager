@@ -5,16 +5,12 @@
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { UploadDraft, WorkshopItemSummary } from '@shared/contracts'
+import { logError, normalizeError } from '@shared/api-error-utils'
 import {
   visibilityLabel,
   type PublishVisibility
 } from '../components/publish/model/visibility'
 import type { UploadDraftState } from '../types/ui'
-
-interface ApiFailure {
-  message: string
-  code: string
-}
 
 interface ToastInput {
   tone: 'success' | 'error' | 'warning' | 'info'
@@ -42,7 +38,6 @@ interface UsePublishActionsOptions {
   updateRequirements: ComputedRef<RequirementsResult>
   hasPendingUpdateChanges: () => boolean
   updateDraftCache: Ref<Record<string, UploadDraftState>>
-  normalizeError: (error: unknown) => ApiFailure
   setStatusMessage: (message: string) => void
   showToast: (toast: ToastInput) => void
   onSelectWorkshopItem: (item: WorkshopItemSummary) => void
@@ -174,7 +169,8 @@ export function usePublishActions(options: UsePublishActionsOptions) {
   }
 
   function handleActionFailure(operation: 'upload' | 'update' | 'visibility', error: unknown): void {
-    const parsed = options.normalizeError(error)
+    const parsed = normalizeError(error)
+    logError(`usePublishActions::${operation}`, parsed)
     options.setStatusMessage(actionFailureStatus(operation))
     options.showToast({
       tone: 'error',
@@ -215,7 +211,8 @@ export function usePublishActions(options: UsePublishActionsOptions) {
         await refreshWorkshopItems()
         options.setStatusMessage('Upload completed successfully. Mod list refreshed.')
       } catch (refreshError) {
-        const parsed = options.normalizeError(refreshError)
+        const parsed = normalizeError(refreshError)
+        logError('usePublishActions::upload::refreshWorkshopItems', parsed)
         options.setStatusMessage(`Upload completed, but mod list refresh failed (${parsed.code}): ${parsed.message}`)
       }
     } catch (error) {
@@ -284,7 +281,8 @@ export function usePublishActions(options: UsePublishActionsOptions) {
         })
         options.setStatusMessage('Update completed successfully. Update page refreshed.')
       } catch (refreshError) {
-        const parsed = options.normalizeError(refreshError)
+        const parsed = normalizeError(refreshError)
+        logError('usePublishActions::update::refreshWorkshopItems', parsed)
         options.setStatusMessage(`Update completed, but refresh failed (${parsed.code}): ${parsed.message}`)
       }
     } catch (error) {

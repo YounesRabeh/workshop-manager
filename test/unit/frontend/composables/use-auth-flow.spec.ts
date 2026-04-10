@@ -248,34 +248,24 @@ describe('useAuthFlow composable', () => {
     expect(onSignedOut).toHaveBeenCalledTimes(1)
   })
 
-  it('picks a manual SteamCMD path into advanced settings', async () => {
-    const flow = useAuthFlow({
-      onShowTimeoutLogs: vi.fn(async () => undefined),
-      onHideTimeoutLogs: vi.fn(),
-      onSignedIn: vi.fn(async () => undefined),
-      onSignedOut: vi.fn()
-    })
-
-    await flow.pickSteamCmdManualPath()
-
-    expect(workshop.pickSteamCmdExecutable).toHaveBeenCalledTimes(1)
-    expect(flow.advancedSettings.steamCmdManualPath).toBe('/tools/steamcmd.sh')
-  })
-
-  it('loads install log path when SteamCMD install fails', async () => {
-    workshop.ensureSteamCmdInstalled.mockRejectedValueOnce(new Error('[install] SteamCMD was downloaded but executable validation failed'))
+  it('notifies app shell to open advanced options when SteamCMD path is missing', async () => {
+    workshop.login.mockRejectedValueOnce(new Error('[install] SteamCMD executable is not configured yet'))
+    const onSteamCmdPathRequired = vi.fn()
 
     const flow = useAuthFlow({
       onShowTimeoutLogs: vi.fn(async () => undefined),
       onHideTimeoutLogs: vi.fn(),
       onSignedIn: vi.fn(async () => undefined),
-      onSignedOut: vi.fn()
+      onSignedOut: vi.fn(),
+      onSteamCmdPathRequired
     })
 
-    await flow.ensureSteamCmdInstalled()
+    flow.loginForm.username = 'alice'
+    flow.loginForm.password = 'secret'
+    await flow.login()
 
-    expect(workshop.getInstallLog).toHaveBeenCalledTimes(1)
-    expect(flow.installLogPath.value).toBe('/tmp/steamcmd-install.log')
+    expect(onSteamCmdPathRequired).toHaveBeenCalledTimes(1)
+    expect(flow.statusMessage.value).toBe('SteamCMD not found. Advanced options opened. Add the SteamCMD executable path.')
   })
 
   it('hydrates remembered username state from profiles payload', async () => {

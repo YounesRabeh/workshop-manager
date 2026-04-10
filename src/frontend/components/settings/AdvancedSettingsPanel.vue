@@ -142,7 +142,7 @@ const webApiStatusLabel = computed(() => {
   if (!props.advancedSettings.secureStorageAvailable) {
     return 'Unavailable'
   }
-  return 'Optional'
+  return '(optional)'
 })
 
 const webApiStatusClass = computed(() => {
@@ -266,12 +266,15 @@ function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string
         <div class="advanced-card-header">
           <div>
             <h3 class="advanced-card-title">Steam Web API Key</h3>
-            <p class="advanced-card-copy">Save a Steam Web API key for API-backed lookups and store it securely when supported.</p>
+            <p class="advanced-card-copy">To fully access this app's functionality.</p>
           </div>
           <span class="advanced-badge" :class="webApiStatusClass">{{ webApiStatusLabel }}</span>
         </div>
 
         <label class="advanced-label mt-4">Steam Web API Key</label>
+        <p class="text-xs text-slate-400 mb-2">
+          <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300">Get your free Steam API key →</a>
+        </p>
         <div class="advanced-key-row">
           <input
             :type="isWebApiKeyPeek ? 'text' : 'password'"
@@ -400,12 +403,15 @@ function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string
         <div class="advanced-card-header">
           <div>
             <h3 class="advanced-card-title">Steam Web API Key</h3>
-            <p class="advanced-card-copy">Save a Steam Web API key for API-backed lookups and store it securely when supported.</p>
+            <p class="advanced-card-copy">To fully access this app's functionality.</p>
           </div>
           <span class="advanced-badge" :class="webApiStatusClass">{{ webApiStatusLabel }}</span>
         </div>
 
         <label class="advanced-label mt-4">Steam Web API Key</label>
+        <p class="text-xs text-slate-400 mb-2">
+          <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300">Get your free Steam API key →</a>
+        </p>
         <div class="advanced-key-row">
           <input
             :type="isWebApiKeyPeek ? 'text' : 'password'"

@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 import extractZip from 'extract-zip'
 import type { InstallLogSnapshot, InstallStatus } from '@shared/contracts'
+import { logError, normalizeError } from '@shared/api-error-utils'
 import { AppError } from '@backend/utils/errors'
 import {
   getSteamCmdPlatformBehavior,
@@ -22,7 +23,7 @@ function toInstallError(prefix: string, error: unknown): AppError {
     return error
   }
 
-  const message = error instanceof Error ? error.message : String(error)
+  const message = normalizeError(error).message
   return new AppError('install', `${prefix}: ${message}`)
 }
 
@@ -48,10 +49,7 @@ function formatInstallLogLine(message: string): string {
 }
 
 function describeUnknownError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error)
+  return normalizeError(error).message
 }
 
 async function findExecutableInDir(
@@ -441,6 +439,7 @@ export class SteamCmdInstallManager {
     } catch (error) {
       await this.appendInstallLog(`Install failed: ${describeUnknownError(error)}`)
       await this.logInstallDirectorySnapshot('Install directory at failure')
+      logError('SteamCmdInstallManager::ensureInstalled', normalizeError(error))
       throw error
     }
   }
