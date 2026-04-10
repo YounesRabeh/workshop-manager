@@ -165,18 +165,16 @@ const shouldShowInstallLogButton = computed(() => {
   return /install error/i.test(props.statusMessage) || props.installLogPath.trim().length > 0
 })
 
-const isStatusError = computed(() => {
-  return /failed|failure|error|incorrect|invalid|denied|timed out|timeout|unavailable|blocked|could not|not available|not found/i.test(
-    props.statusMessage
-  )
+const isHeaderStatusError = computed(() => {
+  return /not found/i.test(props.loginHeaderStatusMessage)
 })
 
 const statusIcon = computed(() => {
-  return isStatusError.value ? '✕' : '✓'
+  return isHeaderStatusError.value ? '✕' : '✓'
 })
 
 const statusClass = computed(() => {
-  return isStatusError.value ? 'login-status-error' : 'login-status-ok'
+  return isHeaderStatusError.value ? 'login-status-error' : 'login-status-ok'
 })
 
 const isOtpChallengeActive = computed(() => props.activeChallengeMode === 'otp')
