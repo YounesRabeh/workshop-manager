@@ -1,7 +1,7 @@
 {
   "name": "workshop-manager",
   "productName": "Workshop Manager",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Create and update items for Steam's Workshop.",
   "author": "Younes Rabeh",
   "license": "MIT",

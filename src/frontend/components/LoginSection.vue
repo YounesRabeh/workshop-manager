@@ -216,7 +216,7 @@ const securityStatusTitle = computed(() => {
     return 'OTP / Email code required'
   }
   if (isMobileChallengeActive.value) {
-    return 'Auth received'
+    return 'Signing in ...'
   }
   if (isStoredSessionFetching.value) {
     return 'Fetching saved session'
@@ -228,6 +228,9 @@ const securityStatusTitle = computed(() => {
 })
 
 const securityStatusCallout = computed(() => {
+  if (props.steamGuardPromptType === 'steam_guard_approved' || isMobileChallengeActive.value) {
+    return 'AUTH APPROVED'
+  }
   if (
     !isStoredSessionFetching.value &&
     (props.steamGuardPromptType === 'waiting' || props.isLoginSubmitting) &&
@@ -246,7 +249,7 @@ const securityStatusCopy = computed(() => {
     return 'Enter the OTP / Email code sent by Steam to continue.'
   }
   if (isMobileChallengeActive.value) {
-    return 'Open Steam on your phone and approve this sign-in request.'
+    return 'Auth request approved. Finalizing sign-in now.'
   }
   if (isStoredSessionFetching.value) {
     return 'Fetching saved Steam session. Steam Guard may be required if Steam requests verification.'
