@@ -116,6 +116,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     setStoredSessionTimeoutMs,
     setWorkshopTimeoutMs,
     toggleAdvancedOptions,
+    openAdvancedOptions,
     ensureSteamCmdInstalled,
     openInstallLog,
     loadAdvancedSettings,
@@ -132,7 +133,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   const isAuthenticated = computed(() => loginState.value === 'signed_in')
   const canAccessMods = computed(() => loginState.value === 'signed_in')
   const accountDisplayName = computed(() => accountPersonaName.value || loginForm.username.trim() || 'Steam account')
-  const loginHeaderStatusMessage = computed(() => statusMessage.value || (isSteamCmdDetected.value ? 'SteamCMD found ✓' : ''))
+  const loginHeaderStatusMessage = computed(() => statusMessage.value || (isSteamCmdDetected.value ? 'SteamCMD found' : ''))
 
   function normalizePreferredAuthMode(mode: SharedPreferredAuthMode | undefined): PreferredAuthMode {
     return mode === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp'
@@ -229,6 +230,24 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
   function canUseStoredSessionForLogin(): boolean {
     return canUseStoredSessionForCurrentLogin.value
+  }
+
+  function isSteamCmdMissingConfigurationMessage(message: string): boolean {
+    return (
+      /steamcmd/i.test(message) &&
+      /(not found|not configured|missing|no such file|cannot find|executable|path)/i.test(message)
+    )
+  }
+
+  function handleSteamCmdMissingStatus(message: string): boolean {
+    if (!isSteamCmdMissingConfigurationMessage(message)) {
+      return false
+    }
+
+    openAdvancedOptions()
+    statusMessage.value = 'SteamCMD not found. Advanced options opened. Add the SteamCMD executable path.'
+    authIssue.value = null
+    return true
   }
 
   function setLoginUsername(value: string): void {
@@ -363,6 +382,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       if (parsed.code === 'timeout') {
         await options.onShowTimeoutLogs()
       }
+      if (handleSteamCmdMissingStatus(parsed.message)) {
+        return
+      }
       if (isSavedSessionFallbackError(parsed)) {
         activeLoginRunId.value = null
         steamGuardPromptType.value = 'none'
@@ -465,6 +487,9 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       activeLoginRunId.value = null
       steamGuardSessionId.value = null
       clearQueuedOtp()
+      if (handleSteamCmdMissingStatus(parsed.message)) {
+        return
+      }
       if (isSavedSessionFallbackError(parsed) && usingSavedSession) {
         canUseStoredSessionForCurrentLogin.value = false
         statusMessage.value = 'Saved session unavailable. Enter password to sign in again.'

@@ -66,6 +66,17 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     isAdvancedOptionsOpen.value = !isAdvancedOptionsOpen.value
   }
 
+  function openAdvancedOptions(): void {
+    isAdvancedOptionsOpen.value = true
+  }
+
+  function isSteamCmdMissingConfigurationMessage(message: string): boolean {
+    return (
+      /steamcmd/i.test(message) &&
+      /(not found|not configured|missing|no such file|cannot find|executable|path)/i.test(message)
+    )
+  }
+
   function millisecondsToSecondsString(value: number): string {
     if (value === STEAMCMD_TIMEOUT_DISABLED_VALUE) {
       return String(STEAMCMD_TIMEOUT_DISABLED_VALUE)
@@ -196,7 +207,12 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
       const parsed = options.normalizeError(error)
       isSteamCmdDetected.value = false
       advancedSettings.steamCmdInstalled = false
-      options.setStatusMessage(`Install error (${parsed.code}): ${parsed.message}`)
+      if (isSteamCmdMissingConfigurationMessage(parsed.message)) {
+        openAdvancedOptions()
+        options.setStatusMessage('SteamCMD not found. Advanced options opened. Add the SteamCMD executable path.')
+      } else {
+        options.setStatusMessage(`Install error (${parsed.code}): ${parsed.message}`)
+      }
       await loadInstallLogPath()
     }
   }
@@ -274,7 +290,12 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
       })
       applyAdvancedSettings(payload)
       isSteamCmdDetected.value = payload.steamCmdInstalled
-      options.setStatusMessage(payload.steamCmdInstalled ? 'SteamCMD is ready.' : 'SteamCMD executable is not configured yet.')
+      if (payload.steamCmdInstalled) {
+        options.setStatusMessage('SteamCMD is ready.')
+      } else {
+        openAdvancedOptions()
+        options.setStatusMessage('SteamCMD not found. Advanced options opened. Add the SteamCMD executable path.')
+      }
       advancedSettings.webApiKey = ''
       advancedSettings.statusMessage = 'Settings saved.'
       scheduleSuccessStatusClear('Settings saved.')
@@ -321,6 +342,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     setStoredSessionTimeoutMs,
     setWorkshopTimeoutMs,
     toggleAdvancedOptions,
+    openAdvancedOptions,
     ensureSteamCmdInstalled,
     openInstallLog,
     loadAdvancedSettings,

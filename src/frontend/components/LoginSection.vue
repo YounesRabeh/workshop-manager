@@ -198,6 +198,20 @@ const shouldShowInstallLogButton = computed(() => {
   return /install error/i.test(props.statusMessage) || props.installLogPath.trim().length > 0
 })
 
+const isStatusError = computed(() => {
+  return /failed|failure|error|incorrect|invalid|denied|timed out|timeout|unavailable|blocked|could not|not available|not found/i.test(
+    props.statusMessage
+  )
+})
+
+const statusIcon = computed(() => {
+  return isStatusError.value ? '✕' : '✓'
+})
+
+const statusClass = computed(() => {
+  return isStatusError.value ? 'login-status-error' : 'login-status-ok'
+})
+
 const isOtpChallengeActive = computed(() => props.activeChallengeMode === 'otp')
 const isMobileChallengeActive = computed(() => props.activeChallengeMode === 'steam_guard_mobile')
 const isStoredSessionFetching = computed(() => {
@@ -403,11 +417,9 @@ watch(
         <header class="login-header">
           <h2 class="login-title">Sign in</h2>
           <p class="login-subtitle">Use your Steam account to unlock mod management.</p>
-          <p v-if="statusMessage" class="login-status">
-            <span v-if="/SteamCMD|ready|configured/i.test(statusMessage)" class="text-green-400">
-              ✓ {{ statusMessage }}
-            </span>
-            <span v-else>{{ statusMessage }}</span>
+          <p v-if="statusMessage" class="login-status" :class="statusClass">
+            <span>{{ statusMessage }}</span>
+            <span class="login-status-icon" aria-hidden="true">{{ statusIcon }}</span>
           </p>
           <button
             v-if="shouldShowInstallLogButton"
