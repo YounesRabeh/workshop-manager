@@ -21,6 +21,18 @@ interface SteamCmdProcessManagerDeps {
 class SteamCmdProcessManager {
   constructor(private readonly deps: SteamCmdProcessManagerDeps) {}
 
+  private buildChildProcessEnv(): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = { ...process.env }
+    if (this.deps.platformBehavior.profile === 'linux') {
+      const isolatedHome = this.deps.runtimeDir
+      env.HOME = isolatedHome
+      env.XDG_CONFIG_HOME = isolatedHome
+      env.XDG_DATA_HOME = isolatedHome
+      env.XDG_CACHE_HOME = `${isolatedHome}/.cache`
+    }
+    return env
+  }
+
   hasPersistentProcess(): boolean {
     return this.deps.state.persistentProcess !== null
   }
@@ -84,7 +96,8 @@ class SteamCmdProcessManager {
       cwd: this.deps.runtimeDir,
       stdio: 'pipe' as const,
       shell: this.deps.platformBehavior.useShellHost,
-      windowsHide: this.deps.platformBehavior.hideWindowsConsole
+      windowsHide: this.deps.platformBehavior.hideWindowsConsole,
+      env: this.buildChildProcessEnv()
     }
   }
 }

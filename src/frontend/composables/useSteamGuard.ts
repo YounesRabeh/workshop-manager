@@ -33,6 +33,10 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
     return queuedOtpCode.value.trim().length > 0
   }
 
+  function isNoPendingPromptError(message: string): boolean {
+    return /no steam guard prompt is currently waiting for this session/i.test(message)
+  }
+
   function setChallengeState(mode: ActiveChallengeMode): void {
     activeChallengeMode.value = mode
     if (mode === 'otp') {
@@ -100,12 +104,18 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
 
     const code = queuedOtpCode.value.trim()
     clearQueuedOtp()
-    steamGuardCode.value = ''
 
     try {
       await submitOtpCodeToSteam(runId, code)
     } catch (error) {
       const parsed = options.parseAndLogError('useAuthFlow::submitQueuedOtpIfReady', error)
+      if (options.isLoginSubmitting.value && isNoPendingPromptError(parsed.message)) {
+        queuedOtpCode.value = code
+        queuedOtpRunId.value = runId
+        options.statusMessage.value = 'OTP / Email code saved. Waiting for Steam challenge...'
+        options.authIssue.value = null
+        return
+      }
       options.statusMessage.value = `OTP / Email code failed (${parsed.code}): ${parsed.message}`
       options.authIssue.value = options.toAuthIssue(parsed)
       steamGuardCode.value = code
@@ -139,10 +149,16 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
 
     try {
       await submitOtpCodeToSteam(sessionId, code)
-      steamGuardCode.value = ''
       clearQueuedOtp()
     } catch (error) {
       const parsed = options.parseAndLogError('useAuthFlow::submitSteamGuardCode', error)
+      if (options.isLoginSubmitting.value && isNoPendingPromptError(parsed.message)) {
+        queuedOtpCode.value = code
+        queuedOtpRunId.value = sessionId
+        options.statusMessage.value = 'OTP / Email code saved. Waiting for Steam challenge...'
+        options.authIssue.value = null
+        return
+      }
       options.statusMessage.value = `OTP / Email code failed (${parsed.code}): ${parsed.message}`
       options.authIssue.value = options.toAuthIssue(parsed)
     }

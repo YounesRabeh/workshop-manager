@@ -517,7 +517,7 @@ async function pickUpdatePreviewFile(): Promise<void> {
         :steam-guard-code="steamGuardCode"
         :is-stored-session-login-attempt="isStoredSessionLoginAttempt"
         :can-clear-stored-session="hasPersistedStoredSession"
-        :can-use-stored-session-for-login="canUseStoredSessionForLogin()"
+        :can-use-stored-session-for-login="canUseStoredSessionForLogin() && loginForm.rememberAuth"
         :is-advanced-options-open="isAdvancedOptionsOpen"
         :advanced-settings="advancedSettings"
         :is-web-api-key-peek="isWebApiKeyPeek"

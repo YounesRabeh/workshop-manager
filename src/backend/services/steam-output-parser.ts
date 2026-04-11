@@ -15,21 +15,54 @@ const INVALID_STEAM_ACCOUNT_ID = 0n
 const INVALID_STEAM_ID64 = STEAM_ID64_BASE.toString()
 const STEAM_GUARD_USAGE_PATTERN =
   /\blogin\s*<username>\s*\[<password>\]\s*\[<[^>\r\n]*(?:steam\s*guard|guard|auth(?:entication)?|two[-\s]?factor|otp|email|code)[^>\r\n]*>\]/i
+const STEAM_GUARD_MOBILE_PATTERN = /steam guard mobile authenticator|waiting for confirmation/i
+const STEAM_GUARD_EMAIL_CHALLENGE_PATTERN = /this computer has not been authenticated.*steam guard/i
+const STEAM_GUARD_EMAIL_CONTINUATION_PATTERN =
+  /enter\s+the\s+steam\s+guard|set_steam_guard_code|code from that message|at the console/i
+const STEAM_GUARD_SET_COMMAND_HINT_PATTERN =
+  /this computer has not been authenticated.*steam guard|set_steam_guard_code|enter\s+the\s+steam\s+guard/i
+const STEAM_GUARD_INVALID_CODE_PATTERN =
+  /that steam guard code was invalid|invalid auth(?:entication)? code|incorrect auth(?:entication)? code|invalid email\s*code|incorrect email\s*code|expired email\s*code|invalid\s*otp|incorrect\s*otp|expired\s*otp|guard code.*(invalid|incorrect|expired)|two-factor.*(invalid|incorrect|expired)|otp.*(invalid|incorrect|expired)|email\s*code.*(invalid|incorrect|expired)|one[-\s]?time\s*(?:code|passcode).*(invalid|incorrect|expired)|accountlogondeniedneedtwofactor/i
+const STEAM_GUARD_EXPLICIT_CODE_PROMPT_PATTERN =
+  /steam guard code\s*:\s*$|auth(?:entication)?\s*code\s*:\s*$|email\s*(?:otp|code)\s*:\s*$|\botp\b\s*:\s*$/i
 
 export function isSteamGuardLoginUsagePrompt(line: string): boolean {
   return STEAM_GUARD_USAGE_PATTERN.test(line)
 }
 
 export function isSteamGuardPrompt(line: string): boolean {
+  if (STEAM_GUARD_MOBILE_PATTERN.test(line)) {
+    return false
+  }
+  if (isSteamGuardInvalidCodeLine(line)) {
+    return false
+  }
+
   return (
     /two-factor|auth(?:entication)?\s*code|guard code|steam guard code|\botp\b|one[-\s]?time\s*(?:code|passcode)|email\s*(?:otp|code)/i.test(
       line
-    ) || isSteamGuardLoginUsagePrompt(line)
+    ) || STEAM_GUARD_EMAIL_CHALLENGE_PATTERN.test(line) || isSteamGuardPromptContinuation(line) || isSteamGuardLoginUsagePrompt(line)
   )
 }
 
+export function isSteamGuardPromptContinuation(line: string): boolean {
+  return STEAM_GUARD_EMAIL_CONTINUATION_PATTERN.test(line)
+}
+
+export function isSteamGuardSetCommandHint(line: string): boolean {
+  return STEAM_GUARD_SET_COMMAND_HINT_PATTERN.test(line)
+}
+
+export function isSteamGuardInvalidCodeLine(line: string): boolean {
+  return STEAM_GUARD_INVALID_CODE_PATTERN.test(line)
+}
+
+export function isExplicitSteamGuardCodePrompt(line: string): boolean {
+  return STEAM_GUARD_EXPLICIT_CODE_PROMPT_PATTERN.test(line)
+}
+
 export function isSteamGuardMobilePrompt(line: string): boolean {
-  return /steam guard mobile authenticator|waiting for confirmation/i.test(line)
+  return STEAM_GUARD_MOBILE_PATTERN.test(line)
 }
 
 export function stripAnsi(line: string): string {
@@ -55,11 +88,7 @@ export function parseSteamLoginFailure(lines: string[]): LoginFailure | undefine
     }
   }
 
-  if (
-    /invalid auth(?:entication)? code|incorrect auth(?:entication)? code|invalid email\s*code|incorrect email\s*code|expired email\s*code|invalid\s*otp|incorrect\s*otp|expired\s*otp|guard code.*(invalid|incorrect|expired)|two-factor.*(invalid|incorrect|expired)|otp.*(invalid|incorrect|expired)|email\s*code.*(invalid|incorrect|expired)|one[-\s]?time\s*(?:code|passcode).*(invalid|incorrect|expired)|accountlogondeniedneedtwofactor/i.test(
-      joined
-    )
-  ) {
+  if (STEAM_GUARD_INVALID_CODE_PATTERN.test(joined)) {
     return {
       code: 'steam_guard',
       message: 'Steam Guard code is invalid or expired. Enter a fresh code and retry.'

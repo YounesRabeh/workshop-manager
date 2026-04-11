@@ -580,7 +580,7 @@ describe('App UI validation gates', () => {
     )
   })
 
-  it('keeps current saved-session login available after unticking keep-signed-in', async () => {
+  it('requires password after unticking keep-signed-in even when saved-session data exists', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
       rememberedUsername: 'alice',
@@ -598,25 +598,18 @@ describe('App UI validation gates', () => {
     await flushPromises()
 
     const passwordInput = wrapper.find('input[type="password"]')
-    expect(passwordInput.attributes('placeholder')).toBe('********')
+    expect(passwordInput.attributes('placeholder')).toBe('')
 
     const submitButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Sign in with saved session'))
+      .find((button) => button.text().trim() === 'Sign in')
     expect(submitButton).toBeDefined()
-    expect(submitButton?.attributes('disabled')).toBeUndefined()
+    expect(submitButton?.attributes('disabled')).toBeDefined()
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(workshop.login).toHaveBeenCalledWith(
-      expect.objectContaining({
-        username: 'alice',
-        password: '',
-        rememberAuth: false,
-        useStoredAuth: true
-      })
-    )
+    expect(workshop.login).not.toHaveBeenCalled()
   })
 
   it('keeps saved-session login messaging generic before any steam guard challenge is requested', async () => {

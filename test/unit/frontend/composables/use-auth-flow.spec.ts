@@ -390,6 +390,33 @@ describe('useAuthFlow composable', () => {
     expect(flow.statusMessage.value).toContain('Steam requested OTP / Email code')
   })
 
+  it('detects OTP challenge from Linux split Steam Guard email prompt line while mobile is preferred', () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.setPreferredAuthMode('steam_guard_mobile')
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'stdout',
+      phase: 'login',
+      line: 'Please check your email for the message from Steam, and enter the Steam Guard'
+    })
+
+    expect(flow.activeChallengeMode.value).toBe('otp')
+    expect(flow.statusMessage.value).toContain('Steam requested OTP / Email code')
+  })
+
   it('marks verification approved when post-approval login progress arrives without explicit OK suffix', () => {
     const flow = useAuthFlow({
       onShowTimeoutLogs: vi.fn(async () => undefined),
@@ -453,6 +480,44 @@ describe('useAuthFlow composable', () => {
     expect(workshop.submitSteamGuardCode).toHaveBeenCalledTimes(1)
   })
 
+  it('queues OTP when backend reports no pending Steam Guard prompt yet', async () => {
+    workshop.submitSteamGuardCode.mockRejectedValueOnce(
+      new Error('[steam_guard] No Steam Guard prompt is currently waiting for this session')
+    )
+
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.isLoginSubmitting.value = true
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'steam_guard_required',
+      phase: 'login',
+      promptType: 'steam_guard_code'
+    })
+
+    flow.setSteamGuardCode('123456')
+    await flow.submitSteamGuardCode()
+
+    expect(workshop.submitSteamGuardCode).toHaveBeenCalledWith({
+      sessionId: 'r1',
+      code: '123456'
+    })
+    expect(flow.authIssue.value).toBeNull()
+    expect(flow.statusMessage.value).toContain('saved. Waiting for Steam challenge')
+  })
+
   it('queues OTP entered before login run id is available and submits when challenge arrives', async () => {
     const flow = useAuthFlow({
       onShowTimeoutLogs: vi.fn(async () => undefined),
@@ -492,7 +557,7 @@ describe('useAuthFlow composable', () => {
     })
   })
 
-  it('keeps saved-session login available for the current sign-in after turning off keep-signed-in', async () => {
+  it('requires password when keep-signed-in is turned off, even if a saved session exists', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
       rememberedUsername: 'alice',
@@ -513,14 +578,8 @@ describe('useAuthFlow composable', () => {
 
     await flow.login()
 
-    expect(workshop.login).toHaveBeenCalledWith(
-      expect.objectContaining({
-        username: 'alice',
-        password: '',
-        rememberAuth: false,
-        useStoredAuth: true
-      })
-    )
+    expect(workshop.login).not.toHaveBeenCalled()
+    expect(flow.statusMessage.value).toBe('Enter your password to sign in.')
   })
 
   it('requires password again after signing out from a saved-session login with keep-signed-in disabled', async () => {

@@ -35,6 +35,12 @@ Steam>`)
     ).toBe(true)
     expect(isSteamGuardPrompt('\tlogin <username> [<password>] [<Steam guard code>]')).toBe(true)
     expect(isSteamGuardPrompt('Usage: login <username> [<password>] [<authcode>]')).toBe(true)
+    expect(
+      isSteamGuardPrompt('Please check your email for the message from Steam, and enter the Steam Guard')
+    ).toBe(true)
+    expect(isSteamGuardPrompt("You can also enter this code at any time using 'set_steam_guard_code'")).toBe(true)
+    expect(isSteamGuardPrompt('That Steam Guard code was invalid.')).toBe(false)
+    expect(isSteamGuardPrompt('Steam Guard mobile authenticator')).toBe(false)
     expect(isSteamGuardPrompt('Work complete')).toBe(false)
   })
 

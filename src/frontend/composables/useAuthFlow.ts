@@ -147,7 +147,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   }
 
   async function tryAutoLoginWithStoredSession(): Promise<void> {
-    if (!canUseStoredSessionForLogin() || loginForm.username.trim().length === 0) {
+    if (!loginForm.rememberAuth || !canUseStoredSessionForLogin() || loginForm.username.trim().length === 0) {
       return
     }
 
@@ -217,7 +217,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
     const hasUsername = loginForm.username.trim().length > 0
     const hasPassword = loginForm.password.trim().length > 0
-    const usingSavedSession = canUseStoredSessionForLogin() && !hasPassword
+    const usingSavedSession = loginForm.rememberAuth && canUseStoredSessionForLogin() && !hasPassword
 
     if (!hasUsername) {
       statusMessage.value = 'Enter your Steam account name.'
@@ -358,7 +358,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
     if (
       event.line &&
-      /auth(?:entication)?\s*code|guard code|two-factor|otp|email code|one-time|login\s*<username>\s*\[<password>\]\s*\[<[^>\r\n]*code[^>\r\n]*>\]/i.test(
+      /auth(?:entication)?\s*code|guard code|two-factor|otp|email code|one-time|login\s*<username>\s*\[<password>\]\s*\[<[^>\r\n]*code[^>\r\n]*>\]|this computer has not been authenticated.*steam guard|enter\s+the\s+steam\s+guard|set_steam_guard_code/i.test(
         event.line
       )
     ) {

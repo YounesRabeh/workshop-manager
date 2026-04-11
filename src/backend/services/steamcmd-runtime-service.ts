@@ -4,7 +4,7 @@
  * run events/logging, and delegates command preparation and workshop/profile fetching to specialized services.
  */
 import { EventEmitter } from 'node:events'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readdir, rm } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import type {
@@ -79,6 +79,17 @@ function errorMessage(error: unknown): string {
 function tempOtpRuntimeLog(message: string, details?: Record<string, unknown>): void {
   const suffix = details ? ` ${JSON.stringify(details)}` : ''
   process.stderr.write(`[TEMP OTP] ${message}${suffix}\n`)
+}
+
+function buildSteamCmdChildEnv(runtimeDir: string, platformBehavior: SteamCmdPlatformBehavior): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  if (platformBehavior.profile === 'linux') {
+    env.HOME = runtimeDir
+    env.XDG_CONFIG_HOME = runtimeDir
+    env.XDG_DATA_HOME = runtimeDir
+    env.XDG_CACHE_HOME = `${runtimeDir}/.cache`
+  }
+  return env
 }
 
 export {
@@ -208,6 +219,50 @@ export class SteamCmdRuntimeService extends EventEmitter {
       '[RUN_META] Steam account identity resolution did not return a valid steamId64'
     )
     return undefined
+  }
+
+  private async clearAuthCacheFilesInDirectory(targetDir: string): Promise<void> {
+    let entries
+    try {
+      entries = await readdir(targetDir, { withFileTypes: true, encoding: 'utf8' })
+    } catch {
+      return
+    }
+
+    const ssfnFiles = entries
+      .filter((entry) => entry.isFile() && /^ssfn/i.test(String(entry.name)))
+      .map((entry) => rm(join(targetDir, String(entry.name)), { force: true }))
+    await Promise.all(ssfnFiles)
+  }
+
+  async clearAuthCacheForStrictLogin(): Promise<void> {
+    tempOtpRuntimeLog('strict login auth cache clear start', {
+      runtimeDir: this.runtimeDir
+    })
+
+    this.logout({ clearStoredAuth: true })
+    await mkdir(this.runtimeDir, { recursive: true })
+
+    const knownAuthFiles = [
+      join(this.runtimeDir, 'sentry.bin'),
+      join(this.runtimeDir, 'clientregistry.blob'),
+      join(this.runtimeDir, 'config', 'config.vdf'),
+      join(this.runtimeDir, 'config', 'loginusers.vdf'),
+      join(this.runtimeDir, 'Steam', 'sentry.bin'),
+      join(this.runtimeDir, 'Steam', 'clientregistry.blob'),
+      join(this.runtimeDir, 'Steam', 'config', 'config.vdf'),
+      join(this.runtimeDir, 'Steam', 'config', 'loginusers.vdf')
+    ]
+    await Promise.all(knownAuthFiles.map((filePath) => rm(filePath, { force: true })))
+    await Promise.all([
+      this.clearAuthCacheFilesInDirectory(this.runtimeDir),
+      this.clearAuthCacheFilesInDirectory(join(this.runtimeDir, 'Steam'))
+    ])
+
+    tempOtpRuntimeLog('strict login auth cache clear complete', {
+      runtimeDir: this.runtimeDir,
+      removedKnownFilesCount: knownAuthFiles.length
+    })
   }
 
   async login(username: string, password: string, useStoredAuth = false): Promise<{ sessionId: string }> {
@@ -383,7 +438,8 @@ export class SteamCmdRuntimeService extends EventEmitter {
         cwd: this.runtimeDir,
         stdio: 'pipe',
         shell: this.platformBehavior.useShellHost,
-        windowsHide: this.platformBehavior.hideWindowsConsole
+        windowsHide: this.platformBehavior.hideWindowsConsole,
+        env: buildSteamCmdChildEnv(this.runtimeDir, this.platformBehavior)
       })
 
       let stdout = ''

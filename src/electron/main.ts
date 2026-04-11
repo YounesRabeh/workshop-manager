@@ -199,26 +199,32 @@ app.whenReady().then(async () => {
   handleIpc(IPC_CHANNELS.login, async (payload: LoginInput) => {
     const useStoredAuth = payload.useStoredAuth === true
     const rememberAuth = payload.rememberAuth === true
+    const effectiveUseStoredAuth = useStoredAuth && rememberAuth
     const rememberUsername = payload.rememberUsername === true || rememberAuth
     const preferredAuthMode = payload.preferredAuthMode === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp'
     tempOtpTerminalLog('IPC login request', {
       username: payload.username,
       passwordLength: payload.password.trim().length,
       useStoredAuth,
+      effectiveUseStoredAuth,
       rememberAuth,
       rememberUsername,
       preferredAuthMode
     })
+    if (!rememberAuth) {
+      tempOtpTerminalLog('strict login mode: clearing SteamCMD auth cache before login')
+      await runtimeService.clearAuthCacheForStrictLogin()
+    }
     await profileStore.setRememberedLoginState({
       rememberedUsername: rememberUsername ? payload.username : undefined,
       rememberAuth,
       preferredAuthMode
     })
-    const state = await runtimeService.login(payload.username, payload.password, useStoredAuth)
+    const state = await runtimeService.login(payload.username, payload.password, effectiveUseStoredAuth)
     tempOtpTerminalLog('IPC login success', {
       sessionId: state.sessionId,
       username: payload.username,
-      useStoredAuth
+      useStoredAuth: effectiveUseStoredAuth
     })
     // Stored session needs username next launch, so keep username when rememberAuth is enabled.
     await profileStore.setRememberedLoginState({
