@@ -9,7 +9,7 @@ ENV PATH=/pnpm:$PATH
 USER root
 
 RUN apt-get update \
-  && apt-get install --no-install-recommends -y ca-certificates curl xz-utils \
+  && apt-get install --no-install-recommends -y ca-certificates curl xz-utils zip \
   && rm -rf /var/lib/apt/lists/*
 
 RUN arch="$(dpkg --print-architecture)" \
