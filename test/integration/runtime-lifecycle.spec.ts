@@ -1060,8 +1060,50 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(loginResult.sessionId).toBe(sessionId)
   })
 
-  it('auto-resubmits the previous guard code once when Steam immediately follows with explicit code prompt', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'runtime-service-guard-auto-resubmit-'))
+  it('continues streaming Steam Guard email guidance lines before a code is submitted', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-guard-guidance-lines-'))
+    const store = new RunLogStore(join(root, 'runs'))
+    const outputLines: string[] = []
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() =>
+      createInteractiveFakeChild({
+        login: {
+          lines: [
+            'This computer has not been authenticated for your account using Steam Guard.',
+            'Please check your email for the message from Steam, and enter the Steam Guard',
+            'code from that message.',
+            "You can also enter this code at any time using 'set_steam_guard_code'",
+            'at the console.'
+          ]
+        }
+      })
+    )
+
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
+    let sessionId = ''
+    runtime.on('run-event', (event) => {
+      if (event.type === 'run_started' && event.phase === 'login') {
+        sessionId = event.runId
+      }
+      if (event.type === 'stdout' && event.phase === 'login' && event.line) {
+        outputLines.push(event.line)
+      }
+    })
+
+    const loginPromise = runtime.login('alice', 'secret')
+
+    await vi.waitFor(() => {
+      expect(sessionId).not.toBe('')
+      expect(outputLines).toContain('Please check your email for the message from Steam, and enter the Steam Guard')
+      expect(outputLines).toContain("You can also enter this code at any time using 'set_steam_guard_code'")
+    })
+
+    runtime.cancelRun(sessionId)
+    await expect(loginPromise).rejects.toThrow('SteamCMD run cancelled by user.')
+  })
+
+  it('requests a fresh guard code when Steam follows set_steam_guard_code with explicit prompt', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-guard-fresh-prompt-'))
     const store = new RunLogStore(join(root, 'runs'))
 
     let childRef:
@@ -1115,11 +1157,18 @@ describe('SteamCmdRuntimeService lifecycle', () => {
 
     runtime.submitSteamGuardCode(sessionId, '12345')
 
+    await vi.waitFor(() => {
+      expect(guardPromptCount).toBe(2)
+    })
+
+    runtime.submitSteamGuardCode(sessionId, '67890')
+
     const loginResult = await loginPromise
     expect(loginResult.sessionId).toBe(sessionId)
     expect(childRef?.commands).toContain('set_steam_guard_code 12345')
-    expect(childRef?.commands).toContain('12345')
-    expect(guardPromptCount).toBe(1)
+    expect(childRef?.commands).toContain('67890')
+    expect(childRef?.commands).not.toContain('12345')
+    expect(guardPromptCount).toBe(2)
   })
 
   it('fails fast with steam_guard error when submitted code is invalid', async () => {
@@ -1155,6 +1204,80 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     await expect(loginPromise).rejects.toThrow(
       'Steam Guard code is invalid or expired. Enter a fresh code and retry.'
     )
+  })
+
+  it('strict auth cache clear tears down a live persistent session before the next login', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-strict-login-reset-'))
+    const store = new RunLogStore(join(root, 'runs'))
+
+    let sessionId = ''
+    let firstChild:
+      | (EventEmitter & {
+          stdout: PassThrough
+          stderr: PassThrough
+          stdin: PassThrough
+          commands: string[]
+          kill: () => void
+        })
+      | undefined
+    let secondChild:
+      | (EventEmitter & {
+          stdout: PassThrough
+          stderr: PassThrough
+          stdin: PassThrough
+          commands: string[]
+          kill: () => void
+        })
+      | undefined
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>)
+      .mockImplementationOnce(() => {
+        firstChild = createInteractiveFakeChild({
+          login: {
+            lines: ['This computer has not been authenticated for your account using Steam Guard.']
+          },
+          setSteamGuardCode: {
+            lines: ['That Steam Guard code was invalid.']
+          }
+        })
+        return firstChild
+      })
+      .mockImplementationOnce(() => {
+        secondChild = createInteractiveFakeChild({
+          login: {
+            lines: [
+              "Logging in user 'alice' [U:1:42] to Steam Public...OK",
+              'Waiting for user info...OK'
+            ]
+          }
+        })
+        return secondChild
+      })
+
+    const runtime = new SteamCmdRuntimeService(async () => '/usr/bin/steamcmd', store, join(root, 'runtime'), 'linux')
+    runtime.on('run-event', (event) => {
+      if (event.type === 'run_started' && event.phase === 'login') {
+        sessionId = event.runId
+      }
+    })
+
+    const firstLoginPromise = runtime.login('alice', 'secret')
+    await vi.waitFor(() => {
+      expect(sessionId).not.toBe('')
+    })
+
+    runtime.submitSteamGuardCode(sessionId, '12345')
+    await expect(firstLoginPromise).rejects.toThrow(
+      'Steam Guard code is invalid or expired. Enter a fresh code and retry.'
+    )
+
+    await runtime.clearAuthCacheForStrictLogin()
+
+    const secondLoginResult = await runtime.login('alice', 'secret')
+    expect(secondLoginResult.sessionId).not.toBe('')
+    expect(spawn).toHaveBeenCalledTimes(2)
+    expect(firstChild?.commands.filter((command) => command.startsWith('login '))).toHaveLength(1)
+    expect(secondChild?.commands.filter((command) => command.startsWith('login '))).toHaveLength(1)
   })
 
   it('fails Windows bad credentials login without attempting a second bootstrap', async () => {

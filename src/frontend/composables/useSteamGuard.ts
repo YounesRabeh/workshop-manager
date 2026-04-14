@@ -150,6 +150,7 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
     try {
       await submitOtpCodeToSteam(sessionId, code)
       clearQueuedOtp()
+      steamGuardCode.value = ''
     } catch (error) {
       const parsed = options.parseAndLogError('useAuthFlow::submitSteamGuardCode', error)
       if (options.isLoginSubmitting.value && isNoPendingPromptError(parsed.message)) {

@@ -23,8 +23,6 @@ const STEAM_GUARD_SET_COMMAND_HINT_PATTERN =
   /this computer has not been authenticated.*steam guard|set_steam_guard_code|enter\s+the\s+steam\s+guard/i
 const STEAM_GUARD_INVALID_CODE_PATTERN =
   /that steam guard code was invalid|invalid auth(?:entication)? code|incorrect auth(?:entication)? code|invalid email\s*code|incorrect email\s*code|expired email\s*code|invalid\s*otp|incorrect\s*otp|expired\s*otp|guard code.*(invalid|incorrect|expired)|two-factor.*(invalid|incorrect|expired)|otp.*(invalid|incorrect|expired)|email\s*code.*(invalid|incorrect|expired)|one[-\s]?time\s*(?:code|passcode).*(invalid|incorrect|expired)|accountlogondeniedneedtwofactor/i
-const STEAM_GUARD_EXPLICIT_CODE_PROMPT_PATTERN =
-  /steam guard code\s*:\s*$|auth(?:entication)?\s*code\s*:\s*$|email\s*(?:otp|code)\s*:\s*$|\botp\b\s*:\s*$/i
 
 export function isSteamGuardLoginUsagePrompt(line: string): boolean {
   return STEAM_GUARD_USAGE_PATTERN.test(line)
@@ -55,10 +53,6 @@ export function isSteamGuardSetCommandHint(line: string): boolean {
 
 export function isSteamGuardInvalidCodeLine(line: string): boolean {
   return STEAM_GUARD_INVALID_CODE_PATTERN.test(line)
-}
-
-export function isExplicitSteamGuardCodePrompt(line: string): boolean {
-  return STEAM_GUARD_EXPLICIT_CODE_PROMPT_PATTERN.test(line)
 }
 
 export function isSteamGuardMobilePrompt(line: string): boolean {

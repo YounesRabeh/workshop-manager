@@ -472,4 +472,14 @@ export class SteamCmdProcessSession {
       this.processManager.writeInteractiveInput('logout')
     }
   }
+
+  resetPersistentSession(): void {
+    const persistentProcess = this.processManager.getPersistentProcess()
+    if (!persistentProcess) {
+      return
+    }
+
+    persistentProcess.kill('SIGTERM')
+    this.processManager.invalidatePersistentSession()
+  }
 }

@@ -518,6 +518,52 @@ describe('useAuthFlow composable', () => {
     expect(flow.statusMessage.value).toContain('saved. Waiting for Steam challenge')
   })
 
+  it('does not auto-reuse a previously submitted OTP when Steam prompts again', async () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.isLoginSubmitting.value = true
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'steam_guard_required',
+      phase: 'login',
+      promptType: 'steam_guard_code'
+    })
+
+    flow.setSteamGuardCode('123456')
+    await flow.submitSteamGuardCode()
+
+    expect(workshop.submitSteamGuardCode).toHaveBeenCalledTimes(1)
+    expect(flow.steamGuardCode.value).toBe('')
+    expect(workshop.submitSteamGuardCode).toHaveBeenLastCalledWith({
+      sessionId: 'r1',
+      code: '123456'
+    })
+
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'steam_guard_required',
+      phase: 'login',
+      promptType: 'steam_guard_code'
+    })
+
+    await vi.waitFor(() => {
+      expect(workshop.submitSteamGuardCode).toHaveBeenCalledTimes(1)
+    })
+  })
+
   it('queues OTP entered before login run id is available and submits when challenge arrives', async () => {
     const flow = useAuthFlow({
       onShowTimeoutLogs: vi.fn(async () => undefined),

@@ -116,7 +116,6 @@ class SteamCmdRunHandler {
       pendingResult: null,
       guardMobilePromptSent: false,
       guardCodeSubmissionCount: 0,
-      guardCodeAutoResubmitCount: 0,
       lastSubmittedGuardCode: null,
       resolve: config.resolve,
       reject: config.reject

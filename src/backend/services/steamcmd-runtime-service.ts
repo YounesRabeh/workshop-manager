@@ -392,7 +392,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     this.loginState = null
     if (options?.clearStoredAuth) {
       this.lastAuthenticatedState = null
-      this.processSession.sendLogoutCommand()
+      this.processSession.resetPersistentSession()
       return
     }
     if (currentState) {

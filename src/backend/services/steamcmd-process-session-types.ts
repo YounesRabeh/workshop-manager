@@ -44,7 +44,6 @@ interface ActiveInteractiveRun {
   pendingResult: { exitCode: number; runtimeError?: AppError } | null
   guardMobilePromptSent: boolean
   guardCodeSubmissionCount: number
-  guardCodeAutoResubmitCount: number
   lastSubmittedGuardCode: string | null
   resolve: (value: { lines: string[]; exitCode: number }) => void
   reject: (error: Error) => void
