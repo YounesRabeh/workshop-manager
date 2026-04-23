@@ -1,7 +1,9 @@
 <!--
   Overview: Root Vue component for the Workshop Manager renderer UI.
-  Responsibility: Orchestrates auth, workshop browsing,
-   publish/update flows, run-log UX, and shared app-level state/composable coordination.
+  Responsibility: Acts as the renderer shell that wires auth, workshop browsing,
+   publish/update flows, run-log UX, and shared app-level state across specialized composables.
+  Design note: Business rules live in composables and child sections stay mostly presentational;
+   this file focuses on top-level coordination, shared event routing, and screen branching.
 -->
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue'
@@ -38,6 +40,8 @@ import type {
 
 const appVersion = ref('dev')
 
+// Draft state is shared across create/update screens and survives navigation
+// between steps, so the root shell owns it and passes slices downward.
 const {
   createDraft,
   updateDraft,
@@ -58,6 +62,8 @@ const {
   clearWorkspaceForMode
 } = useDrafts()
 
+// These late-bound callbacks let independently-scoped composables notify one
+// another without collapsing the entire app shell into a single mega-composable.
 let showTimeoutLogsHandler: () => Promise<void> = async () => undefined
 let hideTimeoutLogsHandler: () => void = () => undefined
 let signedInHandler: () => Promise<void> = async () => undefined
@@ -220,6 +226,8 @@ const {
   unmountGlobalListeners
 } = uiShell
 
+// Bootstrap runs after auth and shell wiring exist so startup listeners can
+// immediately fan out incoming run events to the right domain handlers.
 const { isBootstrapping } = useAppBootstrap({
   appVersion,
   mountGlobalListeners,
@@ -234,6 +242,8 @@ const { isBootstrapping } = useAppBootstrap({
   }
 })
 
+// These three composables form the authenticated workshop loop:
+// browse/select an item, derive publish affordances, then hydrate/sync update drafts.
 const workshopStore = useWorkshopItems({
   canAccessMods: () => canAccessMods.value,
   normalizeError,
@@ -386,6 +396,10 @@ signedOutResetHandler = () => {
 signedInHandler = handleSignedIn
 signedOutHandler = handleSignedOut
 
+/**
+ * Run events can describe either auth progress or publish progress, so the root
+ * shell fans each backend event out to both domains.
+ */
 function handleRunEvent(event: RunEvent): void {
   handleAuthRunEvent(event)
   handlePublishRunEvent(event)
@@ -395,6 +409,8 @@ onUnmounted(() => {
   destroyPublishOrchestration()
 })
 
+// Folder scans update both the staged-file tree and the shared status area so
+// create/update flows report the same success message format.
 function setStagedContentFilesFromFolder(mode: 'create' | 'update', contentFolder: string, files: StagedContentFile[]): void {
   setStagedFilesForMode(mode, files)
   if (files.length === 0) {
@@ -405,6 +421,7 @@ function setStagedContentFilesFromFolder(mode: 'create' | 'update', contentFolde
   statusMessage.value = `Loaded ${files.length} content file(s), ${formatSizeLabel(totalSize)} total.`
 }
 
+// Keep scan failures consistent with successful folder-selection messaging.
 function setContentFolderSelectionError(mode: 'create' | 'update', contentFolder: string, message: string): void {
   setStagedFilesForMode(mode, [])
   statusMessage.value = `Content folder selected: ${contentFolder}. Scan failed: ${message}`
@@ -424,6 +441,7 @@ function selectWorkshopItem(item: WorkshopItemSummary): void {
   workshopStore.selectWorkshopItem(item)
 }
 
+// Create and update use the same picker/scan flow; only the target draft changes.
 async function pickContentFolderForMode(mode: 'create' | 'update'): Promise<void> {
   const path = await window.workshop.pickFolder()
   if (path) {
@@ -487,6 +505,7 @@ async function pickUpdatePreviewFile(): Promise<void> {
 </script>
 
 <template>
+  <!-- Root shell branches by lifecycle state: startup bootstrap, signed-out auth, or the authenticated workspace. -->
   <main class="steam-theme">
     <section v-if="isBootstrapping" class="fade-in splash-screen">
       <div class="splash-panel">
