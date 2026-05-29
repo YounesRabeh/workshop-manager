@@ -353,6 +353,15 @@ app.whenReady().then(async () => {
     return await getAdvancedSettings()
   })
 
+  handleIpc(IPC_CHANNELS.getSavedWebApiKey, async () => {
+    const resolvedKey = await resolveSavedWebApiKey()
+    if (!resolvedKey.hasUsableKey || !resolvedKey.key) {
+      throw new AppError('command_failed', 'Saved Steam Web API key is unavailable. Re-enter it in Advanced Options.')
+    }
+
+    return { webApiKey: resolvedKey.key }
+  })
+
   handleIpc(IPC_CHANNELS.saveProfile, async (payload: { profile: ModProfile }) => {
     return await profileStore.saveProfile(payload.profile)
   })

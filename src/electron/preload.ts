@@ -43,6 +43,7 @@ export interface WorkshopApi {
   getAdvancedSettings: () => Promise<AdvancedSettings>
   getInstallLog: () => Promise<InstallLogSnapshot>
   saveAdvancedSettings: (payload: SaveAdvancedSettingsInput) => Promise<AdvancedSettings>
+  getSavedWebApiKey: () => Promise<{ webApiKey: string }>
   saveProfile: (payload: { profile: ModProfile }) => Promise<ModProfile>
   deleteProfile: (payload: { profileId: string }) => Promise<{ ok: true }>
   getRunLogs: () => Promise<PersistedRunLog[]>
@@ -75,6 +76,7 @@ const api: WorkshopApi = {
   getAdvancedSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getAdvancedSettings),
   getInstallLog: () => ipcRenderer.invoke(IPC_CHANNELS.getInstallLog),
   saveAdvancedSettings: (payload) => ipcRenderer.invoke(IPC_CHANNELS.saveAdvancedSettings, payload),
+  getSavedWebApiKey: () => ipcRenderer.invoke(IPC_CHANNELS.getSavedWebApiKey),
   saveProfile: (payload) => ipcRenderer.invoke(IPC_CHANNELS.saveProfile, payload),
   deleteProfile: (payload) => ipcRenderer.invoke(IPC_CHANNELS.deleteProfile, payload),
   getRunLogs: () => ipcRenderer.invoke(IPC_CHANNELS.getRunLogs),

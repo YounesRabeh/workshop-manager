@@ -288,12 +288,10 @@ function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string
           <button
             type="button"
             class="login-peek advanced-inline-button"
-            @mouseenter="emit('set-web-api-key-peek', true)"
-            @mouseleave="emit('set-web-api-key-peek', false)"
-            @focus="emit('set-web-api-key-peek', true)"
-            @blur="emit('set-web-api-key-peek', false)"
+            :aria-pressed="isWebApiKeyPeek ? 'true' : 'false'"
+            @click="emit('set-web-api-key-peek', !isWebApiKeyPeek)"
           >
-            Show
+            {{ isWebApiKeyPeek ? 'Hide' : 'Show' }}
           </button>
         </div>
 
@@ -425,12 +423,10 @@ function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string
           <button
             type="button"
             class="login-peek advanced-inline-button"
-            @mouseenter="emit('set-web-api-key-peek', true)"
-            @mouseleave="emit('set-web-api-key-peek', false)"
-            @focus="emit('set-web-api-key-peek', true)"
-            @blur="emit('set-web-api-key-peek', false)"
+            :aria-pressed="isWebApiKeyPeek ? 'true' : 'false'"
+            @click="emit('set-web-api-key-peek', !isWebApiKeyPeek)"
           >
-            Show
+            {{ isWebApiKeyPeek ? 'Hide' : 'Show' }}
           </button>
         </div>
 

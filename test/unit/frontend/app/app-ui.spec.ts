@@ -45,6 +45,7 @@ const workshop = {
     content: '[install] example log',
     exists: true
   })),
+  getSavedWebApiKey: vi.fn(async () => ({ webApiKey: 'saved-dev-key' })),
   saveAdvancedSettings: vi.fn(async (payload: {
     webApiEnabled: boolean
     webApiKey?: string
@@ -1114,6 +1115,47 @@ describe('App UI validation gates', () => {
       webApiEnabled: true,
       clearWebApiKey: true
     })
+  })
+
+  it('retrieves a saved web api key when revealing it from credentials', async () => {
+    workshop.getAdvancedSettings.mockResolvedValueOnce({
+      webApiEnabled: true,
+      hasWebApiKey: true,
+      secureStorageAvailable: true,
+      steamCmdManualPath: undefined,
+      steamCmdInstalled: true,
+      steamCmdSource: 'auto',
+      timeouts: {
+        loginTimeoutMs: 60_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
+    })
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const toggleButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Show API Options')
+    expect(toggleButton).toBeDefined()
+    await toggleButton?.trigger('click')
+    await flushPromises()
+
+    const apiKeyInput = wrapper.find('input[placeholder="Saved securely (enter new key to replace)"]')
+    expect(apiKeyInput.exists()).toBe(true)
+
+    const showButtons = wrapper
+      .findAll('button')
+      .filter((button) => button.text().trim() === 'Show')
+    const revealButton = showButtons[showButtons.length - 1]
+    expect(revealButton).toBeDefined()
+    await revealButton?.trigger('click')
+    await flushPromises()
+
+    expect(workshop.getSavedWebApiKey).toHaveBeenCalledTimes(1)
+    expect((apiKeyInput.element as HTMLInputElement).value).toBe('saved-dev-key')
+    expect((apiKeyInput.element as HTMLInputElement).type).toBe('text')
   })
 
   it('browses and saves a manual SteamCMD path from advanced settings', async () => {

@@ -119,7 +119,20 @@ const {
 
 const isWebApiKeyPeek = ref(false)
 
-function setWebApiKeyPeek(value: boolean): void {
+async function setWebApiKeyPeek(value: boolean): Promise<void> {
+  if (
+    value &&
+    advancedSettings.hasWebApiKey &&
+    advancedSettings.webApiKey.trim().length === 0
+  ) {
+    try {
+      const payload = await window.workshop.getSavedWebApiKey()
+      setWebApiKey(payload.webApiKey)
+    } catch (error) {
+      const parsed = normalizeError(error)
+      advancedSettings.statusMessage = `Saved Web API key lookup failed (${parsed.code}): ${parsed.message}`
+    }
+  }
   isWebApiKeyPeek.value = value
 }
 

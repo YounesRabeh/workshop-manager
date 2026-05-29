@@ -17,6 +17,7 @@ export const IPC_CHANNELS = {
   getAdvancedSettings: 'workshop:getAdvancedSettings',
   getInstallLog: 'workshop:getInstallLog',
   saveAdvancedSettings: 'workshop:saveAdvancedSettings',
+  getSavedWebApiKey: 'workshop:getSavedWebApiKey',
   saveProfile: 'workshop:saveProfile',
   deleteProfile: 'workshop:deleteProfile',
   getRunLogs: 'workshop:getRunLogs',
