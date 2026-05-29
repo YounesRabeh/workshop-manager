@@ -72,7 +72,7 @@ Packaging commands always run inside the repo's Docker builder image, even when 
 > Docker is build-only. The generated `.AppImage` and `.exe` run natively after packaging.
 > Dockerized builds are currently supported on Linux and Windows hosts.
 
-Packaging commands include icon generation and rebuild the app bundle first so installers do not ship stale `out/` code.
+Packaging commands include icon generation and rebuild the app bundle first so artifacts do not ship stale `out/` code.
 The wrapper performs host-side cleanup before entering Docker so stale local Electron processes do not interfere with packaging.
 Persistent Docker build caches live under `~/.cache/workshop-manager/docker-build`.
 Output artifacts are written to `dist/`.
