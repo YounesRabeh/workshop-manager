@@ -25,26 +25,46 @@ function isAlive(pid) {
 
 export function isTargetProcessForProject(command, projectRootPath) {
   const lower = command.toLowerCase()
-  if (lower.includes('kill-old-instance.mjs')) {
+  const normalizedRoot = projectRootPath.toLowerCase()
+
+  const knownBuildOrScriptProcess =
+    lower.includes('kill-old-instance.mjs') ||
+    lower.includes('run-build-in-docker.mjs') ||
+    lower.includes('build-executable.mjs') ||
+    lower.includes('sync-app-icon.mjs') ||
+    lower.includes('generate-release-checksums.mjs') ||
+    lower.includes('electron-builder') ||
+    lower.includes('pnpm ') ||
+    lower.includes('npm ') ||
+    lower.includes('node scripts/')
+
+  if (knownBuildOrScriptProcess) {
     return false
   }
 
-  const mentionsProject =
-    lower.includes(projectRootPath.toLowerCase()) ||
-    lower.includes('workshop-manager') ||
-    lower.includes('steam-workshop-manager') ||
-    lower.includes('steam-workshop-mod-manager')
-  if (!mentionsProject) {
-    return false
-  }
-
-  return (
-    lower.includes('electron') ||
+  const isDevServerApp =
     lower.includes('electron-vite') ||
-    lower.includes('out/main/index.js') ||
-    lower.includes('workshop-manager') ||
-    lower.includes('steam-workshop-manager')
-  )
+    (
+      lower.includes('electron') &&
+      lower.includes(`${normalizedRoot}/out/main/index.js`)
+    )
+
+  const isPackagedApp =
+    lower.includes(`${normalizedRoot}/dist/`) &&
+    (
+      lower.includes('workshop manager') ||
+      lower.includes('workshop-manager') ||
+      lower.includes('steam-workshop-manager') ||
+      lower.includes('steam-workshop-mod-manager')
+    ) &&
+    (
+      lower.includes('.appimage') ||
+      lower.includes('.exe') ||
+      lower.includes('/workshop manager') ||
+      lower.includes('/workshop-manager')
+    )
+
+  return isDevServerApp || isPackagedApp
 }
 
 function listUnixProcesses() {

@@ -29,6 +29,7 @@
     },
     "win": {
       "icon": "resources/img/app-icon.ico",
+      "signAndEditExecutable": false,
       "target": [
         {
           "target": "nsis"
