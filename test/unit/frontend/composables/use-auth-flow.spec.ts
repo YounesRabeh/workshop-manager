@@ -306,6 +306,29 @@ describe('useAuthFlow composable', () => {
     expect(flow.loginForm.rememberAuth).toBe(false)
   })
 
+  it('hydrates keep-signed-in preference even when cached auth is not available', async () => {
+    workshop.getProfiles.mockResolvedValueOnce({
+      profiles: [],
+      rememberedUsername: 'alice',
+      rememberAuth: true,
+      hasStoredAuth: false,
+      preferredAuthMode: 'otp'
+    })
+
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    await flow.refreshRememberedLoginState()
+
+    expect(flow.loginForm.rememberAuth).toBe(true)
+    expect(flow.hasPersistedStoredSession.value).toBe(false)
+    expect(flow.canUseStoredSessionForLogin()).toBe(false)
+  })
+
   it('hydrates preferred auth mode from profiles payload and defaults to otp', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],

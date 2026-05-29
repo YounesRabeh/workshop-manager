@@ -113,6 +113,25 @@ app.whenReady().then(async () => {
     await runtimeService.clearAuthCacheForStrictLogin()
   }
 
+  let isQuitAfterAuthCleanup = false
+  app.on('before-quit', (event) => {
+    if (isQuitAfterAuthCleanup) {
+      return
+    }
+
+    event.preventDefault()
+    void (async () => {
+      try {
+        if (!(await profileStore.getRememberAuth())) {
+          await runtimeService.clearAuthCacheForStrictLogin()
+        }
+      } finally {
+        isQuitAfterAuthCleanup = true
+        app.quit()
+      }
+    })()
+  })
+
   const resolveSavedWebApiKey = async (): Promise<{
     key?: string
     hasUsableKey: boolean

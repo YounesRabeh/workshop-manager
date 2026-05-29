@@ -53,7 +53,7 @@ export function useLoginForm(options: UseLoginFormOptions) {
     loginForm.rememberUsername = rememberedUsername.length > 0
     options.onPreferredAuthModeLoaded(options.normalizePreferredAuthMode(payload.preferredAuthMode))
     const hasStoredAuth = payload.hasStoredAuth === true
-    loginForm.rememberAuth = payload.rememberAuth === true && hasStoredAuth
+    loginForm.rememberAuth = payload.rememberAuth === true
     options.applyRememberedProfileState(hasStoredAuth)
     if (loginForm.rememberAuth) {
       loginForm.rememberUsername = true
