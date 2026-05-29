@@ -10,7 +10,6 @@ import { AppError } from '@backend/utils/errors'
 import { validateDraft } from '@backend/utils/validation'
 import { listContentFolderFiles } from './content-folder-scanner'
 import { buildWorkshopArgs } from './steam-output-parser'
-import type { SteamCmdPlatformProfile } from './steamcmd-platform-profile'
 import { generateWorkshopVdf } from './vdf-generator'
 
 export interface PreparedWorkshopCommand {
@@ -47,12 +46,7 @@ async function ensureUpdateContentFolderHasFiles(draft: UploadDraft): Promise<vo
 }
 
 export class WorkshopCommandService {
-  constructor(
-    private readonly runtimeDir: string,
-    _platformProfile: SteamCmdPlatformProfile
-  ) {
-    // Compatibility constructor parameter kept during migration to avoid broad call-site churn.
-  }
+  constructor(private readonly runtimeDir: string) {}
 
   async prepare(
     username: string,

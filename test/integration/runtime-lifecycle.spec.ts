@@ -1317,7 +1317,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     )
   })
 
-  it('submits Steam Guard code as a login command when SteamCMD shows usage prompt format', async () => {
+  it('submits Steam Guard code as direct input when explicit code prompt appears', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-guard-usage-'))
     const store = new RunLogStore(join(root, 'runs'))
 
@@ -1336,6 +1336,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
           lines: [
             'Usage:',
             '\tlogin <username> [<password>] [<Steam guard code>]',
+            'Steam Guard code:',
             'Steam>'
           ]
         }
@@ -1368,8 +1369,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     runtime.submitSteamGuardCode(sessionId, '12345')
 
     await vi.waitFor(() => {
-      const loginCommands = childRef?.commands.filter((command) => command.startsWith('login ')) ?? []
-      expect(loginCommands).toContain('login alice secret 12345')
+      expect(childRef?.commands).toContain('12345')
     })
 
     runtime.cancelRun(sessionId)

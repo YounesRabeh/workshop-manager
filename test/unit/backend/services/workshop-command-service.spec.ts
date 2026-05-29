@@ -18,7 +18,7 @@ describe('WorkshopCommandService', () => {
   it('prepares upload command and writes a VDF file', async () => {
     const runtimeDir = await mkdtemp(join(tmpdir(), 'wm-command-'))
     try {
-      const service = new WorkshopCommandService(runtimeDir, 'linux')
+      const service = new WorkshopCommandService(runtimeDir)
       const command = await service.prepare(
         'alice',
         {
@@ -47,7 +47,7 @@ describe('WorkshopCommandService', () => {
     vi.mocked(listContentFolderFiles).mockResolvedValueOnce([])
     const runtimeDir = await mkdtemp(join(tmpdir(), 'wm-command-'))
     try {
-      const service = new WorkshopCommandService(runtimeDir, 'linux')
+      const service = new WorkshopCommandService(runtimeDir)
 
       await expect(
         service.prepare(
@@ -73,7 +73,7 @@ describe('WorkshopCommandService', () => {
   it('prepares Windows workshop commands with expected args', async () => {
     const runtimeDir = await mkdtemp(join(tmpdir(), 'wm-command-'))
     try {
-      const service = new WorkshopCommandService(runtimeDir, 'windows')
+      const service = new WorkshopCommandService(runtimeDir)
       const command = await service.prepare(
         'alice',
         {

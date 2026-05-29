@@ -5,11 +5,9 @@
  */
 import { AppError } from '@backend/utils/errors'
 import {
-  escapeInteractiveArg,
   isBenignSteamLatencyWarning,
   isLoginSuccessLine,
   isLoginProgressLine,
-  isSteamGuardLoginUsagePrompt,
   isSteamGuardMobilePrompt,
   isSteamGuardMobileTimeout,
   isSteamGuardPrompt,
@@ -228,12 +226,11 @@ class SteamCmdOutputProcessor {
           isSteamGuardPrompt(normalizedLine) &&
           this.deps.state.pendingSteamGuard.has(activeRun.runId) === false
         ) {
-          const isLoginUsagePrompt = isSteamGuardLoginUsagePrompt(normalizedLine)
           const isDirectCodePrompt = isExplicitSteamGuardCodePrompt(normalizedLine)
 
           // Advisory email lines arrive before the real "Steam Guard code:" prompt.
-          // Wait for the explicit code prompt (or usage prompt) to avoid submitting against stale context.
-          if (isDirectCodePrompt || isLoginUsagePrompt) {
+          // Wait for the explicit code prompt to avoid submitting against stale context.
+          if (isDirectCodePrompt) {
             if (activeRun.failOnSteamGuardCodePrompt) {
               this.deps.onFailActiveRun(
                 activeRun,
@@ -250,9 +247,6 @@ class SteamCmdOutputProcessor {
             ) {
               // Steam may repeat context lines while waiting after a submitted code; avoid duplicate challenge loops.
             } else {
-              const shouldSubmitLoginCommandWithGuardCode =
-                isLoginUsagePrompt && activeRun.command.startsWith('login ')
-
               let pendingGuardPrompt!: { resolve: (code: string) => void; reject: (error: Error) => void }
               const guardPromise = new Promise<string>((guardResolve, guardReject) => {
                 pendingGuardPrompt = {
@@ -286,23 +280,13 @@ class SteamCmdOutputProcessor {
                   clearPendingGuardChallenge()
                   activeRun.lastSubmittedGuardCode = guardCode
                   activeRun.guardCodeSubmissionCount += 1
-                  if (shouldSubmitLoginCommandWithGuardCode) {
-                    if (activeRun.persistLogs) {
-                      this.deps.logger.appendLineNoThrow(
-                        activeRun.runId,
-                        this.deps.logger.formatRunMeta('steam guard usage prompt detected; submitting login command with guard code')
-                      )
-                    }
-                    activeRun.writeInput(`${activeRun.command} ${escapeInteractiveArg(guardCode)}`)
-                  } else {
-                    if (activeRun.persistLogs) {
-                      this.deps.logger.appendLineNoThrow(
-                        activeRun.runId,
-                        this.deps.logger.formatRunMeta('steam guard code prompt detected; submitting direct code response')
-                      )
-                    }
-                    activeRun.writeInput(guardCode)
+                  if (activeRun.persistLogs) {
+                    this.deps.logger.appendLineNoThrow(
+                      activeRun.runId,
+                      this.deps.logger.formatRunMeta('steam guard code prompt detected; submitting direct code response')
+                    )
                   }
+                  activeRun.writeInput(guardCode)
                 })
                 .catch((error) => {
                   this.deps.onFailActiveRun(

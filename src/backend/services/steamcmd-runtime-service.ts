@@ -145,7 +145,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     this.workshopFetchService = new WorkshopFetchService({
       getLoginState: () => this.loginState
     })
-    this.workshopCommandService = new WorkshopCommandService(this.runtimeDir, platformProfile)
+    this.workshopCommandService = new WorkshopCommandService(this.runtimeDir)
   }
 
   getExecutionPolicy(): SteamCmdExecutionPolicy {
