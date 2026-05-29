@@ -109,6 +109,9 @@ app.whenReady().then(async () => {
   )
   await runtimeService.purgeStaleScriptArtifacts()
   runtimeService.setTimeoutSettings(await profileStore.getTimeoutSettings())
+  if (!(await profileStore.getRememberAuth())) {
+    await runtimeService.clearAuthCacheForStrictLogin()
+  }
 
   const resolveSavedWebApiKey = async (): Promise<{
     key?: string
