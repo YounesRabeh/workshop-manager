@@ -188,6 +188,8 @@ export function createDockerRunArgs({
 
   args.push(
     '--env',
+    'CI=true',
+    '--env',
     `HOME=${CONTAINER_HOME_DIR}`,
     '--env',
     'PNPM_HOME=/pnpm',

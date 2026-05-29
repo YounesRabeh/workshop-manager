@@ -194,7 +194,8 @@ function timeoutLimitSeconds(timeoutMs: number): number {
 }
 
 function isTimeoutDisabled(value: string): boolean {
-  return Number(value.trim()) === STEAMCMD_TIMEOUT_DISABLED_VALUE
+  const normalized = value.trim()
+  return /^\d+$/.test(normalized) && Number(normalized) === STEAMCMD_TIMEOUT_DISABLED_VALUE
 }
 
 function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string {

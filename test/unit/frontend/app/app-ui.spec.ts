@@ -965,6 +965,30 @@ describe('App UI validation gates', () => {
     })
   })
 
+  it('does not auto-disable login timeout when clearing the timeout input', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const advancedToggle = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Advanced Options'))
+    expect(advancedToggle).toBeDefined()
+    await advancedToggle?.trigger('click')
+    await flushPromises()
+
+    const timeoutToggle = wrapper.find('.advanced-timeout-toggle input[type="checkbox"]')
+    expect(timeoutToggle.exists()).toBe(true)
+    expect((timeoutToggle.element as HTMLInputElement).checked).toBe(false)
+
+    const timeoutInput = wrapper.find('input[type="number"]')
+    expect(timeoutInput.exists()).toBe(true)
+    await timeoutInput.setValue('')
+    await flushPromises()
+
+    expect(timeoutInput.attributes('disabled')).toBeUndefined()
+    expect((timeoutToggle.element as HTMLInputElement).checked).toBe(false)
+  })
+
   it('saves advanced web api settings from login panel', async () => {
     const wrapper = mount(App)
     await flushPromises()

@@ -61,7 +61,7 @@ Packaging commands always run inside the repo's Docker builder image, even when 
 | --- | --- | --- |
 | Build production bundle only | `pnpm build` | Writes compiled app output to `out/` |
 | Build Linux package | `pnpm build:linux` | Produces Linux `.AppImage` artifacts |
-| Build Windows package | `pnpm build:win` | Produces a Windows portable `.exe` artifact |
+| Build Windows package | `pnpm build:win` | Produces a portable Windows `.exe` artifact, not an installer |
 | Build any target explicitly | `pnpm build:platform <bundle\|linux\|win\|all>` | Generic build entry point |
 | Build Linux and Windows | `pnpm build:all` | Runs both platform packaging commands |
 | Generate icons only | `pnpm icon` | Regenerates derived icon assets |
@@ -74,6 +74,7 @@ Packaging commands always run inside the repo's Docker builder image, even when 
 
 Packaging commands include icon generation and rebuild the app bundle first so artifacts do not ship stale `out/` code.
 The wrapper performs host-side cleanup before entering Docker so stale local Electron processes do not interfere with packaging.
+Docker packaging runs with `CI=true` inside the container so `pnpm` can rebuild the mounted dependency cache without an interactive prompt.
 Persistent Docker build caches live under `~/.cache/workshop-manager/docker-build`.
 Output artifacts are written to `dist/`.
 Use `pnpm build:platform all --checksums` when you want the generic build command plus checksum generation.
@@ -82,7 +83,9 @@ Use `pnpm build:platform all --checksums` when you want the generic build comman
 
 Each public release artifact is accompanied by its own checksum file in `dist/`:
 
+- `Workshop Manager-<version>-linux-x86_64.AppImage`
 - `Workshop Manager-<version>-linux-x86_64.AppImage.checksum.txt`
+- `Workshop Manager-<version>-win-x64.exe`
 - `Workshop Manager-<version>-win-x64.exe.checksum.txt`
 
 Each checksum file contains the SHA-256 hash for its matching artifact. Upload the app files and their `.checksum.txt` companions together on GitHub Releases.

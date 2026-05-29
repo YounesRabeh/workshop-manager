@@ -8,7 +8,7 @@ Common entry points:
 - `pnpm build`: build the production bundle inside Docker
 - `pnpm build:platform <bundle|linux|win|all>`: generic build entry point
 - `pnpm build:linux`: package the Linux AppImage
-- `pnpm build:win`: package the Windows portable `.exe`
+- `pnpm build:win`: package the portable Windows `.exe`
 - `pnpm build:all`: package Linux and Windows artifacts
 - `pnpm checksums`: generate per-artifact `.checksum.txt` files in `dist/`
 - `pnpm release`: build Linux and Windows release artifacts with icons, then generate checksums
@@ -22,3 +22,8 @@ Notable scripts:
 - `sync-app-icon.mjs`: syncs icon assets derived from `resources/img/app-icon.png`
 - `electron-builder-before-build.mjs`: pre-build hook used by Electron Builder
 - `after-sign.mjs`: optional post-sign hook for notarization/signing workflows
+
+Docker notes:
+
+- The Docker runner sets `CI=true` inside the container so `pnpm` can recreate the mounted `node_modules` cache without an interactive prompt.
+- Release packaging is intentionally Docker-based for reproducible Linux AppImage and Windows portable `.exe` artifacts.

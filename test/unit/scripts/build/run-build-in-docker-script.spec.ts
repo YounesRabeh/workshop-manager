@@ -84,6 +84,8 @@ describe('run-build-in-docker script helpers', () => {
         '--security-opt',
         'label=disable',
         '--env',
+        'CI=true',
+        '--env',
         `HOME=${CONTAINER_HOME_DIR}`,
         '--env',
         'PNPM_HOME=/pnpm',
