@@ -150,4 +150,115 @@ describe('WorkshopFetchService', () => {
       })
     ).toBe(true)
   })
+
+  it('uses appid=0 for web api lookup when app filter is not provided', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+
+      if (url.startsWith('https://api.steampowered.com/IPublishedFileService/GetUserFiles/v1/')) {
+        const parsed = new URL(url)
+        expect(parsed.searchParams.get('appid')).toBe('0')
+        return new Response(JSON.stringify({ response: { publishedfiledetails: [] } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      }
+
+      if (url.includes('/myworkshopfiles/')) {
+        return new Response('<html><body>No items here</body></html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' }
+        })
+      }
+
+      if (url === 'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/') {
+        return new Response(JSON.stringify({ response: { publishedfiledetails: [] } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      }
+
+      throw new Error(`Unexpected fetch url: ${url}`)
+    })
+
+    const service = new WorkshopFetchService({
+      getLoginState: () => ({
+        username: 'Alice',
+        steamId64: '76561198000000000'
+      })
+    })
+
+    await service.getMyWorkshopItems(undefined, 'valid-key', { allowWebApi: true })
+
+    expect(
+      fetchSpy.mock.calls.some(([input]) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+        return url.startsWith('https://api.steampowered.com/IPublishedFileService/GetUserFiles/v1/')
+      })
+    ).toBe(true)
+  })
+
+  it('hydrates web api ids-only rows through published file details lookup', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+
+      if (url.startsWith('https://api.steampowered.com/IPublishedFileService/GetUserFiles/v1/')) {
+        return new Response(
+          JSON.stringify({
+            response: {
+              publishedfiledetails: [{ publishedfileid: '555' }]
+            }
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+      }
+
+      if (url === 'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/') {
+        const params = new URLSearchParams(String(init?.body ?? ''))
+        const id = params.get('publishedfileids[0]')
+        return new Response(
+          JSON.stringify({
+            response: {
+              publishedfiledetails: [
+                {
+                  publishedfileid: id,
+                  title: 'Hidden item',
+                  consumer_appid: '480',
+                  visibility: 2,
+                  time_updated: 123
+                }
+              ]
+            }
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+      }
+
+      if (url.includes('/myworkshopfiles/')) {
+        return new Response('<html><body>No items here</body></html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' }
+        })
+      }
+
+      throw new Error(`Unexpected fetch url: ${url}`)
+    })
+
+    const service = new WorkshopFetchService({
+      getLoginState: () => ({
+        username: 'Alice',
+        steamId64: '76561198000000000'
+      })
+    })
+
+    const items = await service.getMyWorkshopItems(undefined, 'valid-key', { allowWebApi: true })
+
+    expect(items.some((item) => item.publishedFileId === '555' && item.visibility === 2)).toBe(true)
+    expect(
+      fetchSpy.mock.calls.some(([input]) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+        return url === 'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/'
+      })
+    ).toBe(true)
+  })
 })

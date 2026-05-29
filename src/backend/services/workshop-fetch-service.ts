@@ -42,6 +42,32 @@ function unresolvedIdentityMessage(
   return `Signed in to Steam, but account identity could not be resolved on this platform. ${action}${webApiHint}`
 }
 
+function extractPublishedFileIds(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object') {
+    return []
+  }
+
+  const response = payload as {
+    response?: {
+      publishedfiledetails?: Array<Record<string, unknown>>
+      publishedfileids?: Array<Record<string, unknown>>
+    }
+  }
+
+  const raw = response.response?.publishedfiledetails ?? response.response?.publishedfileids ?? []
+  const ids = new Set<string>()
+
+  for (const item of raw) {
+    const value = item?.['publishedfileid']
+    const normalized = typeof value === 'string' || typeof value === 'number' ? String(value).trim() : ''
+    if (normalized.length > 0) {
+      ids.add(normalized)
+    }
+  }
+
+  return [...ids]
+}
+
 export class WorkshopFetchService {
   constructor(private readonly context: WorkshopFetchContext) {}
 
@@ -214,18 +240,18 @@ export class WorkshopFetchService {
 
     for (const mode of privacyModes) {
       for (let page = 1; page <= maxPages; page += 1) {
+        // Steam's GetUserFiles expects appid. Use 0 as "all apps" when no filter is selected.
+        const effectiveAppId = appId && appId.trim().length > 0 ? appId.trim() : '0'
         const params = new URLSearchParams({
           key: apiKey,
           steamid: steamId64,
+          appid: effectiveAppId,
           numperpage: String(perPage),
-          page: String(page)
+          page: String(page),
+          return_details: 'true'
         })
         if (mode.value) {
           params.set('privacy', mode.value)
-        }
-
-        if (appId) {
-          params.set('appid', appId)
         }
 
         const response = await fetch(
@@ -238,7 +264,13 @@ export class WorkshopFetchService {
         }
 
         const payload = (await response.json()) as unknown
-        const pageItems = normalizeWorkshopItems(payload)
+        let pageItems = normalizeWorkshopItems(payload)
+        if (pageItems.length === 0) {
+          const ids = extractPublishedFileIds(payload)
+          if (ids.length > 0) {
+            pageItems = await this.fetchPublishedFileDetails(ids)
+          }
+        }
 
         if (pageItems.length === 0) {
           break
