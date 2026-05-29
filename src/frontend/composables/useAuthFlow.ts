@@ -83,6 +83,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     steamGuardPromptType,
     activeChallengeMode,
     setSteamGuardCode,
+    clearQueuedOtp,
     bindQueuedOtpToRun,
     resetSteamGuardState,
     submitQueuedOtpIfReady,
@@ -318,6 +319,14 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
   }
 
+  function applyMobilePreferredOtpGuidance(): void {
+    clearQueuedOtp()
+    steamGuardPromptType.value = 'waiting'
+    activeChallengeMode.value = 'none'
+    statusMessage.value =
+      'Steam requested OTP / Email code, but Steam app approval is selected. Switch to OTP / Email mode and sign in again.'
+  }
+
   function handleRunEvent(event: RunEvent): void {
     if (event.type === 'run_started' && event.phase === 'login') {
       activeLoginRunId.value = event.runId
@@ -346,6 +355,10 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       if (event.promptType === 'steam_guard_mobile') {
         applyMobileChallengeStatus(isStoredSessionLoginAttempt.value)
       } else {
+        if (preferredAuthMode.value === 'steam_guard_mobile') {
+          applyMobilePreferredOtpGuidance()
+          return
+        }
         applyOtpChallengeStatus(isStoredSessionLoginAttempt.value)
         void submitQueuedOtpIfReady(event.runId)
       }
@@ -362,6 +375,10 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         event.line
       )
     ) {
+      if (preferredAuthMode.value === 'steam_guard_mobile' && activeChallengeMode.value !== 'otp') {
+        applyMobilePreferredOtpGuidance()
+        return
+      }
       steamGuardSessionId.value = event.runId
       applyOtpChallengeStatus(isStoredSessionLoginAttempt.value)
       void submitQueuedOtpIfReady(event.runId)

@@ -20,6 +20,7 @@ interface SessionRunOptions {
   emitRunEvents?: boolean
   persistLogs?: boolean
   disableSteamGuardPromptHandling?: boolean
+  failOnSteamGuardCodePrompt?: boolean
 }
 
 type RunPhase = 'login' | 'upload' | 'update' | 'visibility'
@@ -44,6 +45,7 @@ interface ActiveInteractiveRun {
   lineQueue: Promise<void>
   pendingResult: { exitCode: number; runtimeError?: AppError } | null
   disableSteamGuardPromptHandling: boolean
+  failOnSteamGuardCodePrompt: boolean
   guardMobilePromptSent: boolean
   guardCodeSubmissionCount: number
   lastSubmittedGuardCode: string | null
@@ -81,6 +83,7 @@ interface ActiveRunConfig {
   commandDispatched?: boolean
   waitForPromptBeforeDispatch?: boolean
   disableSteamGuardPromptHandling?: boolean
+  failOnSteamGuardCodePrompt?: boolean
 }
 
 interface SteamCmdSessionState {

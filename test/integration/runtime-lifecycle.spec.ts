@@ -1047,7 +1047,51 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       expect(spawn).toHaveBeenCalledTimes(1)
       expect(generatedScripts[0]).toContain('login alice secret')
       expect(generatedScripts[0]).not.toContain('12345')
-      expect(childRef?.commands).toContain('set_steam_guard_code 12345')
+      expect(childRef?.commands).toContain('12345')
+    } finally {
+      if (originalExecutionMode === undefined) {
+        delete process.env['STEAMCMD_EXECUTION_MODE']
+      } else {
+        process.env['STEAMCMD_EXECUTION_MODE'] = originalExecutionMode
+      }
+    }
+  })
+
+  it('fails fast in script mode when mobile auth is preferred but Steam requests OTP/email code', async () => {
+    const originalExecutionMode = process.env['STEAMCMD_EXECUTION_MODE']
+    process.env['STEAMCMD_EXECUTION_MODE'] = 'script'
+
+    try {
+      const root = await mkdtemp(join(tmpdir(), 'runtime-service-script-mobile-fail-fast-'))
+      const store = new RunLogStore(join(root, 'runs'))
+
+      ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+          throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+        }
+
+        return createOneShotGuardChallengeChild({
+          promptLines: [
+            'This computer has not been authenticated for your account using Steam Guard.',
+            "You can also enter this code at any time using 'set_steam_guard_code'"
+          ],
+          promptWithoutNewline: 'Steam Guard code:',
+          expectedGuardCode: 'never-submitted',
+          successLines: []
+        })
+      })
+
+      const runtime = new SteamCmdRuntimeService(
+        async () => '/usr/bin/steamcmd',
+        store,
+        join(root, 'runtime'),
+        'linux'
+      )
+
+      await expect(runtime.login('alice', 'secret', false, 'steam_guard_mobile')).rejects.toThrow(
+        'Steam requested OTP / Email code for this sign-in. Switch Security mode to OTP / Email code and retry.'
+      )
+      expect(spawn).toHaveBeenCalledTimes(1)
     } finally {
       if (originalExecutionMode === undefined) {
         delete process.env['STEAMCMD_EXECUTION_MODE']
@@ -1332,7 +1376,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     await expect(loginPromise).rejects.toThrow('SteamCMD run cancelled by user.')
   })
 
-  it('detects Linux split Steam Guard email prompt lines and submits set_steam_guard_code', async () => {
+  it('detects Linux split Steam Guard email prompt lines and submits direct guard code at the explicit prompt', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-guard-split-lines-'))
     const store = new RunLogStore(join(root, 'runs'))
 
@@ -1353,10 +1397,11 @@ describe('SteamCmdRuntimeService lifecycle', () => {
             'Please check your email for the message from Steam, and enter the Steam Guard',
             'code from that message.',
             "You can also enter this code at any time using 'set_steam_guard_code'",
-            'at the console.'
+            'at the console.',
+            'Steam Guard code:'
           ]
         },
-        setSteamGuardCode: {
+        guardCode: {
           lines: [
             "Logging in user 'alice' [U:1:42] to Steam Public...OK",
             'Waiting for user info...OK'
@@ -1391,7 +1436,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     runtime.submitSteamGuardCode(sessionId, '12345')
 
     await vi.waitFor(() => {
-      expect(childRef?.commands).toContain('set_steam_guard_code 12345')
+      expect(childRef?.commands).toContain('12345')
     })
     expect(guardPromptCount).toBe(1)
 
@@ -1441,7 +1486,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     await expect(loginPromise).rejects.toThrow('SteamCMD run cancelled by user.')
   })
 
-  it('requests a fresh guard code when Steam follows set_steam_guard_code with explicit prompt', async () => {
+  it('requests a fresh guard code when Steam repeats the explicit code prompt', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-guard-fresh-prompt-'))
     const store = new RunLogStore(join(root, 'runs'))
 
@@ -1460,14 +1505,13 @@ describe('SteamCmdRuntimeService lifecycle', () => {
           lines: [
             'This computer has not been authenticated for your account using Steam Guard.',
             "You can also enter this code at any time using 'set_steam_guard_code'",
-            'at the console.'
+            'at the console.',
+            'Steam Guard code:'
           ]
-        },
-        setSteamGuardCode: {
-          lines: ['Steam Guard code:']
         },
         guardCode: {
           lines: [
+            'Steam Guard code:',
             "Logging in user 'alice' [U:1:42] to Steam Public...OK",
             'Waiting for user info...OK'
           ]
@@ -1504,10 +1548,10 @@ describe('SteamCmdRuntimeService lifecycle', () => {
 
     const loginResult = await loginPromise
     expect(loginResult.sessionId).toBe(sessionId)
-    expect(childRef?.commands).toContain('set_steam_guard_code 12345')
+    expect(childRef?.commands).toContain('12345')
     expect(childRef?.commands).toContain('67890')
-    expect(childRef?.commands).not.toContain('12345')
-    expect(guardPromptCount).toBe(2)
+    expect(childRef?.commands).not.toContain('set_steam_guard_code 12345')
+    expect(guardPromptCount).toBe(3)
   })
 
   it('fails fast with steam_guard error when submitted code is invalid', async () => {
@@ -1518,9 +1562,12 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() =>
       createInteractiveFakeChild({
         login: {
-          lines: ['This computer has not been authenticated for your account using Steam Guard.']
+          lines: [
+            'This computer has not been authenticated for your account using Steam Guard.',
+            'Steam Guard code:'
+          ]
         },
-        setSteamGuardCode: {
+        guardCode: {
           lines: ['That Steam Guard code was invalid.']
         }
       })
@@ -1573,9 +1620,12 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       .mockImplementationOnce(() => {
         firstChild = createInteractiveFakeChild({
           login: {
-            lines: ['This computer has not been authenticated for your account using Steam Guard.']
+            lines: [
+              'This computer has not been authenticated for your account using Steam Guard.',
+              'Steam Guard code:'
+            ]
           },
-          setSteamGuardCode: {
+          guardCode: {
             lines: ['That Steam Guard code was invalid.']
           }
         })

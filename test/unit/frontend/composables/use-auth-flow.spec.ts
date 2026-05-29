@@ -336,7 +336,7 @@ describe('useAuthFlow composable', () => {
     )
   })
 
-  it('auto-switches challenge copy when steam requests OTP while mobile is preferred', () => {
+  it('does not switch to OTP challenge when steam requests OTP while mobile is preferred', () => {
     const flow = useAuthFlow({
       onShowTimeoutLogs: vi.fn(async () => undefined),
       onHideTimeoutLogs: vi.fn(),
@@ -359,11 +359,13 @@ describe('useAuthFlow composable', () => {
       promptType: 'steam_guard_code'
     })
 
-    expect(flow.activeChallengeMode.value).toBe('otp')
-    expect(flow.statusMessage.value).toContain('Steam requested OTP / Email code')
+    expect(flow.activeChallengeMode.value).toBe('none')
+    expect(flow.statusMessage.value).toContain(
+      'Steam requested OTP / Email code, but Steam app approval is selected.'
+    )
   })
 
-  it('detects OTP challenge from steamcmd usage output format while mobile is preferred', () => {
+  it('keeps mobile mode guidance for steamcmd usage OTP prompt while mobile is preferred', () => {
     const flow = useAuthFlow({
       onShowTimeoutLogs: vi.fn(async () => undefined),
       onHideTimeoutLogs: vi.fn(),
@@ -386,11 +388,13 @@ describe('useAuthFlow composable', () => {
       line: 'login <username> [<password>] [<Steam guard code>]'
     })
 
-    expect(flow.activeChallengeMode.value).toBe('otp')
-    expect(flow.statusMessage.value).toContain('Steam requested OTP / Email code')
+    expect(flow.activeChallengeMode.value).toBe('none')
+    expect(flow.statusMessage.value).toContain(
+      'Steam requested OTP / Email code, but Steam app approval is selected.'
+    )
   })
 
-  it('detects OTP challenge from Linux split Steam Guard email prompt line while mobile is preferred', () => {
+  it('keeps mobile mode guidance for Linux split Steam Guard email prompt while mobile is preferred', () => {
     const flow = useAuthFlow({
       onShowTimeoutLogs: vi.fn(async () => undefined),
       onHideTimeoutLogs: vi.fn(),
@@ -413,8 +417,10 @@ describe('useAuthFlow composable', () => {
       line: 'Please check your email for the message from Steam, and enter the Steam Guard'
     })
 
-    expect(flow.activeChallengeMode.value).toBe('otp')
-    expect(flow.statusMessage.value).toContain('Steam requested OTP / Email code')
+    expect(flow.activeChallengeMode.value).toBe('none')
+    expect(flow.statusMessage.value).toContain(
+      'Steam requested OTP / Email code, but Steam app approval is selected.'
+    )
   })
 
   it('marks verification approved when post-approval login progress arrives without explicit OK suffix', () => {

@@ -191,7 +191,12 @@ app.whenReady().then(async () => {
       rememberAuth,
       preferredAuthMode
     })
-    const state = await runtimeService.login(payload.username, payload.password, effectiveUseStoredAuth)
+    const state = await runtimeService.login(
+      payload.username,
+      payload.password,
+      effectiveUseStoredAuth,
+      preferredAuthMode
+    )
     // Stored session needs username next launch, so keep username when rememberAuth is enabled.
     await profileStore.setRememberedLoginState({
       rememberedUsername: rememberUsername ? payload.username : undefined,

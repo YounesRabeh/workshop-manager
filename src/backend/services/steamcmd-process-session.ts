@@ -183,6 +183,7 @@ export class SteamCmdProcessSession {
     if (this.state.activeInteractiveRun !== activeRun) {
       return
     }
+    const processHandle = this.state.activeRuns.get(activeRun.runId)
     const normalizedError =
       error instanceof AppError ? error : new AppError('command_failed', error.message)
     this.rejectPendingSteamGuard(activeRun.runId, normalizedError)
@@ -191,6 +192,7 @@ export class SteamCmdProcessSession {
       runtimeError: normalizedError
     }
     this.finishActiveRun(activeRun)
+    processHandle?.kill('SIGTERM')
   }
 
   async run(
@@ -234,6 +236,7 @@ export class SteamCmdProcessSession {
           emitOutputEvents: options.emitOutputEvents === true,
           timeout,
           disableSteamGuardPromptHandling: options.disableSteamGuardPromptHandling === true,
+          failOnSteamGuardCodePrompt: options.failOnSteamGuardCodePrompt === true,
           writeInput: (value: string) => {
             this.processManager.writeInteractiveInput(value)
           },
@@ -317,6 +320,7 @@ export class SteamCmdProcessSession {
           emitOutputEvents: options.emitOutputEvents === true,
           timeout,
           disableSteamGuardPromptHandling: options.disableSteamGuardPromptHandling === true,
+          failOnSteamGuardCodePrompt: options.failOnSteamGuardCodePrompt === true,
           writeInput: (value: string) => {
             this.processManager.writeInteractiveInput(value)
           },
@@ -379,6 +383,7 @@ export class SteamCmdProcessSession {
           emitOutputEvents: options.emitOutputEvents === true,
           timeout,
           disableSteamGuardPromptHandling: options.disableSteamGuardPromptHandling === true,
+          failOnSteamGuardCodePrompt: options.failOnSteamGuardCodePrompt === true,
           writeInput: (value: string) => {
             child.stdin.write(`${value}${this.platformBehavior.interactiveLineEnding}`)
           },

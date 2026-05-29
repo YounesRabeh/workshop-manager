@@ -8,6 +8,7 @@ import { mkdir, readdir, rm } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import type {
+  PreferredAuthMode,
   RunEvent,
   RunResult,
   SteamProfileSummary,
@@ -269,7 +270,12 @@ export class SteamCmdRuntimeService extends EventEmitter {
     ])
   }
 
-  async login(username: string, password: string, useStoredAuth = false): Promise<{ sessionId: string }> {
+  async login(
+    username: string,
+    password: string,
+    useStoredAuth = false,
+    preferredAuthMode: PreferredAuthMode = 'otp'
+  ): Promise<{ sessionId: string }> {
     const normalizedUsername = username.trim()
     if (!normalizedUsername) {
       throw new AppError('validation', 'Steam username is required')
@@ -309,6 +315,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
           username: normalizedUsername,
           password,
           useStoredAuth,
+          preferredAuthMode,
           timeoutMs
         })
       : await this.runCompatibilityInteractiveLogin(runId, args, timeoutMs)
@@ -546,6 +553,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     username: string
     password: string
     useStoredAuth: boolean
+    preferredAuthMode: PreferredAuthMode
     timeoutMs: number
   }): Promise<{ lines: string[]; exitCode: number }> {
     const scriptContent = buildSteamCmdLoginScript({
@@ -560,7 +568,8 @@ export class SteamCmdRuntimeService extends EventEmitter {
         await this.processSession.runOneShot(options.runId, ['+runscript', scriptPath], {
           phase: 'login',
           timeoutMs: options.timeoutMs,
-          emitOutputEvents: true
+          emitOutputEvents: true,
+          failOnSteamGuardCodePrompt: options.preferredAuthMode === 'steam_guard_mobile'
         })
     })
   }
