@@ -35,7 +35,7 @@ const workshop = {
     steamCmdInstalled: true,
     steamCmdSource: 'auto',
     timeouts: {
-      loginTimeoutMs: 30_000,
+      loginTimeoutMs: 60_000,
       storedSessionTimeoutMs: 10_000,
       workshopTimeoutMs: 60_000
     }
@@ -63,7 +63,7 @@ const workshop = {
     steamCmdInstalled: true,
     steamCmdSource: payload.steamCmdManualPath?.trim() ? 'manual' : 'auto',
     timeouts: {
-      loginTimeoutMs: payload.timeouts?.loginTimeoutMs ?? 30_000,
+      loginTimeoutMs: payload.timeouts?.loginTimeoutMs ?? 60_000,
       storedSessionTimeoutMs: payload.timeouts?.storedSessionTimeoutMs ?? 10_000,
       workshopTimeoutMs: payload.timeouts?.workshopTimeoutMs ?? 60_000
     }
@@ -718,7 +718,7 @@ describe('App UI validation gates', () => {
       steamCmdInstalled: true,
       steamCmdSource: 'auto',
       timeouts: {
-        loginTimeoutMs: 30_000,
+        loginTimeoutMs: 60_000,
         storedSessionTimeoutMs: 10_000,
         workshopTimeoutMs: 60_000
       }
@@ -786,7 +786,7 @@ describe('App UI validation gates', () => {
 
     const timeoutInputs = wrapper.findAll('input[type="number"]')
     expect(timeoutInputs).toHaveLength(3)
-    expect((timeoutInputs[0]!.element as HTMLInputElement).value).toBe('30')
+    expect((timeoutInputs[0]!.element as HTMLInputElement).value).toBe('60')
     expect((timeoutInputs[1]!.element as HTMLInputElement).value).toBe('10')
     expect((timeoutInputs[2]!.element as HTMLInputElement).value).toBe('60')
     await timeoutInputs[0].setValue('45')
@@ -853,7 +853,7 @@ describe('App UI validation gates', () => {
       webApiKey: undefined,
       steamCmdManualPath: '',
       timeouts: {
-        loginTimeoutMs: 30_000,
+        loginTimeoutMs: 60_000,
         storedSessionTimeoutMs: 0,
         workshopTimeoutMs: 0
       }
@@ -866,7 +866,7 @@ describe('App UI validation gates', () => {
 
     const advancedToggle = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Advanced Developer Options'))
+      .find((button) => button.text().includes('Advanced Options'))
     expect(advancedToggle).toBeDefined()
     await advancedToggle?.trigger('click')
     await flushPromises()
@@ -933,7 +933,7 @@ describe('App UI validation gates', () => {
 
     const advancedToggle = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Advanced Developer Options'))
+      .find((button) => button.text().includes('Advanced Options'))
     expect(advancedToggle).toBeDefined()
     await advancedToggle?.trigger('click')
     await flushPromises()
@@ -969,14 +969,6 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(false)
-    const toggleButton = wrapper
-      .findAll('button')
-      .find((button) => button.text().trim() === 'Show API Options')
-    expect(toggleButton).toBeDefined()
-    await toggleButton?.trigger('click')
-    await flushPromises()
-
     const apiKeyInput = wrapper.find('input[placeholder="Paste key..."]')
     expect(apiKeyInput.exists()).toBe(true)
     await apiKeyInput.setValue('dev-key-123')
@@ -993,36 +985,20 @@ describe('App UI validation gates', () => {
       webApiKey: 'dev-key-123',
       steamCmdManualPath: '',
       timeouts: {
-        loginTimeoutMs: 30_000,
+        loginTimeoutMs: 60_000,
         storedSessionTimeoutMs: 10_000,
         workshopTimeoutMs: 60_000
       }
     })
   })
 
-  it('toggles api key section visibility in credentials', async () => {
+  it('keeps api key section visible in credentials by default', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(false)
-
-    const showButton = wrapper
-      .findAll('button')
-      .find((button) => button.text().trim() === 'Show API Options')
-    expect(showButton).toBeDefined()
-    await showButton?.trigger('click')
-    await flushPromises()
-
     expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(true)
-
-    const hideButton = wrapper
-      .findAll('button')
-      .find((button) => button.text().trim() === 'Hide API Options')
-    expect(hideButton).toBeDefined()
-    await hideButton?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Show API Options')
+    expect(wrapper.text()).not.toContain('Hide API Options')
   })
 
   it('saves advanced settings with no key without enabling web api', async () => {
@@ -1031,7 +1007,7 @@ describe('App UI validation gates', () => {
 
     const advancedToggle = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Advanced Developer Options'))
+      .find((button) => button.text().includes('Advanced Options'))
     expect(advancedToggle).toBeDefined()
     await advancedToggle?.trigger('click')
     await flushPromises()
@@ -1048,7 +1024,7 @@ describe('App UI validation gates', () => {
       webApiKey: undefined,
       steamCmdManualPath: '',
       timeouts: {
-        loginTimeoutMs: 30_000,
+        loginTimeoutMs: 60_000,
         storedSessionTimeoutMs: 10_000,
         workshopTimeoutMs: 60_000
       }
@@ -1064,20 +1040,13 @@ describe('App UI validation gates', () => {
       steamCmdInstalled: true,
       steamCmdSource: 'auto',
       timeouts: {
-        loginTimeoutMs: 30_000,
+        loginTimeoutMs: 60_000,
         storedSessionTimeoutMs: 10_000,
         workshopTimeoutMs: 60_000
       }
     })
 
     const wrapper = mount(App)
-    await flushPromises()
-
-    const toggleButton = wrapper
-      .findAll('button')
-      .find((button) => button.text().trim() === 'Show API Options')
-    expect(toggleButton).toBeDefined()
-    await toggleButton?.trigger('click')
     await flushPromises()
 
     const clearButton = wrapper
@@ -1099,7 +1068,7 @@ describe('App UI validation gates', () => {
 
     const advancedToggle = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Advanced Developer Options'))
+      .find((button) => button.text().includes('Advanced Options'))
     expect(advancedToggle).toBeDefined()
     await advancedToggle?.trigger('click')
     await flushPromises()
@@ -1128,7 +1097,7 @@ describe('App UI validation gates', () => {
       webApiKey: undefined,
       steamCmdManualPath: '/tools/steamcmd.sh',
       timeouts: {
-        loginTimeoutMs: 30_000,
+        loginTimeoutMs: 60_000,
         storedSessionTimeoutMs: 10_000,
         workshopTimeoutMs: 60_000
       }
@@ -1144,7 +1113,7 @@ describe('App UI validation gates', () => {
       steamCmdInstalled: true,
       steamCmdSource: 'auto',
       timeouts: {
-        loginTimeoutMs: 30_000,
+        loginTimeoutMs: 60_000,
         storedSessionTimeoutMs: 10_000,
         workshopTimeoutMs: 60_000
       }
@@ -1157,7 +1126,7 @@ describe('App UI validation gates', () => {
       steamCmdInstalled: true,
       steamCmdSource: 'manual',
       timeouts: {
-        loginTimeoutMs: 30_000,
+        loginTimeoutMs: 60_000,
         storedSessionTimeoutMs: 10_000,
         workshopTimeoutMs: 60_000
       }
@@ -1168,7 +1137,7 @@ describe('App UI validation gates', () => {
 
     const advancedToggle = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Advanced Developer Options'))
+      .find((button) => button.text().includes('Advanced Options'))
     expect(advancedToggle).toBeDefined()
     await advancedToggle?.trigger('click')
     await flushPromises()
@@ -1193,7 +1162,7 @@ describe('App UI validation gates', () => {
       webApiKey: undefined,
       steamCmdManualPath: '/tools/steamcmd.sh',
       timeouts: {
-        loginTimeoutMs: 30_000,
+        loginTimeoutMs: 60_000,
         storedSessionTimeoutMs: 10_000,
         workshopTimeoutMs: 60_000
       }

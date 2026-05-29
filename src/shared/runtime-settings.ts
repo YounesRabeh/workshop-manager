@@ -20,7 +20,7 @@ interface TimeoutFieldDefinition {
 
 const TIMEOUT_FIELD_DEFINITIONS: Record<TimeoutKey, TimeoutFieldDefinition> = {
   loginTimeoutMs: {
-    defaultValue: 30_000,
+    defaultValue: 60_000,
     min: 5_000,
     max: 180_000
   },

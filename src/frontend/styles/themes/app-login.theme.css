@@ -188,19 +188,24 @@
 
 .login-form {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.72rem;
 }
 
 .login-primary-grid {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.65rem;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .login-secondary-grid {
   display: grid;
-  gap: 0.75rem;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  gap: 0.65rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.login-credentials-stack {
+  display: grid;
+  gap: 0.65rem;
 }
 
 .login-block {
@@ -211,10 +216,15 @@
   padding: 0.85rem 0.9rem;
 }
 
-.login-actions-block {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+.login-actions-inline {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.login-inline-actions-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
 }
 
 .login-block-title {
@@ -234,9 +244,9 @@
 }
 
 .login-api-card {
-  margin-top: 0.85rem;
+  margin-top: 0.65rem;
   border-top: 1px solid rgba(72, 108, 133, 0.45);
-  padding-top: 0.85rem;
+  padding-top: 0.7rem;
 }
 
 .login-api-header {
@@ -288,9 +298,9 @@
 
 .login-api-actions {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.48rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 0.65rem;
+  margin-top: 0.52rem;
 }
 
 .login-input {
@@ -492,6 +502,10 @@
 
   .login-secondary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .login-inline-actions-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

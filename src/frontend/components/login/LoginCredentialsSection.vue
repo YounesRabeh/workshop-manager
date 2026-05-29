@@ -7,8 +7,6 @@ const props = defineProps<{
   passwordPlaceholder: string
   advancedSettings: AdvancedSettingsState
   isWebApiKeyPeek: boolean
-  isApiSectionExpanded: boolean
-  apiSectionToggleLabel: string
   webApiStatusLabel: string
   webApiStatusClass: string
   webApiStorageHint: string
@@ -23,7 +21,6 @@ const emit = defineEmits<{
   (e: 'update-password', value: string): void
   (e: 'set-password-peek', value: boolean): void
   (e: 'update-web-api-key', value: string): void
-  (e: 'toggle-api-section'): void
   (e: 'set-web-api-key-peek', value: boolean): void
   (e: 'save-advanced-settings'): void
   (e: 'clear-web-api-key'): void
@@ -84,19 +81,9 @@ const emit = defineEmits<{
             Add a Web API key to fully use this app, including non-public Workshop items.
           </p>
         </div>
-        <div class="login-api-header-actions">
-          <button
-            type="button"
-            class="login-peek login-api-toggle rounded px-3 py-2 text-xs font-semibold"
-            :aria-expanded="isApiSectionExpanded ? 'true' : 'false'"
-            @click="emit('toggle-api-section')"
-          >
-            {{ apiSectionToggleLabel }}
-          </button>
-        </div>
       </div>
 
-      <div v-if="isApiSectionExpanded">
+      <div>
         <label class="advanced-label mt-3">Steam Web API Key</label>
         <p class="mt-1 text-xs">
           <a

@@ -122,7 +122,7 @@ Steam>`)
   })
 
   it('uses a longer timeout for full logins than stored-session reuse', () => {
-    expect(resolveLoginTimeoutMs(false)).toBe(30_000)
+    expect(resolveLoginTimeoutMs(false)).toBe(60_000)
     expect(resolveLoginTimeoutMs(true)).toBe(10_000)
     expect(
       resolveLoginTimeoutMs(true, {

@@ -77,12 +77,6 @@ function authIssueClasses(tone: AuthIssueTone): string {
   return 'login-note-info'
 }
 
-const isApiSectionExpanded = ref(false)
-
-function toggleApiSection(): void {
-  isApiSectionExpanded.value = !isApiSectionExpanded.value
-}
-
 const canSubmitLogin = computed(() => {
   const hasUsername = props.loginForm.username.trim().length > 0
   const hasPassword = props.loginForm.password.trim().length > 0
@@ -131,10 +125,6 @@ const webApiStorageHint = computed(() => {
     return 'Saved keys are encrypted using OS secure storage.'
   }
   return 'Secure storage is unavailable on this system. Leave the key empty to continue without non-public item access.'
-})
-
-const apiSectionToggleLabel = computed(() => {
-  return isApiSectionExpanded.value ? 'Hide API Options' : 'Show API Options'
 })
 
 const submitLabel = computed(() => {
@@ -430,32 +420,61 @@ watch(
           </button>
         </header>
 
-        <form ref="loginFormRef" class="login-form mt-5" @submit.prevent="emit('submit-login')">
+        <form ref="loginFormRef" class="login-form mt-3" @submit.prevent="emit('submit-login')">
           <div class="login-primary-grid">
-            <LoginCredentialsSection
-              :login-form="loginForm"
-              :is-password-peek="isPasswordPeek"
-              :password-placeholder="passwordPlaceholder"
-              :advanced-settings="advancedSettings"
-              :is-web-api-key-peek="isWebApiKeyPeek"
-              :is-api-section-expanded="isApiSectionExpanded"
-              :api-section-toggle-label="apiSectionToggleLabel"
-              :web-api-status-label="webApiStatusLabel"
-              :web-api-status-class="webApiStatusClass"
-              :web-api-storage-hint="webApiStorageHint"
-              :is-web-api-key-save-blocked="isWebApiKeySaveBlocked"
-              :can-save-web-api-key="canSaveWebApiKey"
-              :can-clear-saved-web-api-key="canClearSavedWebApiKey"
-              :on-control-arrow-key="onLoginControlArrowKey"
-              @update-username="onUsernameInput"
-              @update-password="onPasswordInput"
-              @set-password-peek="emit('set-password-peek', $event)"
-              @update-web-api-key="emit('update-web-api-key', $event)"
-              @toggle-api-section="toggleApiSection"
-              @set-web-api-key-peek="emit('set-web-api-key-peek', $event)"
-              @save-advanced-settings="emit('save-advanced-settings')"
-              @clear-web-api-key="emit('clear-web-api-key')"
-            />
+            <div class="login-credentials-stack">
+              <LoginCredentialsSection
+                :login-form="loginForm"
+                :is-password-peek="isPasswordPeek"
+                :password-placeholder="passwordPlaceholder"
+                :advanced-settings="advancedSettings"
+                :is-web-api-key-peek="isWebApiKeyPeek"
+                :web-api-status-label="webApiStatusLabel"
+                :web-api-status-class="webApiStatusClass"
+                :web-api-storage-hint="webApiStorageHint"
+                :is-web-api-key-save-blocked="isWebApiKeySaveBlocked"
+                :can-save-web-api-key="canSaveWebApiKey"
+                :can-clear-saved-web-api-key="canClearSavedWebApiKey"
+                :on-control-arrow-key="onLoginControlArrowKey"
+                @update-username="onUsernameInput"
+                @update-password="onPasswordInput"
+                @set-password-peek="emit('set-password-peek', $event)"
+                @update-web-api-key="emit('update-web-api-key', $event)"
+                @set-web-api-key-peek="emit('set-web-api-key-peek', $event)"
+                @save-advanced-settings="emit('save-advanced-settings')"
+                @clear-web-api-key="emit('clear-web-api-key')"
+              />
+
+              <section class="login-block login-actions-inline">
+                <button
+                  data-login-control="submit"
+                  type="submit"
+                  class="login-submit w-full rounded px-3 py-2 text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="!canSubmitLogin"
+                  @keydown="onLoginControlArrowKey($event, 4)"
+                >
+                  {{ submitLabel }}
+                </button>
+
+                <div class="login-inline-actions-row">
+                  <button
+                    type="button"
+                    class="login-peek rounded px-3 py-2 text-xs font-semibold"
+                    @click="emit('toggle-advanced-options')"
+                  >
+                    {{ isAdvancedOptionsOpen ? 'Hide Advanced Options' : 'Advanced Options' }}
+                  </button>
+
+                  <button
+                    type="button"
+                    class="login-quit rounded px-3 py-2 text-xs font-semibold"
+                    @click="emit('quit-app')"
+                  >
+                    Quit
+                  </button>
+                </div>
+              </section>
+            </div>
 
             <LoginSecuritySection
               :preferred-auth-mode="preferredAuthMode"
@@ -484,34 +503,6 @@ watch(
               @update-remember-auth="onRememberAuthChange"
               @clear-stored-session="emit('clear-stored-session')"
             />
-
-            <section class="login-block login-actions-block">
-              <button
-                data-login-control="submit"
-                type="submit"
-                class="login-submit w-full rounded px-3 py-2 text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="!canSubmitLogin"
-                @keydown="onLoginControlArrowKey($event, 4)"
-              >
-                {{ submitLabel }}
-              </button>
-
-              <button
-                type="button"
-                class="login-peek mt-3 w-full rounded px-3 py-2 text-xs font-semibold"
-                @click="emit('toggle-advanced-options')"
-              >
-                {{ isAdvancedOptionsOpen ? 'Hide Advanced Options' : 'Advanced Developer Options' }}
-              </button>
-
-              <button
-                type="button"
-                class="login-quit mt-3 w-full rounded px-3 py-2 text-xs font-semibold"
-                @click="emit('quit-app')"
-              >
-                Quit
-              </button>
-            </section>
           </div>
 
           <AdvancedSettingsPanel
