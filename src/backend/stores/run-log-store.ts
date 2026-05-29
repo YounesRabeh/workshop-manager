@@ -84,6 +84,24 @@ export class RunLogStore {
     this.scheduleFlush()
   }
 
+  async appendDiagnosticLine(line: string): Promise<void> {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer)
+      this.flushTimer = null
+    }
+    await this.flushPendingLines()
+
+    for (const current of this.runs.values()) {
+      current.lines.push(line)
+      current.steamOutputSummary = current.lines.slice(-25).join('\n')
+    }
+
+    await this.withWriteLock(async () => {
+      await mkdir(this.logsDir, { recursive: true })
+      await appendFile(this.getSessionLogPath(), `${line}\n`, 'utf8')
+    })
+  }
+
   async finalize(runId: string, update: Partial<PersistedRunLog>): Promise<PersistedRunLog> {
     if (this.flushTimer) {
       clearTimeout(this.flushTimer)

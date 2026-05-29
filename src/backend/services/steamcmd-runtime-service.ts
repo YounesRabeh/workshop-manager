@@ -143,7 +143,10 @@ export class SteamCmdRuntimeService extends EventEmitter {
     }, platformProfile)
     this.steamIdentityResolver = new SteamIdentityResolver(platformProfile)
     this.workshopFetchService = new WorkshopFetchService({
-      getLoginState: () => this.loginState
+      getLoginState: () => this.loginState,
+      appendDiagnosticLog: async (line) => {
+        await this.runLogStore.appendDiagnosticLine(line)
+      }
     })
     this.workshopCommandService = new WorkshopCommandService(this.runtimeDir)
   }

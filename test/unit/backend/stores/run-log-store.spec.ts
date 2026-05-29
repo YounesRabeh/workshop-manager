@@ -36,6 +36,23 @@ describe('RunLogStore batching', () => {
     expect(persisted.trim().split('\n')).toEqual(['first', 'second'])
   })
 
+  it('appends diagnostic lines after pending run output', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'run-log-store-diagnostic-'))
+    const store = new RunLogStore(join(root, 'logs'))
+    const runId = 'run-diagnostic'
+    await store.create(runId)
+
+    await store.appendLine(runId, 'login line')
+    await store.appendDiagnosticLine('[API_META] web_api request status=200')
+
+    const finalized = await store.finalize(runId, { success: true, status: 'success' })
+    const persisted = await readFile(finalized.logPath, 'utf8')
+    expect(persisted.trim().split('\n')).toEqual([
+      'login line',
+      '[API_META] web_api request status=200'
+    ])
+  })
+
   it('does not drop lines under high-volume append bursts', async () => {
     const root = await mkdtemp(join(tmpdir(), 'run-log-store-burst-'))
     const store = new RunLogStore(join(root, 'logs'))

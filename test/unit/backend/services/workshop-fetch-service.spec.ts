@@ -198,6 +198,63 @@ describe('WorkshopFetchService', () => {
     ).toBe(true)
   })
 
+  it('logs web api request diagnostics without exposing the api key', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+
+      if (url.startsWith('https://api.steampowered.com/IPublishedFileService/GetUserFiles/v1/')) {
+        const parsed = new URL(url)
+        const privacy = parsed.searchParams.get('privacy')
+        const rows = privacy === null
+          ? [{
+              publishedfileid: '555',
+              title: 'Hidden item',
+              consumer_appid: '480',
+              visibility: 2,
+              time_updated: 123
+            }]
+          : []
+
+        return new Response(JSON.stringify({ response: { publishedfiledetails: rows } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      }
+
+      if (url.includes('/myworkshopfiles/')) {
+        return new Response('<html><body>No items here</body></html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' }
+        })
+      }
+
+      throw new Error(`Unexpected fetch url: ${url}`)
+    })
+
+    const diagnosticLines: string[] = []
+    const service = new WorkshopFetchService({
+      getLoginState: () => ({
+        username: 'Alice',
+        steamId64: '76561198000000000'
+      }),
+      appendDiagnosticLog: (line) => {
+        diagnosticLines.push(line)
+      }
+    })
+
+    const items = await service.getMyWorkshopItems('480', 'secret-api-key', {
+      allowWebApi: true,
+      webApiAccess: 'active'
+    })
+
+    expect(items.some((item) => item.publishedFileId === '555' && item.visibility === 2)).toBe(true)
+    expect(diagnosticLines.some((line) => line.includes('web_api request appid=480 privacy=any page=1 status=200'))).toBe(true)
+    expect(diagnosticLines.some((line) => line.includes('web_api response appid=480 privacy=any page=1 rawRows=1 ids=0 normalized=1'))).toBe(true)
+    expect(diagnosticLines.some((line) => line.includes('workshop list combined'))).toBe(true)
+    expect(diagnosticLines.join('\n')).not.toContain('secret-api-key')
+    expect(diagnosticLines.join('\n')).not.toContain('key=')
+  })
+
   it('hydrates web api ids-only rows through published file details lookup', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url

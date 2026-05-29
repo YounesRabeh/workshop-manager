@@ -16,6 +16,7 @@ import {
 
 interface WorkshopFetchContext {
   getLoginState: () => { username: string; steamId64?: string } | null
+  appendDiagnosticLog?: (line: string) => void | Promise<void>
 }
 
 export type WorkshopWebApiAccessState = 'active' | 'configured_unavailable' | 'disabled'
@@ -71,12 +72,35 @@ function extractPublishedFileIds(payload: unknown): string[] {
 export class WorkshopFetchService {
   constructor(private readonly context: WorkshopFetchContext) {}
 
+  private appendDiagnosticLog(line: string): void {
+    const result = this.context.appendDiagnosticLog?.(`[API_META] ${line}`)
+    if (result) {
+      void Promise.resolve(result).catch(() => undefined)
+    }
+  }
+
+  private countRawPublishedFileRows(payload: unknown): number {
+    if (!payload || typeof payload !== 'object') {
+      return 0
+    }
+
+    const response = payload as {
+      response?: {
+        publishedfiledetails?: Array<Record<string, unknown>>
+        publishedfileids?: Array<Record<string, unknown>>
+      }
+    }
+
+    return (response.response?.publishedfiledetails ?? response.response?.publishedfileids ?? []).length
+  }
+
   private async fetchPublishedFileDetails(ids: string[]): Promise<WorkshopItemSummary[]> {
     const items: WorkshopItemSummary[] = []
     const batchSize = 100
 
     for (let start = 0; start < ids.length; start += batchSize) {
       const batch = ids.slice(start, start + batchSize)
+      this.appendDiagnosticLog(`details request ids=${batch.length}`)
       const detailsParams = new URLSearchParams({ itemcount: String(batch.length) })
       for (const [index, id] of batch.entries()) {
         detailsParams.set(`publishedfileids[${index}]`, id)
@@ -94,6 +118,7 @@ export class WorkshopFetchService {
       )
 
       if (!detailsResponse.ok) {
+        this.appendDiagnosticLog(`details response status=${detailsResponse.status}`)
         throw new AppError(
           'command_failed',
           `Workshop details fetch failed with status ${detailsResponse.status}`
@@ -101,7 +126,11 @@ export class WorkshopFetchService {
       }
 
       const payload = (await detailsResponse.json()) as unknown
-      items.push(...normalizeWorkshopItems(payload))
+      const normalized = normalizeWorkshopItems(payload)
+      this.appendDiagnosticLog(
+        `details response status=${detailsResponse.status} rawRows=${this.countRawPublishedFileRows(payload)} normalized=${normalized.length}`
+      )
+      items.push(...normalized)
     }
 
     return mergeWorkshopItems(items)
@@ -174,6 +203,10 @@ export class WorkshopFetchService {
     let webApiItems: WorkshopItemSummary[] = []
     let communityItems: WorkshopItemSummary[] = []
 
+    this.appendDiagnosticLog(
+      `workshop list start steamId64=${loginState.steamId64} appId=${normalizedAppId ?? 'all'} webApiAccess=${options.webApiAccess ?? 'unknown'} allowWebApi=${allowWebApi} apiKeyPresent=${Boolean(apiKey)}`
+    )
+
     type WorkshopFetchOutcome =
       | { source: 'web_api' | 'community'; ok: true; items: WorkshopItemSummary[] }
       | { source: 'web_api' | 'community'; ok: false; error: unknown }
@@ -186,6 +219,8 @@ export class WorkshopFetchService {
           .then((items) => ({ source: 'web_api' as const, ok: true as const, items }))
           .catch((error: unknown) => ({ source: 'web_api' as const, ok: false as const, error }))
       )
+    } else {
+      this.appendDiagnosticLog('web_api skipped reason=no_usable_key_or_disabled')
     }
 
     tasks.push(
@@ -199,20 +234,27 @@ export class WorkshopFetchService {
       if (outcome.ok) {
         if (outcome.source === 'web_api') {
           webApiItems = outcome.items
+          this.appendDiagnosticLog(`web_api outcome=ok items=${outcome.items.length}`)
         } else {
           communityItems = outcome.items
+          this.appendDiagnosticLog(`community outcome=ok items=${outcome.items.length}`)
         }
         continue
       }
 
       if (outcome.source === 'web_api') {
         failures.push(`Web API: ${errorMessage(outcome.error)}`)
+        this.appendDiagnosticLog(`web_api outcome=failed error=${errorMessage(outcome.error)}`)
       } else {
         failures.push(`Community: ${errorMessage(outcome.error)}`)
+        this.appendDiagnosticLog(`community outcome=failed error=${errorMessage(outcome.error)}`)
       }
     }
 
     const combined = mergeWorkshopItems([...webApiItems, ...communityItems])
+    this.appendDiagnosticLog(
+      `workshop list combined webApiItems=${webApiItems.length} communityItems=${communityItems.length} merged=${combined.length} failures=${failures.length}`
+    )
     if (combined.length > 0) {
       return combined
     }
@@ -242,6 +284,7 @@ export class WorkshopFetchService {
       for (let page = 1; page <= maxPages; page += 1) {
         // Steam's GetUserFiles expects appid. Use 0 as "all apps" when no filter is selected.
         const effectiveAppId = appId && appId.trim().length > 0 ? appId.trim() : '0'
+        const privacyLabel = mode.value ?? 'any'
         const params = new URLSearchParams({
           key: apiKey,
           steamid: steamId64,
@@ -257,18 +300,28 @@ export class WorkshopFetchService {
         const response = await fetch(
           `https://api.steampowered.com/IPublishedFileService/GetUserFiles/v1/?${params.toString()}`
         )
+        this.appendDiagnosticLog(
+          `web_api request appid=${effectiveAppId} privacy=${privacyLabel} page=${page} status=${response.status}`
+        )
 
         if (!response.ok) {
-          failures.push(`privacy=${mode.value ?? 'any'}, page=${page}, status=${response.status}`)
+          failures.push(`privacy=${privacyLabel}, page=${page}, status=${response.status}`)
           break
         }
 
         const payload = (await response.json()) as unknown
         let pageItems = normalizeWorkshopItems(payload)
+        const rawRows = this.countRawPublishedFileRows(payload)
+        const ids = pageItems.length === 0 ? extractPublishedFileIds(payload) : []
+        this.appendDiagnosticLog(
+          `web_api response appid=${effectiveAppId} privacy=${privacyLabel} page=${page} rawRows=${rawRows} ids=${ids.length} normalized=${pageItems.length}`
+        )
         if (pageItems.length === 0) {
-          const ids = extractPublishedFileIds(payload)
           if (ids.length > 0) {
             pageItems = await this.fetchPublishedFileDetails(ids)
+            this.appendDiagnosticLog(
+              `web_api details hydrated appid=${effectiveAppId} privacy=${privacyLabel} page=${page} normalized=${pageItems.length}`
+            )
           }
         }
 
@@ -324,6 +377,9 @@ export class WorkshopFetchService {
     const allIds = extractWorkshopFileIdsFromHtml(firstHtml)
     const seenIds = new Set(allIds)
     const maxPage = extractMaxWorkshopPage(firstHtml)
+    this.appendDiagnosticLog(
+      `community request appId=${appId ?? 'all'} page=1 status=${firstPage.status} ids=${allIds.length} maxPage=${maxPage}`
+    )
 
     for (let page = 2; page <= maxPage; page += 1) {
       params.set('p', String(page))
@@ -331,10 +387,12 @@ export class WorkshopFetchService {
         `https://steamcommunity.com/profiles/${steamId64}/myworkshopfiles/?${params.toString()}`
       )
       if (!response.ok) {
+        this.appendDiagnosticLog(`community request appId=${appId ?? 'all'} page=${page} status=${response.status}`)
         continue
       }
       const html = await response.text()
       const ids = extractWorkshopFileIdsFromHtml(html)
+      this.appendDiagnosticLog(`community request appId=${appId ?? 'all'} page=${page} status=${response.status} ids=${ids.length}`)
       for (const id of ids) {
         if (!seenIds.has(id)) {
           seenIds.add(id)
