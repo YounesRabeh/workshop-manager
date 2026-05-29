@@ -216,6 +216,22 @@
   padding: 0.85rem 0.9rem;
 }
 
+.login-session-embedded {
+  margin-top: 0.52rem;
+  border-color: rgba(67, 105, 132, 0.58);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(14, 27, 40, 0.72), rgba(12, 23, 34, 0.84));
+  padding: 0.58rem 0.78rem 0.66rem;
+}
+
+.login-session-embedded .login-block-title {
+  margin-bottom: 0.35rem;
+}
+
+.login-session-embedded .login-peek {
+  margin-top: 0.45rem;
+}
+
 .login-actions-inline {
   display: grid;
   gap: 0.55rem;
@@ -223,7 +239,7 @@
 
 .login-inline-actions-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
   gap: 0.55rem;
 }
 
@@ -244,9 +260,9 @@
 }
 
 .login-api-card {
-  margin-top: 0.65rem;
+  margin-top: 0.55rem;
   border-top: 1px solid rgba(72, 108, 133, 0.45);
-  padding-top: 0.7rem;
+  padding-top: 0.62rem;
 }
 
 .login-api-header {
@@ -431,7 +447,8 @@
 }
 
 .login-quit {
-  min-width: 82px;
+  width: 100%;
+  min-width: 0;
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid #b14a5f;
@@ -750,6 +767,13 @@
   justify-self: start;
 }
 
+.login-api-key-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
 .advanced-meta {
   margin-top: 0.65rem;
   font-size: 12px;
@@ -806,6 +830,7 @@
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
   }
+
 
   .advanced-timeout-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));

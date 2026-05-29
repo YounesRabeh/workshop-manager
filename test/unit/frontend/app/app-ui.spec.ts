@@ -969,6 +969,13 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
+    const toggleButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Show API Options')
+    expect(toggleButton).toBeDefined()
+    await toggleButton?.trigger('click')
+    await flushPromises()
+
     const apiKeyInput = wrapper.find('input[placeholder="Paste key..."]')
     expect(apiKeyInput.exists()).toBe(true)
     await apiKeyInput.setValue('dev-key-123')
@@ -992,13 +999,29 @@ describe('App UI validation gates', () => {
     })
   })
 
-  it('keeps api key section visible in credentials by default', async () => {
+  it('toggles api key section visibility in credentials', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
+    expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(false)
+
+    const showButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Show API Options')
+    expect(showButton).toBeDefined()
+    await showButton?.trigger('click')
+    await flushPromises()
+
     expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(true)
-    expect(wrapper.text()).not.toContain('Show API Options')
-    expect(wrapper.text()).not.toContain('Hide API Options')
+
+    const hideButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Hide API Options')
+    expect(hideButton).toBeDefined()
+    await hideButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('input[placeholder="Paste key..."]').exists()).toBe(false)
   })
 
   it('saves advanced settings with no key without enabling web api', async () => {
@@ -1047,6 +1070,13 @@ describe('App UI validation gates', () => {
     })
 
     const wrapper = mount(App)
+    await flushPromises()
+
+    const toggleButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Show API Options')
+    expect(toggleButton).toBeDefined()
+    await toggleButton?.trigger('click')
     await flushPromises()
 
     const clearButton = wrapper

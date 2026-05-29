@@ -443,7 +443,20 @@ watch(
                 @set-web-api-key-peek="emit('set-web-api-key-peek', $event)"
                 @save-advanced-settings="emit('save-advanced-settings')"
                 @clear-web-api-key="emit('clear-web-api-key')"
-              />
+              >
+                <template #between-password-and-api>
+                  <LoginSessionSection
+                    :login-form="loginForm"
+                    :is-login-submitting="isLoginSubmitting"
+                    :can-clear-stored-session="canClearStoredSession"
+                    :missing-stored-session-hint="missingStoredSessionHint"
+                    :on-control-arrow-key="onLoginControlArrowKey"
+                    @update-remember-username="onRememberUsernameChange"
+                    @update-remember-auth="onRememberAuthChange"
+                    @clear-stored-session="emit('clear-stored-session')"
+                  />
+                </template>
+              </LoginCredentialsSection>
 
               <section class="login-block login-actions-inline">
                 <button
@@ -489,19 +502,6 @@ watch(
               @update-preferred-auth-mode="emit('update-preferred-auth-mode', $event)"
               @update-steam-guard-code="emit('update-steam-guard-code', $event)"
               @submit-guard-code="emit('submit-guard-code')"
-            />
-          </div>
-
-          <div class="login-secondary-grid">
-            <LoginSessionSection
-              :login-form="loginForm"
-              :is-login-submitting="isLoginSubmitting"
-              :can-clear-stored-session="canClearStoredSession"
-              :missing-stored-session-hint="missingStoredSessionHint"
-              :on-control-arrow-key="onLoginControlArrowKey"
-              @update-remember-username="onRememberUsernameChange"
-              @update-remember-auth="onRememberAuthChange"
-              @clear-stored-session="emit('clear-stored-session')"
             />
           </div>
 

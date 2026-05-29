@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
 import type { AdvancedSettingsState, LoginFormState } from '../../types/ui'
+import ShowHideButton from './ShowHideButton.vue'
 
 const props = defineProps<{
   loginForm: LoginFormState
@@ -25,6 +27,24 @@ const emit = defineEmits<{
   (e: 'save-advanced-settings'): void
   (e: 'clear-web-api-key'): void
 }>()
+
+const isApiSectionExpanded = ref(false)
+
+const apiToggleLabel = computed(() => (isApiSectionExpanded.value ? 'Hide API Options' : 'Show API Options'))
+
+watch(
+  () => props.advancedSettings.isSaving,
+  (isSaving, wasSaving) => {
+    const saveSucceeded =
+      wasSaving &&
+      !isSaving &&
+      props.advancedSettings.statusMessage.toLowerCase().includes('saved')
+
+    if (saveSucceeded) {
+      isApiSectionExpanded.value = false
+    }
+  }
+)
 </script>
 
 <template>
@@ -51,15 +71,13 @@ const emit = defineEmits<{
         @keydown="onControlArrowKey($event, 1)"
         @input="emit('update-password', ($event.target as HTMLInputElement | null)?.value ?? '')"
       />
-      <button
-        type="button"
-        class="login-peek rounded px-3 py-2 text-xs font-semibold"
-        :aria-pressed="isPasswordPeek ? 'true' : 'false'"
-        @click="emit('set-password-peek', !isPasswordPeek)"
-      >
-        {{ isPasswordPeek ? 'Hide' : 'Show' }}
-      </button>
+      <ShowHideButton
+        :is-visible="isPasswordPeek"
+        @toggle="emit('set-password-peek', !isPasswordPeek)"
+      />
     </div>
+
+    <slot name="between-password-and-api" />
 
     <div class="login-api-card">
       <div class="login-api-header">
@@ -81,9 +99,17 @@ const emit = defineEmits<{
             Add a Web API key to fully use this app, including non-public Workshop items.
           </p>
         </div>
+        <button
+          type="button"
+          class="login-peek rounded px-3 py-2 text-xs font-semibold"
+          :aria-expanded="isApiSectionExpanded ? 'true' : 'false'"
+          @click="isApiSectionExpanded = !isApiSectionExpanded"
+        >
+          {{ apiToggleLabel }}
+        </button>
       </div>
 
-      <div>
+      <div v-if="isApiSectionExpanded">
         <label class="advanced-label mt-3">Steam Web API Key</label>
         <p class="mt-1 text-xs">
           <a
@@ -95,25 +121,19 @@ const emit = defineEmits<{
             Get your free Steam Web API key
           </a>
         </p>
-        <div class="advanced-key-row">
+        <div class="login-api-key-row">
           <input
             :type="isWebApiKeyPeek ? 'text' : 'password'"
             :value="advancedSettings.webApiKey"
             :placeholder="advancedSettings.hasWebApiKey ? 'Saved securely (enter new key to replace)' : 'Paste key...'"
             autocomplete="off"
-            class="login-input advanced-input"
+            class="login-input w-full rounded px-3 py-2"
             @input="emit('update-web-api-key', ($event.target as HTMLInputElement | null)?.value ?? '')"
           />
-          <button
-            type="button"
-            class="login-peek advanced-inline-button"
-            @mouseenter="emit('set-web-api-key-peek', true)"
-            @mouseleave="emit('set-web-api-key-peek', false)"
-            @focus="emit('set-web-api-key-peek', true)"
-            @blur="emit('set-web-api-key-peek', false)"
-          >
-            Show
-          </button>
+          <ShowHideButton
+            :is-visible="isWebApiKeyPeek"
+            @toggle="emit('set-web-api-key-peek', !isWebApiKeyPeek)"
+          />
         </div>
 
         <p class="login-api-meta">{{ webApiStorageHint }}</p>

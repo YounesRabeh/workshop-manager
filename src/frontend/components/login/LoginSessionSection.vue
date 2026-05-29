@@ -17,9 +17,9 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section class="login-block">
+  <section class="login-block login-session-embedded">
     <p class="login-block-title">Session</p>
-    <label class="mt-1 flex items-center gap-2 text-sm text-slate-700">
+    <div class="mt-1 flex items-center gap-2 text-sm text-slate-700">
       <input
         data-login-control="remember-username"
         :checked="loginForm.rememberUsername"
@@ -27,10 +27,10 @@ const emit = defineEmits<{
         @keydown="onControlArrowKey($event, 2)"
         @change="emit('update-remember-username', ($event.target as HTMLInputElement | null)?.checked ?? false)"
       />
-      Remember account name
-    </label>
+      <span>Remember account name</span>
+    </div>
 
-    <label class="mt-2 flex items-center gap-2 text-sm text-slate-700">
+    <div class="mt-2 flex items-center gap-2 text-sm text-slate-700">
       <input
         data-login-control="remember-auth"
         :checked="loginForm.rememberAuth"
@@ -38,8 +38,8 @@ const emit = defineEmits<{
         @keydown="onControlArrowKey($event, 3)"
         @change="emit('update-remember-auth', ($event.target as HTMLInputElement | null)?.checked ?? false)"
       />
-      Keep me signed in on this device
-    </label>
+      <span>Keep me signed in on this device</span>
+    </div>
     <p class="mt-1 text-[11px] text-slate-500">
       Uses SteamCMD cached login session. Password is never stored by this app.
     </p>
