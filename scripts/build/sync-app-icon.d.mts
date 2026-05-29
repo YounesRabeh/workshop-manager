@@ -18,6 +18,9 @@ export interface DesktopEntryMappingOptions {
 /** Escapes single quotes for use inside a single-quoted bash string literal. */
 export function escapeSingleQuotesForBash(value: string): string
 
+/** Resolves the available ImageMagick executable for icon derivation. */
+export function resolveImageMagickCommand(platform?: string): 'magick' | 'convert' | undefined
+
 /** Creates the canonical Linux desktop-entry content for the project launcher. */
 export function buildLinuxLauncherContent(
   options: LinuxLauncherContentOptions

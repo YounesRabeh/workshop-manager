@@ -31,6 +31,18 @@ function hasCommand(command) {
   return result.status === 0
 }
 
+export function resolveImageMagickCommand(platform = process.platform) {
+  if (hasCommand('magick')) {
+    return 'magick'
+  }
+  // ImageMagick v6 commonly exposes `convert` on Linux/macOS. On Windows,
+  // `convert` can resolve to a non-ImageMagick system utility.
+  if (platform !== 'win32' && hasCommand('convert')) {
+    return 'convert'
+  }
+  return undefined
+}
+
 function runCommand(command, args) {
   const result = spawnSync(command, args, { stdio: 'pipe', shell: false, encoding: 'utf8' })
   if (result.status !== 0) {
@@ -82,12 +94,13 @@ export function rewriteDesktopEntryMappings(original, { displayName, appId, icon
 }
 
 async function generateNormalizedPng() {
-  if (!hasCommand('magick')) {
+  const imageMagickCommand = resolveImageMagickCommand()
+  if (!imageMagickCommand) {
     return sourceIconPath
   }
   try {
     // Trim transparent borders and scale close to full canvas for better dock/taskbar legibility.
-    runCommand('magick', [
+    runCommand(imageMagickCommand, [
       sourceIconPath,
       '-trim',
       '+repage',
@@ -112,12 +125,13 @@ async function generateNormalizedPng() {
 }
 
 async function generateIco(inputIconPath) {
-  if (!hasCommand('magick')) {
-    console.warn('Skipping ICO generation: ImageMagick (magick) not found.')
+  const imageMagickCommand = resolveImageMagickCommand()
+  if (!imageMagickCommand) {
+    console.warn('Skipping ICO generation: ImageMagick not found (expected `magick` or `convert`).')
     return
   }
   try {
-    runCommand('magick', [
+    runCommand(imageMagickCommand, [
       inputIconPath,
       '-define',
       'icon:auto-resize=256,128,64,48,32,16',
@@ -166,12 +180,15 @@ async function generateIcns(inputIconPath) {
     await generateIcnsWithIconutil(inputIconPath)
     return
   }
-  if (!hasCommand('magick')) {
-    console.warn('Skipping ICNS generation: no iconutil/sips (macOS) or ImageMagick (magick).')
+  const imageMagickCommand = resolveImageMagickCommand()
+  if (!imageMagickCommand) {
+    console.warn(
+      'Skipping ICNS generation: no iconutil/sips (macOS) or ImageMagick (`magick`/`convert`).'
+    )
     return
   }
   try {
-    runCommand('magick', [inputIconPath, sourceIcnsPath])
+    runCommand(imageMagickCommand, [inputIconPath, sourceIcnsPath])
     console.log(`Generated macOS icon: ${sourceIcnsPath}`)
   } catch (error) {
     console.warn(
@@ -201,9 +218,10 @@ async function syncLinuxDesktopIcon(inputIconPath) {
       const outPath = resolve(outDir, iconName)
       try {
         await mkdir(outDir, { recursive: true })
-        if (hasCommand('magick')) {
+        const imageMagickCommand = resolveImageMagickCommand()
+        if (imageMagickCommand) {
           try {
-            runCommand('magick', [inputIconPath, '-resize', `${size}x${size}`, outPath])
+            runCommand(imageMagickCommand, [inputIconPath, '-resize', `${size}x${size}`, outPath])
           } catch {
             await cp(inputIconPath, outPath, { force: true, errorOnExist: false })
           }

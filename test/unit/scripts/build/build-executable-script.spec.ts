@@ -12,7 +12,7 @@ import {
 
 describe('build-executable script helpers', () => {
   it('maps platform to packaging target correctly', () => {
-    expect(getPackagingTargetForPlatform('win32')).toEqual({ platformArg: '--win', target: 'nsis' })
+    expect(getPackagingTargetForPlatform('win32')).toEqual({ platformArg: '--win', target: 'portable' })
     expect(getPackagingTargetForPlatform('darwin')).toEqual({ platformArg: '--mac', target: 'dmg' })
     expect(getPackagingTargetForPlatform('linux')).toEqual({
       platformArg: '--linux',
@@ -77,7 +77,7 @@ describe('build-executable script helpers', () => {
     expect(steps[1]).toMatchObject({ command: 'pnpm', args: [NATIVE_BUNDLE_SCRIPT] })
     expect(steps[2]).toMatchObject({
       command: process.execPath,
-      args: expect.arrayContaining(['--win', 'nsis', '--publish', 'never'])
+      args: expect.arrayContaining(['--win', 'portable', '--publish', 'never'])
     })
     expect(steps[2].args[0]).toMatch(/electron-builder[\\/]cli\.js$/)
   })
@@ -90,7 +90,7 @@ describe('build-executable script helpers', () => {
       'Build app bundles',
       'Package executable artifacts'
     ])
-    expect(steps[1]).toMatchObject({ command: 'pnpm', args: ['sync:icon'] })
+    expect(steps[1]).toMatchObject({ command: 'pnpm', args: ['icon'] })
   })
 
   it('parses generate icon and explicit target platform flags from argv', () => {
@@ -128,6 +128,21 @@ describe('build-executable script helpers', () => {
       'Build app bundles',
       'Package executable artifacts'
     ])
+  })
+
+  it('keeps icon sync before bundle builds when host cleanup already ran outside docker', () => {
+    const steps = buildStepsForPlatform('linux', {
+      generateIcon: true,
+      skipKillInstance: true,
+      targetPlatform: 'win32'
+    })
+
+    expect(steps.map((s) => s.label)).toEqual([
+      'Sync icon assets',
+      'Build app bundles',
+      'Package executable artifacts'
+    ])
+    expect(steps[0]).toMatchObject({ command: 'pnpm', args: ['icon'] })
   })
 
   it('rejects conflicting target platform flags', () => {

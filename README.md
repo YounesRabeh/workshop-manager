@@ -4,7 +4,7 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 
 > [!NOTE]
 > `pnpm dev`, `pnpm preview`, `pnpm test`, and `pnpm typecheck` run natively on the host.
-> All `pnpm build*` and `pnpm release` `pnpm icon` packaging commands run through Docker.
+> Packaging commands run through Docker. `pnpm icon` is the standalone icon-generation command.
 
 ## Screenshots
 
@@ -31,7 +31,7 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 | Use case | Requirement |
 | --- | --- |
 | Development | Node.js `22.x` |
-| Development | `pnpm` `10.x` |
+| Development | `pnpm` `11.x` |
 | Packaging builds | Docker on a Linux or Windows host |
 
 
@@ -61,24 +61,22 @@ Packaging commands always run inside the repo's Docker builder image, even when 
 | --- | --- | --- |
 | Build production bundle only | `pnpm build` | Writes compiled app output to `out/` |
 | Build Linux package | `pnpm build:linux` | Produces Linux `.AppImage` artifacts |
-| Build Linux package with icon sync | `pnpm build:linux:icon` | Regenerates icon assets first |
-| Build Windows package | `pnpm build:win` | Produces Windows installer artifacts |
-| Build Windows package with icon sync | `pnpm build:win:icon` | Regenerates icon assets first |
-| Build Linux and Windows with icon sync | `pnpm build:all:icon` | Runs both platform packaging commands |
-| Write checksums for existing release artifacts | `pnpm release:checksums` | Scans `dist/` and writes one `.checksum.txt` file per artifact |
-| Release bundle with checksums | `pnpm release` | Builds Linux and Windows artifacts with icon sync, then writes per-artifact checksum files |
+| Build Windows package | `pnpm build:win` | Produces a Windows portable `.exe` artifact |
+| Build any target explicitly | `pnpm build:platform <bundle\|linux\|win\|all>` | Generic build entry point |
+| Build Linux and Windows | `pnpm build:all` | Runs both platform packaging commands |
+| Generate icons only | `pnpm icon` | Regenerates derived icon assets |
+| Write checksums for existing release artifacts | `pnpm checksums` | Scans `dist/` and writes one `.checksum.txt` file per artifact |
+| Release bundle with checksums | `pnpm release` | Builds Linux and Windows artifacts with icons, then writes per-artifact checksum files |
 
 > [!IMPORTANT]
 > Docker is build-only. The generated `.AppImage` and `.exe` run natively after packaging.
 > Dockerized builds are currently supported on Linux and Windows hosts.
 
-Packaging commands always rebuild the app bundle first so installers do not ship stale `out/` code.
+Packaging commands include icon generation and rebuild the app bundle first so installers do not ship stale `out/` code.
 The wrapper performs host-side cleanup before entering Docker so stale local Electron processes do not interfere with packaging.
 Persistent Docker build caches live under `~/.cache/workshop-manager/docker-build`.
 Output artifacts are written to `dist/`.
-
-
-> Packaging command suffixes are composable: `:icon` regenerates icon assets first, and `:checksums` runs the package command and then writes per-artifact checksum files. The generic pattern is `pnpm build:<platform>:checksums`, and icon-aware variants follow `pnpm build:<platform>:icon:checksums`. For example, `pnpm build:win:checksums` packages Windows artifacts and writes checksums, while `pnpm build:linux:icon:checksums` also refreshes icon assets first.
+Use `pnpm build:platform all --checksums` when you want the generic build command plus checksum generation.
 
 ## Verifying Release Downloads
 
@@ -92,7 +90,7 @@ Each checksum file contains the SHA-256 hash for its matching artifact. Upload t
 You can generate those checksum files in two ways:
 
 - `pnpm release` to build fresh Linux and Windows artifacts and then write checksums
-- `pnpm release:checksums` to only write checksum files for artifacts that already exist in `dist/`
+- `pnpm checksums` to only write checksum files for artifacts that already exist in `dist/`
 
 On Linux, users can verify a download with:
 
@@ -114,7 +112,7 @@ For this portfolio project, the checksum pipeline is the intended release-integr
 `resources/img/app-icon.png` is the single source of truth for the app icon used by both the app and packaged builds.
 
 > [!NOTE]
-> `pnpm sync:icon` is the manual icon-only step. The `:icon` build and preview commands simply run that sync step first, then continue with the main command.
+> `pnpm icon` is the manual icon-only step. Packaging commands run icon sync as part of the build path.
 
 ## Project Layout
 

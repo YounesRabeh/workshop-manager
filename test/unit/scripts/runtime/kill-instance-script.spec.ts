@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { buildPowershellKillScript, isTargetProcessForProject } from '../../../../scripts/runtime/kill-old-instance.mjs'
 
 describe('kill-old-instance script helpers', () => {
-  const projectRoot = '/home/yuyu/Desktop/DEV/Steam Projects/Mod Manager'
+  const projectRoot = '/home/yuyu/Desktop/DEV/New Projects/Workshop Manager/workshop-manager'
 
   it('targets workshop manager electron processes from this project', () => {
-    const command = `${projectRoot}/node_modules/.bin/electron out/main/index.js --some-flag`
+    const command = `${projectRoot}/node_modules/.bin/electron ${projectRoot}/out/main/index.js --some-flag`
     expect(isTargetProcessForProject(command, projectRoot)).toBe(true)
   })
 

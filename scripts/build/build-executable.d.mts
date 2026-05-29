@@ -5,7 +5,7 @@
  */
 export interface PackagingTarget {
   platformArg: '--win' | '--mac' | '--linux'
-  target: 'nsis' | 'dmg' | 'AppImage'
+  target: 'portable' | 'dmg' | 'AppImage'
 }
 
 export interface BuildExecutableOptions {

@@ -1,7 +1,7 @@
 {
   "name": "workshop-manager",
   "productName": "Workshop Manager",
-  "version": "1.3.7",
+  "version": "1.3.8",
   "description": "Create and update items for Steam's Workshop.",
   "author": "Younes Rabeh",
   "license": "MIT",
@@ -18,6 +18,7 @@
     "beforeBuild": "./scripts/build/electron-builder-before-build.mjs",
     "afterSign": "./scripts/build/after-sign.mjs",
     "asar": true,
+    "compression": "store",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "files": [
       "out/**/*",
@@ -32,11 +33,12 @@
       "signAndEditExecutable": false,
       "target": [
         {
-          "target": "nsis"
+          "target": "portable"
         }
       ]
     },
     "nsis": {
+      "differentialPackage": false,
       "include": "resources/installer.nsh",
       "runAfterFinish": true
     },
@@ -67,28 +69,24 @@
   "scripts": {
     "clean": "node scripts/maintenance/clean.mjs",
     "kill:instance": "node scripts/runtime/kill-old-instance.mjs",
-    "predev": "pnpm sync:icon && pnpm kill:instance",
-    "dev": "env -u ELECTRON_RUN_AS_NODE CHROME_DESKTOP=workshop-manager.desktop electron-vite dev",
-    "dev:icon": "pnpm sync:icon && pnpm dev",
-    "sync:icon": "node scripts/build/sync-app-icon.mjs",
-    "release:checksums": "node scripts/build/generate-release-checksums.mjs",
-    "build:bundle:native": "pnpm sync:icon && electron-vite build",
-    "build:bundle": "pnpm sync:icon && node scripts/build/run-build-in-docker.mjs build:bundle:native",
-    "build": "pnpm sync:icon && node scripts/build/run-build-in-docker.mjs build:bundle:native",
-    "build:exe:native": "pnpm sync:icon && node scripts/build/build-executable.mjs",
-    "build:linux": "pnpm sync:icon && node scripts/build/run-build-in-docker.mjs build:exe:native",
-    "build:linux:checksums": "pnpm sync:icon && pnpm build:linux && pnpm release:checksums",
-    "build:linux:icon": "pnpm sync:icon && node scripts/build/run-build-in-docker.mjs build:exe:native --generate-icon",
-    "build:linux:icon:checksums": "pnpm sync:icon && pnpm build:linux:icon && pnpm release:checksums",
-    "build:win": "pnpm sync:icon && node scripts/build/run-build-in-docker.mjs build:exe:native --win",
-    "build:win:checksums": "pnpm sync:icon && pnpm build:win && pnpm release:checksums",
-    "build:win:icon": "pnpm sync:icon && node scripts/build/run-build-in-docker.mjs build:exe:native --win --generate-icon",
-    "build:win:icon:checksums": "pnpm sync:icon && pnpm build:win:icon && pnpm release:checksums",
-    "build:all:icon": "pnpm sync:icon && pnpm build:linux:icon && pnpm build:win:icon",
-    "build:all:icon:checksums": "pnpm sync:icon && pnpm build:all:icon && pnpm release:checksums",
-    "release": "pnpm sync:icon && pnpm build:all:icon && pnpm release:checksums",
-    "preview": "env -u ELECTRON_RUN_AS_NODE CHROME_DESKTOP=workshop-manager.desktop electron-vite preview",
-    "preview:icon": "pnpm sync:icon && pnpm preview",
+    "predev": "pnpm icon && pnpm kill:instance",
+    "dev": "node scripts/runtime/run-electron-vite-command.mjs dev",
+    "dev:icon": "pnpm icon && pnpm dev",
+    "icon": "node scripts/build/sync-app-icon.mjs",
+    "sync:icon": "pnpm icon",
+    "checksums": "node scripts/build/generate-release-checksums.mjs",
+    "release:checksums": "pnpm checksums",
+    "build:bundle:native": "electron-vite build",
+    "build:exe:native": "node scripts/build/build-executable.mjs",
+    "build:platform": "node scripts/build/build-platform.mjs",
+    "build": "pnpm build:platform bundle",
+    "build:bundle": "pnpm build",
+    "build:linux": "pnpm build:platform linux",
+    "build:win": "pnpm build:platform win",
+    "build:all": "pnpm build:platform all",
+    "release": "pnpm build:platform all --checksums",
+    "preview": "node scripts/runtime/run-electron-vite-command.mjs preview",
+    "preview:icon": "pnpm icon && pnpm preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.renderer.json && vue-tsc --noEmit -p tsconfig.renderer-tests.json",
     "test": "vitest run",
     "test:watch": "vitest"

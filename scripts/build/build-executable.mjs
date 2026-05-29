@@ -3,7 +3,7 @@
  * Responsibility: Resolves platform-specific electron-builder arguments,
  *  assembles the ordered build steps, and runs them when invoked as a CLI.
  */
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -24,7 +24,7 @@ export function resolvePnpmCommand(platform = process.platform) {
  */
 export function getPackagingTargetForPlatform(platform) {
   if (platform === 'win32') {
-    return { platformArg: '--win', target: 'nsis' }
+    return { platformArg: '--win', target: 'portable' }
   }
   if (platform === 'darwin') {
     return { platformArg: '--mac', target: 'dmg' }
@@ -121,10 +121,11 @@ export function buildStepsForPlatform(platform, options = {}) {
   )
 
   if (options.generateIcon) {
-    steps.splice(1, 0, {
+    const iconStepIndex = options.skipKillInstance === true ? 0 : 1
+    steps.splice(iconStepIndex, 0, {
       label: 'Sync icon assets',
       command: pnpmCommand,
-      args: ['sync:icon']
+      args: ['icon']
     })
   }
 
@@ -132,21 +133,46 @@ export function buildStepsForPlatform(platform, options = {}) {
 }
 function runStep(step) {
   console.log(`\n[build:package] ${step.label}`)
-  const result = spawnSync(step.command, step.args, {
-    stdio: 'inherit',
-    shell: false,
-    env: step.env ?? process.env
+  const startedAt = Date.now()
+  const heartbeat = step.label === 'Package executable artifacts'
+    ? setInterval(() => {
+        const elapsedSeconds = Math.round((Date.now() - startedAt) / 1000)
+        console.log(`[build:package] Still packaging executable artifacts (${elapsedSeconds}s elapsed)`)
+      }, 30000)
+    : undefined
+
+  return new Promise((resolveStep, rejectStep) => {
+    const child = spawn(step.command, step.args, {
+      stdio: 'inherit',
+      shell: false,
+      env: step.env ?? process.env
+    })
+
+    child.once('error', (error) => {
+      if (heartbeat) {
+        clearInterval(heartbeat)
+      }
+      rejectStep(error)
+    })
+
+    child.once('close', (status) => {
+      if (heartbeat) {
+        clearInterval(heartbeat)
+      }
+      if (status === 0) {
+        resolveStep()
+        return
+      }
+      rejectStep(new Error(`[build:package] Step failed: ${step.label}`))
+    })
   })
-  if (result.status !== 0) {
-    throw new Error(`[build:package] Step failed: ${step.label}`)
-  }
 }
 
 async function main() {
   const options = parseBuildExecutableOptions(process.argv.slice(2))
   const steps = buildStepsForPlatform(process.platform, options)
   for (const step of steps) {
-    runStep(step)
+    await runStep(step)
   }
 }
 

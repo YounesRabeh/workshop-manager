@@ -33,7 +33,7 @@ describe('run-build-in-docker script helpers', () => {
 
   it('builds the container shell command with install-first behavior and forwarded args', () => {
     expect(createContainerShellCommand('build:exe:native', ['--win', '--generate-icon'])).toBe(
-      `pnpm install --frozen-lockfile && pnpm run 'build:exe:native' -- '--win' '--generate-icon' '${SKIP_KILL_INSTANCE_FLAG}'`
+      `pnpm install --frozen-lockfile --prefer-offline && pnpm run 'build:exe:native' -- '--win' '--generate-icon' '${SKIP_KILL_INSTANCE_FLAG}'`
     )
   })
 
@@ -86,9 +86,13 @@ describe('run-build-in-docker script helpers', () => {
         '--env',
         `HOME=${CONTAINER_HOME_DIR}`,
         '--env',
+        'PNPM_HOME=/pnpm',
+        '--env',
         `PNPM_STORE_DIR=${CONTAINER_PNPM_STORE_DIR}`,
         '--env',
         `COREPACK_HOME=${CONTAINER_COREPACK_HOME}`,
+        '--env',
+        `XDG_CACHE_HOME=${CONTAINER_HOME_DIR}/.cache`,
         '--env',
         `ELECTRON_CACHE=${CONTAINER_ELECTRON_CACHE_DIR}`,
         '--env',
@@ -112,7 +116,7 @@ describe('run-build-in-docker script helpers', () => {
         'mod-manager:test',
         '/bin/bash',
         '-lc',
-        `pnpm install --frozen-lockfile && pnpm run 'build:exe:native' -- '--win' '${SKIP_KILL_INSTANCE_FLAG}'`
+        `pnpm install --frozen-lockfile --prefer-offline && pnpm run 'build:exe:native' -- '--win' '${SKIP_KILL_INSTANCE_FLAG}'`
       ])
     )
   })
