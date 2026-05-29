@@ -21,6 +21,8 @@ interface ProfileDb {
   profiles: ModProfile[]
 }
 
+const LEGACY_LOGIN_TIMEOUT_DEFAULT_MS = 30_000
+
 const DEFAULT_DB: ProfileDb = {
   profiles: []
 }
@@ -237,10 +239,31 @@ export class ProfileStore {
 
   async getTimeoutSettings(): Promise<SteamCmdTimeoutSettings> {
     const db = await this.readDb()
-    return normalizeSteamCmdTimeoutSettings({
-      loginTimeoutMs: db.loginTimeoutMs,
+    const shouldMigrateLegacyLoginDefault =
+      db.loginTimeoutMs === LEGACY_LOGIN_TIMEOUT_DEFAULT_MS &&
+      typeof db.storedSessionTimeoutMs !== 'number' &&
+      typeof db.workshopTimeoutMs !== 'number'
+
+    const normalizedInput = {
+      loginTimeoutMs: shouldMigrateLegacyLoginDefault ? undefined : db.loginTimeoutMs,
       storedSessionTimeoutMs: db.storedSessionTimeoutMs,
       workshopTimeoutMs: db.workshopTimeoutMs
+    }
+
+    if (shouldMigrateLegacyLoginDefault) {
+      const migrated = normalizeSteamCmdTimeoutSettings(normalizedInput)
+      await this.updateDb(async (mutableDb) => {
+        mutableDb.loginTimeoutMs = migrated.loginTimeoutMs
+        mutableDb.storedSessionTimeoutMs = migrated.storedSessionTimeoutMs
+        mutableDb.workshopTimeoutMs = migrated.workshopTimeoutMs
+      })
+      return migrated
+    }
+
+    return normalizeSteamCmdTimeoutSettings({
+      loginTimeoutMs: normalizedInput.loginTimeoutMs,
+      storedSessionTimeoutMs: normalizedInput.storedSessionTimeoutMs,
+      workshopTimeoutMs: normalizedInput.workshopTimeoutMs
     })
   }
 

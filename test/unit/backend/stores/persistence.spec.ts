@@ -128,6 +128,23 @@ describe('profile and run-log persistence', () => {
     })
   })
 
+  it('migrates legacy login-only 30s timeout default to 60s', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'profile-store-legacy-timeout-'))
+    const dbPath = join(root, 'profiles.json')
+    const store = new ProfileStore(dbPath)
+
+    await writeFile(dbPath, JSON.stringify({
+      profiles: [],
+      loginTimeoutMs: 30_000
+    }), 'utf8')
+
+    expect(await store.getTimeoutSettings()).toEqual({
+      loginTimeoutMs: 60_000,
+      storedSessionTimeoutMs: 10_000,
+      workshopTimeoutMs: 60_000
+    })
+  })
+
   it('stores steamcmd output in a single session file and overwrites it on next run', async () => {
     const root = await mkdtemp(join(tmpdir(), 'run-log-store-'))
     const store = new RunLogStore(join(root, 'runs'))
