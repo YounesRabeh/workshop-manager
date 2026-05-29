@@ -14,7 +14,6 @@ interface ScriptDirectiveOptions {
 interface LoginScriptOptions extends ScriptDirectiveOptions {
   username: string
   password?: string
-  steamGuardCode?: string
 }
 
 interface WorkshopScriptOptions extends ScriptDirectiveOptions {
@@ -45,7 +44,6 @@ export function buildSteamCmdScriptDirectives(options: ScriptDirectiveOptions): 
 export function buildSteamCmdLoginScript(options: LoginScriptOptions): string {
   const username = assertNonEmptyValue('username', options.username)
   const password = options.password?.trim()
-  const steamGuardCode = options.steamGuardCode?.trim()
   const hasPassword = Boolean(password)
 
   const directives = buildSteamCmdScriptDirectives({
@@ -56,9 +54,6 @@ export function buildSteamCmdLoginScript(options: LoginScriptOptions): string {
   const loginParts = ['login', escapeInteractiveArg(username)]
   if (hasPassword) {
     loginParts.push(escapeInteractiveArg(password!))
-  }
-  if (steamGuardCode) {
-    loginParts.push(escapeInteractiveArg(steamGuardCode))
   }
 
   return `${[...directives, loginParts.join(' '), 'quit'].join('\n')}\n`
@@ -87,4 +82,3 @@ export function buildSteamCmdWorkshopScript(options: WorkshopScriptOptions): str
     'quit'
   ].join('\n')}\n`
 }
-

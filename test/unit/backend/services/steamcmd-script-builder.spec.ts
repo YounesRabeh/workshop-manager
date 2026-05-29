@@ -21,14 +21,13 @@ describe('steamcmd script builder', () => {
     expect(script).toContain('\nquit\n')
   })
 
-  it('builds login scripts with password and guard code', () => {
+  it('builds login scripts with password only', () => {
     const script = buildSteamCmdLoginScript({
       username: 'alice',
-      password: 'secret pass',
-      steamGuardCode: '12345'
+      password: 'secret pass'
     })
 
-    expect(script).toContain('login alice "secret pass" 12345')
+    expect(script).toContain('login alice "secret pass"')
     expect(script).not.toContain('@NoPromptForPassword 1')
   })
 
@@ -59,4 +58,3 @@ describe('steamcmd script builder', () => {
     ).toThrow('vdfPath is required')
   })
 })
-

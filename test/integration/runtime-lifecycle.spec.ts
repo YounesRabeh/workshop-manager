@@ -219,6 +219,91 @@ function createOneShotFakeChild(response: InteractiveResponse): EventEmitter & {
   return emitter
 }
 
+function createOneShotGuardChallengeChild(options: {
+  promptLines: string[]
+  promptWithoutNewline?: string
+  successLines: string[]
+  expectedGuardCode: string
+}): EventEmitter & {
+  stdout: PassThrough
+  stderr: PassThrough
+  stdin: PassThrough
+  commands: string[]
+  kill: () => void
+} {
+  const emitter = new EventEmitter() as EventEmitter & {
+    stdout: PassThrough
+    stderr: PassThrough
+    stdin: PassThrough
+    commands: string[]
+    kill: () => void
+  }
+
+  emitter.stdout = new PassThrough()
+  emitter.stderr = new PassThrough()
+  emitter.stdin = new PassThrough()
+  emitter.commands = []
+  let closed = false
+  let stdinBuffer = ''
+
+  const closeWithCode = (code: number) => {
+    if (closed) {
+      return
+    }
+    closed = true
+    emitter.emit('close', code)
+  }
+
+  emitter.stdin.on('data', (chunk: Buffer) => {
+    stdinBuffer += chunk.toString('utf8')
+    const commands = stdinBuffer.split(/\r?\n/)
+    stdinBuffer = commands.pop() ?? ''
+
+    for (const rawCommand of commands) {
+      const command = rawCommand.trim()
+      if (!command) {
+        continue
+      }
+      emitter.commands.push(command)
+      const guardCode =
+        command.startsWith('set_steam_guard_code ')
+          ? command.slice('set_steam_guard_code '.length).trim()
+          : command
+      if (guardCode !== options.expectedGuardCode) {
+        continue
+      }
+      queueMicrotask(() => {
+        if (closed) {
+          return
+        }
+        for (const line of options.successLines) {
+          emitter.stdout.write(`${line}\n`)
+        }
+        closeWithCode(0)
+      })
+      return
+    }
+  })
+
+  queueMicrotask(() => {
+    if (closed) {
+      return
+    }
+    for (const line of options.promptLines) {
+      emitter.stdout.write(`${line}\n`)
+    }
+    if (options.promptWithoutNewline) {
+      emitter.stdout.write(options.promptWithoutNewline)
+    }
+  })
+
+  emitter.kill = () => {
+    closeWithCode(0)
+  }
+
+  return emitter
+}
+
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
     status,
@@ -889,7 +974,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     }
   })
 
-  it('uses script-mode login retry flow with submitSteamGuardCode', async () => {
+  it('uses script-mode login prompt handling with submitSteamGuardCode on Linux-style trailing prompt output', async () => {
     const originalExecutionMode = process.env['STEAMCMD_EXECUTION_MODE']
     process.env['STEAMCMD_EXECUTION_MODE'] = 'script'
 
@@ -897,6 +982,15 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-script-'))
       const store = new RunLogStore(join(root, 'runs'))
       const generatedScripts: string[] = []
+      let childRef:
+        | (EventEmitter & {
+            stdout: PassThrough
+            stderr: PassThrough
+            stdin: PassThrough
+            commands: string[]
+            kill: () => void
+          })
+        | undefined
 
       ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
         if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
@@ -906,19 +1000,19 @@ describe('SteamCmdRuntimeService lifecycle', () => {
         const scriptContent = readFileSync(args[1], 'utf8')
         generatedScripts.push(scriptContent)
 
-        if (/login alice secret 12345/i.test(scriptContent)) {
-          return createOneShotFakeChild({
-            lines: [
-              "Logging in user 'alice' [U:1:42] to Steam Public...",
-              'Waiting for user info...OK'
-            ]
-          })
-        }
-
-        return createOneShotFakeChild({
-          lines: ['Steam Guard code:'],
-          closeCode: 0
+        childRef = createOneShotGuardChallengeChild({
+          promptLines: [
+            'This computer has not been authenticated for your account using Steam Guard.',
+            "You can also enter this code at any time using 'set_steam_guard_code'"
+          ],
+          promptWithoutNewline: 'Steam Guard code:',
+          expectedGuardCode: '12345',
+          successLines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...OK",
+            'Waiting for user info...OK'
+          ]
         })
+        return childRef
       })
 
       const runtime = new SteamCmdRuntimeService(
@@ -950,10 +1044,10 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       const loginResult = await loginPromise
 
       expect(loginResult.sessionId).toBe(activeRunId)
-      expect(spawn).toHaveBeenCalledTimes(2)
+      expect(spawn).toHaveBeenCalledTimes(1)
       expect(generatedScripts[0]).toContain('login alice secret')
       expect(generatedScripts[0]).not.toContain('12345')
-      expect(generatedScripts[1]).toContain('login alice secret 12345')
+      expect(childRef?.commands).toContain('set_steam_guard_code 12345')
     } finally {
       if (originalExecutionMode === undefined) {
         delete process.env['STEAMCMD_EXECUTION_MODE']

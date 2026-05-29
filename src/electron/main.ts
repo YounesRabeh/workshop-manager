@@ -32,11 +32,6 @@ import { configureStableUserDataPath, migrateLegacyUserData } from './user-data-
 
 let mainWindow: BrowserWindow | null = null
 
-function tempOtpTerminalLog(message: string, details?: Record<string, unknown>): void {
-  const suffix = details ? ` ${JSON.stringify(details)}` : ''
-  process.stderr.write(`[TEMP OTP] ${message}${suffix}\n`)
-}
-
 if (process.env['ELECTRON_VERBOSE_LOGS'] !== '1') {
   // Hide noisy Chromium internal stderr lines (for example atom_cache copy/paste warnings).
   app.commandLine.appendSwitch('disable-logging')
@@ -77,7 +72,6 @@ async function createWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  tempOtpTerminalLog('electron main ready')
   await migrateLegacyUserData(stableUserDataPath)
 
   if (process.platform === 'linux') {
@@ -109,7 +103,6 @@ app.whenReady().then(async () => {
     steamCmdPlatformProfile
   )
   await runtimeService.purgeStaleScriptArtifacts()
-  tempOtpTerminalLog('SteamCMD execution policy resolved', runtimeService.getExecutionPolicy())
   runtimeService.setTimeoutSettings(await profileStore.getTimeoutSettings())
 
   const resolveSavedWebApiKey = async (): Promise<{
@@ -170,20 +163,6 @@ app.whenReady().then(async () => {
   }
 
   runtimeService.on('run-event', (event) => {
-    if (
-      event.phase === 'login' &&
-      (event.type === 'run_started' ||
-        event.type === 'run_finished' ||
-        event.type === 'run_failed' ||
-        event.type === 'steam_guard_required')
-    ) {
-      tempOtpTerminalLog('login run event', {
-        type: event.type,
-        runId: event.runId,
-        promptType: 'promptType' in event ? event.promptType : undefined,
-        errorCode: 'errorCode' in event ? event.errorCode : undefined
-      })
-    }
     if (!mainWindow) {
       return
     }
@@ -204,17 +183,7 @@ app.whenReady().then(async () => {
     const effectiveUseStoredAuth = useStoredAuth && rememberAuth
     const rememberUsername = payload.rememberUsername === true || rememberAuth
     const preferredAuthMode = payload.preferredAuthMode === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp'
-    tempOtpTerminalLog('IPC login request', {
-      username: payload.username,
-      passwordLength: payload.password.trim().length,
-      useStoredAuth,
-      effectiveUseStoredAuth,
-      rememberAuth,
-      rememberUsername,
-      preferredAuthMode
-    })
     if (!rememberAuth) {
-      tempOtpTerminalLog('strict login mode: clearing SteamCMD auth cache before login')
       await runtimeService.clearAuthCacheForStrictLogin()
     }
     await profileStore.setRememberedLoginState({
@@ -223,11 +192,6 @@ app.whenReady().then(async () => {
       preferredAuthMode
     })
     const state = await runtimeService.login(payload.username, payload.password, effectiveUseStoredAuth)
-    tempOtpTerminalLog('IPC login success', {
-      sessionId: state.sessionId,
-      username: payload.username,
-      useStoredAuth: effectiveUseStoredAuth
-    })
     // Stored session needs username next launch, so keep username when rememberAuth is enabled.
     await profileStore.setRememberedLoginState({
       rememberedUsername: rememberUsername ? payload.username : undefined,
@@ -259,10 +223,6 @@ app.whenReady().then(async () => {
   })
 
   handleIpc(IPC_CHANNELS.submitSteamGuardCode, async (payload: SteamGuardInput) => {
-    tempOtpTerminalLog('IPC submitSteamGuardCode received', {
-      sessionId: payload.sessionId,
-      codeLength: payload.code.trim().length
-    })
     runtimeService.submitSteamGuardCode(payload.sessionId, payload.code)
     return { ok: true }
   })

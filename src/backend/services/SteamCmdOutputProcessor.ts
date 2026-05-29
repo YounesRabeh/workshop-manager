@@ -36,11 +36,6 @@ interface SteamCmdOutputProcessorDeps {
   onScheduleActiveRunSettle: (activeRun: ActiveInteractiveRun) => void
 }
 
-function tempOtpDebug(message: string, details?: Record<string, unknown>): void {
-  const suffix = details ? ` ${JSON.stringify(details)}` : ''
-  process.stderr.write(`[TEMP OTP] ${message}${suffix}\n`)
-}
-
 function isSteamPromptLine(line: string): boolean {
   return /steam>\s*$/i.test(line)
 }
@@ -57,6 +52,14 @@ function isTrailingSteamGuardPromptBuffer(line: string): boolean {
     /auth(?:entication)?\s*code\s*:\s*$/i.test(normalized) ||
     /email\s*(?:otp|code)\s*:\s*$/i.test(normalized) ||
     /\botp\b\s*:\s*$/i.test(normalized)
+}
+
+function sanitizeSensitiveOutputLine(line: string): string {
+  return line
+    .replace(/(steam guard code\s*:)\s*[^\s]+/gi, '$1 [REDACTED]')
+    .replace(/(auth(?:entication)?\s*code\s*:)\s*[^\s]+/gi, '$1 [REDACTED]')
+    .replace(/(email\s*(?:otp|code)\s*:)\s*[^\s]+/gi, '$1 [REDACTED]')
+    .replace(/(\botp\b\s*:)\s*[^\s]+/gi, '$1 [REDACTED]')
 }
 
 class SteamCmdOutputProcessor {
@@ -105,6 +108,10 @@ class SteamCmdOutputProcessor {
     buffers[key] = parts.pop() ?? ''
     for (const part of parts) {
       this.routeLineToActiveRun(part, stream)
+    }
+    if (stream === 'stdout' && isTrailingSteamGuardPromptBuffer(buffers.stdout)) {
+      this.routeLineToActiveRun(buffers.stdout, stream)
+      buffers.stdout = ''
     }
   }
 
@@ -171,6 +178,7 @@ class SteamCmdOutputProcessor {
     if (!normalizedLine) {
       return
     }
+    const sanitizedLine = sanitizeSensitiveOutputLine(normalizedLine)
     if (isSteamPromptLine(normalizedLine)) {
       this.deps.state.persistentPromptReady = true
     }
@@ -217,36 +225,12 @@ class SteamCmdOutputProcessor {
             activeRun.guardCodeSubmissionCount > 0 &&
             isSteamGuardPromptContinuation(normalizedLine)
           ) {
-            tempOtpDebug('Steam Guard continuation line ignored after prior code submission', {
-              runId: activeRun.runId,
-              promptLine: normalizedLine,
-              submissionCount: activeRun.guardCodeSubmissionCount
-            })
+            // Steam may repeat context lines while waiting after a submitted code; avoid duplicate challenge loops.
           } else {
             const shouldSubmitLoginCommandWithGuardCode =
               isSteamGuardLoginUsagePrompt(normalizedLine) && activeRun.command.startsWith('login ')
             const shouldSubmitSetSteamGuardCodeCommand =
               !shouldSubmitLoginCommandWithGuardCode && isSteamGuardSetCommandHint(normalizedLine)
-
-            tempOtpDebug('Steam Guard prompt detected', {
-              runId: activeRun.runId,
-              promptLine: normalizedLine,
-              submissionMode: shouldSubmitLoginCommandWithGuardCode
-                ? 'login_with_code'
-                : shouldSubmitSetSteamGuardCodeCommand
-                  ? 'set_steam_guard_code'
-                  : 'code_only'
-            })
-
-            if (activeRun.emitRunEvents) {
-              this.deps.logger.emit({
-                runId: activeRun.runId,
-                ts: Date.now(),
-                type: 'steam_guard_required',
-                phase: activeRun.phase,
-                promptType: 'steam_guard_code'
-              })
-            }
 
             let pendingGuardPrompt!: { resolve: (code: string) => void; reject: (error: Error) => void }
             const guardPromise = new Promise<string>((guardResolve, guardReject) => {
@@ -256,10 +240,15 @@ class SteamCmdOutputProcessor {
               }
               this.deps.state.pendingSteamGuard.set(activeRun.runId, pendingGuardPrompt)
             })
-            tempOtpDebug('Pending Steam Guard challenge registered', {
-              runId: activeRun.runId,
-              pendingCount: this.deps.state.pendingSteamGuard.size
-            })
+            if (activeRun.emitRunEvents) {
+              this.deps.logger.emit({
+                runId: activeRun.runId,
+                ts: Date.now(),
+                type: 'steam_guard_required',
+                phase: activeRun.phase,
+                promptType: 'steam_guard_code'
+              })
+            }
             const clearPendingGuardChallenge = () => {
               const currentPendingPrompt = this.deps.state.pendingSteamGuard.get(activeRun.runId)
               if (currentPendingPrompt !== pendingGuardPrompt) {
@@ -269,18 +258,10 @@ class SteamCmdOutputProcessor {
               if (!didClear) {
                 return
               }
-              tempOtpDebug('Pending Steam Guard challenge cleared', {
-                runId: activeRun.runId,
-                pendingCount: this.deps.state.pendingSteamGuard.size
-              })
             }
 
             void guardPromise
               .then((guardCode) => {
-                tempOtpDebug('Steam Guard code received for submission', {
-                  runId: activeRun.runId,
-                  codeLength: guardCode.length
-                })
                 clearPendingGuardChallenge()
                 activeRun.lastSubmittedGuardCode = guardCode
                 activeRun.guardCodeSubmissionCount += 1
@@ -307,10 +288,6 @@ class SteamCmdOutputProcessor {
                 }
               })
               .catch((error) => {
-                tempOtpDebug('Steam Guard submission failed in output processor', {
-                  runId: activeRun.runId,
-                  error: error instanceof Error ? error.message : String(error)
-                })
                 this.deps.onFailActiveRun(
                   activeRun,
                   error instanceof Error ? error : new AppError('steam_guard', 'Steam Guard submission failed')
@@ -322,16 +299,16 @@ class SteamCmdOutputProcessor {
           }
         }
 
-        activeRun.lines.push(normalizedLine)
+        activeRun.lines.push(sanitizedLine)
         if (activeRun.persistLogs) {
-          this.deps.logger.appendLineNoThrow(activeRun.runId, normalizedLine)
+          this.deps.logger.appendLineNoThrow(activeRun.runId, sanitizedLine)
         }
-        if (activeRun.emitOutputEvents && !isBenignSteamLatencyWarning(normalizedLine)) {
+        if (activeRun.emitOutputEvents && !isBenignSteamLatencyWarning(sanitizedLine)) {
           this.deps.logger.emit({
             runId: activeRun.runId,
             ts: Date.now(),
             type,
-            line: normalizedLine,
+            line: sanitizedLine,
             phase: activeRun.phase
           })
         }
