@@ -151,7 +151,7 @@ export function createHostPreflightSteps(scriptName, platform = process.platform
 export function createContainerShellCommand(scriptName, forwardedArgs = []) {
   const normalizedScript = normalizeInternalBuildScript(scriptName)
   const normalizedArgs = createContainerForwardedArgs(normalizedScript, forwardedArgs)
-  const installCommand = 'pnpm install --frozen-lockfile'
+  const installCommand = 'pnpm install --frozen-lockfile --prefer-offline'
   const runCommand =
     normalizedArgs.length > 0
       ? `pnpm run ${shellEscape(normalizedScript)} -- ${normalizedArgs.map(shellEscape).join(' ')}`
