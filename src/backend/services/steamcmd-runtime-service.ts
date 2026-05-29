@@ -301,6 +301,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
         runId,
         '[RUN_META] restored active SteamCMD session without re-running login command'
       )
+      await this.runLogStore.appendLine(runId, '[RUN_META] login_outcome=success_restored_session')
       this.emitRunEvent({ runId, ts: Date.now(), type: 'run_finished', phase: 'login' })
       await this.runLogStore.finalize(runId, {
         success: true,
@@ -326,6 +327,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
         this.lastAuthenticatedState = null
       }
       if (isSteamGuardMobileTimeout(result.lines)) {
+        await this.runLogStore.appendLine(runId, '[RUN_META] login_outcome=timeout_mobile_confirmation')
         this.emitRunEvent({ runId, ts: Date.now(), type: 'run_failed', phase: 'login', errorCode: 'steam_guard' })
         await this.runLogStore.finalize(runId, {
           success: false,
@@ -352,6 +354,15 @@ export class SteamCmdRuntimeService extends EventEmitter {
           }
 
       this.emitRunEvent({ runId, ts: Date.now(), type: 'run_failed', phase: 'login', errorCode: failure.code })
+      if (failure.code === 'steam_guard') {
+        await this.runLogStore.appendLine(runId, '[RUN_META] login_outcome=otp_invalid_or_expired')
+      } else if (failure.code === 'auth' && useStoredAuth) {
+        await this.runLogStore.appendLine(runId, '[RUN_META] login_outcome=stored_auth_unavailable')
+      } else if (failure.code === 'auth') {
+        await this.runLogStore.appendLine(runId, '[RUN_META] login_outcome=auth_failed')
+      } else {
+        await this.runLogStore.appendLine(runId, '[RUN_META] login_outcome=failed')
+      }
       await this.runLogStore.finalize(runId, {
         success: false,
         status: 'failed'
@@ -365,6 +376,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
       username: this.loginState.username,
       steamId64: this.loginState.steamId64
     }
+    await this.runLogStore.appendLine(runId, '[RUN_META] login_outcome=success')
     this.emitRunEvent({ runId, ts: Date.now(), type: 'run_finished', phase: 'login' })
     await this.runLogStore.finalize(runId, {
       success: true,

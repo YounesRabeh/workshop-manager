@@ -74,6 +74,11 @@ async function createWindow(): Promise<void> {
 app.whenReady().then(async () => {
   await migrateLegacyUserData(stableUserDataPath)
 
+  // Step-1 migration safety: force script mode in app runtime while keeping
+  // compatibility internals in code until full script-only cutover is validated.
+  process.env['STEAMCMD_EXECUTION_MODE'] = 'script'
+  process.stdout.write('[RUN_META] steamcmd execution mode forced to script for soak window\n')
+
   if (process.platform === 'linux') {
     app.setName('Workshop Manager')
     const linuxApp = app as Electron.App & { setDesktopName?: (desktopFileName: string) => void }

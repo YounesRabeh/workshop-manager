@@ -209,6 +209,12 @@ class SteamCmdOutputProcessor {
 
         if (activeRun.phase === 'login' && isSteamGuardMobilePrompt(normalizedLine) && !activeRun.guardMobilePromptSent) {
           activeRun.guardMobilePromptSent = true
+          if (activeRun.persistLogs) {
+            this.deps.logger.appendLineNoThrow(
+              activeRun.runId,
+              this.deps.logger.formatRunMeta('login_challenge prompt=steam_guard_mobile')
+            )
+          }
           if (activeRun.emitRunEvents) {
             this.deps.logger.emit({
               runId: activeRun.runId,
@@ -263,6 +269,12 @@ class SteamCmdOutputProcessor {
                   phase: activeRun.phase,
                   promptType: 'steam_guard_code'
                 })
+              }
+              if (activeRun.persistLogs) {
+                this.deps.logger.appendLineNoThrow(
+                  activeRun.runId,
+                  this.deps.logger.formatRunMeta('login_challenge prompt=steam_guard_code')
+                )
               }
               const clearPendingGuardChallenge = () => {
                 const currentPendingPrompt = this.deps.state.pendingSteamGuard.get(activeRun.runId)
