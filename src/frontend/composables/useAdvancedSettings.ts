@@ -281,7 +281,10 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
         return
       }
       const normalizedKey = advancedSettings.webApiKey.trim()
-      const implicitEnable = normalizedKey.length > 0 ? true : advancedSettings.webApiEnabled
+      const implicitEnable =
+        normalizedKey.length > 0 ||
+        advancedSettings.webApiEnabled ||
+        (advancedSettings.hasWebApiKey && advancedSettings.secureStorageAvailable)
       const payload = await window.workshop.saveAdvancedSettings({
         webApiEnabled: implicitEnable,
         webApiKey: normalizedKey.length > 0 ? normalizedKey : undefined,

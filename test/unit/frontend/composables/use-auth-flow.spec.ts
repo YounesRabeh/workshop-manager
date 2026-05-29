@@ -241,11 +241,31 @@ describe('useAuthFlow composable', () => {
     })
 
     flow.loginState.value = 'signed_in'
+    flow.loginForm.rememberAuth = true
     await flow.signOut()
 
+    expect(workshop.logout).toHaveBeenCalledTimes(1)
+    expect(workshop.clearStoredSession).not.toHaveBeenCalled()
     expect(flow.loginState.value).toBe('signed_out')
     expect(onHideTimeoutLogs).toHaveBeenCalledTimes(1)
     expect(onSignedOut).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears stored session on sign-out when keep-signed-in is disabled', async () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.loginState.value = 'signed_in'
+    flow.loginForm.rememberAuth = false
+    await flow.signOut()
+
+    expect(workshop.clearStoredSession).toHaveBeenCalledTimes(1)
+    expect(workshop.logout).not.toHaveBeenCalled()
+    expect(flow.loginState.value).toBe('signed_out')
   })
 
   it('notifies app shell to open advanced options when SteamCMD path is missing', async () => {

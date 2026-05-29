@@ -285,7 +285,11 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
 
   async function signOut(): Promise<void> {
     try {
-      await window.workshop.logout()
+      if (loginForm.rememberAuth) {
+        await window.workshop.logout()
+      } else {
+        await clearStoredSessionPersistedState()
+      }
     } catch (error) {
       logError('useAuthFlow::signOut', normalizeSharedError(error))
       // keep local sign out even if backend IPC fails

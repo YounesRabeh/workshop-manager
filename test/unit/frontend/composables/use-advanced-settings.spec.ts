@@ -84,4 +84,30 @@ describe('useAdvancedSettings composable', () => {
     expect(workshop.pickSteamCmdExecutable).toHaveBeenCalledTimes(1)
     expect(advanced.advancedSettings.steamCmdManualPath).toBe('/tools/steamcmd.sh')
   })
+
+  it('re-enables Web API on save when a secure saved key already exists', async () => {
+    workshop.getAdvancedSettings.mockResolvedValueOnce({
+      webApiEnabled: false,
+      hasWebApiKey: true,
+      secureStorageAvailable: true,
+      steamCmdManualPath: undefined,
+      steamCmdInstalled: true,
+      steamCmdSource: 'auto',
+      timeouts: {
+        loginTimeoutMs: 60_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      }
+    })
+
+    const { advanced } = createComposable()
+    await advanced.loadAdvancedSettings()
+    await advanced.saveAdvancedSettings()
+
+    expect(workshop.saveAdvancedSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        webApiEnabled: true
+      })
+    )
+  })
 })
