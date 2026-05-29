@@ -108,6 +108,8 @@ app.whenReady().then(async () => {
     paths.runtimeDir,
     steamCmdPlatformProfile
   )
+  await runtimeService.purgeStaleScriptArtifacts()
+  tempOtpTerminalLog('SteamCMD execution policy resolved', runtimeService.getExecutionPolicy())
   runtimeService.setTimeoutSettings(await profileStore.getTimeoutSettings())
 
   const resolveSavedWebApiKey = async (): Promise<{

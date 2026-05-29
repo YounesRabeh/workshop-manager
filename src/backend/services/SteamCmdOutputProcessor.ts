@@ -153,10 +153,7 @@ class SteamCmdOutputProcessor {
           runtimeError: new AppError('command_failed', `SteamCMD process exited unexpectedly (code ${exitCode ?? 1})`)
         }
       }
-      return {
-        exitCode: 1,
-        runtimeError: new AppError('auth', 'Steam login failed. Check credentials or guard method.')
-      }
+      return { exitCode: 1 }
     }
 
     const parsedWorkshopFailure = parseWorkshopRunFailure(lines, phase)
@@ -212,6 +209,7 @@ class SteamCmdOutputProcessor {
 
         if (
           activeRun.phase === 'login' &&
+          !activeRun.disableSteamGuardPromptHandling &&
           isSteamGuardPrompt(normalizedLine) &&
           this.deps.state.pendingSteamGuard.has(activeRun.runId) === false
         ) {

@@ -233,6 +233,7 @@ export class SteamCmdProcessSession {
           persistLogs: context.persistLogs,
           emitOutputEvents: options.emitOutputEvents === true,
           timeout,
+          disableSteamGuardPromptHandling: options.disableSteamGuardPromptHandling === true,
           writeInput: (value: string) => {
             this.processManager.writeInteractiveInput(value)
           },
@@ -315,6 +316,7 @@ export class SteamCmdProcessSession {
           persistLogs: context.persistLogs,
           emitOutputEvents: options.emitOutputEvents === true,
           timeout,
+          disableSteamGuardPromptHandling: options.disableSteamGuardPromptHandling === true,
           writeInput: (value: string) => {
             this.processManager.writeInteractiveInput(value)
           },
@@ -376,6 +378,7 @@ export class SteamCmdProcessSession {
           persistLogs: context.persistLogs,
           emitOutputEvents: options.emitOutputEvents === true,
           timeout,
+          disableSteamGuardPromptHandling: options.disableSteamGuardPromptHandling === true,
           writeInput: (value: string) => {
             child.stdin.write(`${value}${this.platformBehavior.interactiveLineEnding}`)
           },

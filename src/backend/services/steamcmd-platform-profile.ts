@@ -15,9 +15,6 @@ export interface SteamCmdPlatformBehavior {
   useShellHost: boolean
   hideWindowsConsole: boolean
   interactiveLineEnding: '\n' | '\r\n'
-  loginExecution: 'interactive' | 'one_shot'
-  workshopExecution: 'interactive' | 'one_shot'
-  persistentSessionStartup: 'empty_process' | 'startup_args' | 'none'
   identityResolution: 'steamcmd_output' | 'steamcmd_output_then_custom_profile'
   waitForPromptBeforeInteractiveLogin: boolean
   enableInteractiveLoginRetry: boolean
@@ -35,9 +32,6 @@ const STEAMCMD_PLATFORM_BEHAVIORS: Record<SteamCmdPlatformProfile, SteamCmdPlatf
     useShellHost: false,
     hideWindowsConsole: false,
     interactiveLineEnding: '\n',
-    loginExecution: 'interactive',
-    workshopExecution: 'interactive',
-    persistentSessionStartup: 'empty_process',
     identityResolution: 'steamcmd_output',
     waitForPromptBeforeInteractiveLogin: false,
     enableInteractiveLoginRetry: false,
@@ -53,9 +47,6 @@ const STEAMCMD_PLATFORM_BEHAVIORS: Record<SteamCmdPlatformProfile, SteamCmdPlatf
     useShellHost: false,
     hideWindowsConsole: true,
     interactiveLineEnding: '\r\n',
-    loginExecution: 'one_shot',
-    workshopExecution: 'one_shot',
-    persistentSessionStartup: 'none',
     identityResolution: 'steamcmd_output_then_custom_profile',
     waitForPromptBeforeInteractiveLogin: false,
     enableInteractiveLoginRetry: false,

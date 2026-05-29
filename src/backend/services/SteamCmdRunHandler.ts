@@ -114,6 +114,7 @@ class SteamCmdRunHandler {
       settleTimeout: null,
       lineQueue: Promise.resolve(),
       pendingResult: null,
+      disableSteamGuardPromptHandling: config.disableSteamGuardPromptHandling ?? false,
       guardMobilePromptSent: false,
       guardCodeSubmissionCount: 0,
       lastSubmittedGuardCode: null,

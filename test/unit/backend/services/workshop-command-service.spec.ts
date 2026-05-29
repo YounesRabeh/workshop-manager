@@ -34,7 +34,7 @@ describe('WorkshopCommandService', () => {
 
       expect(command.runId).toMatch(/^\d+-[0-9a-f]+$/)
       expect(command.args.join(' ')).toContain('workshop_build_item')
-      expect(command.execution).toBe('interactive')
+      expect(command.vdfPath).toMatch(/\.vdf$/)
 
       const files = await readdir(runtimeDir)
       expect(files.some((file) => file.endsWith('.vdf'))).toBe(true)
@@ -70,7 +70,7 @@ describe('WorkshopCommandService', () => {
     }
   })
 
-  it('marks Windows workshop commands for one-shot execution', async () => {
+  it('prepares Windows workshop commands with expected args', async () => {
     const runtimeDir = await mkdtemp(join(tmpdir(), 'wm-command-'))
     try {
       const service = new WorkshopCommandService(runtimeDir, 'windows')
@@ -87,7 +87,7 @@ describe('WorkshopCommandService', () => {
         'upload'
       )
 
-      expect(command.execution).toBe('one_shot')
+      expect(command.vdfPath).toMatch(/\.vdf$/)
       expect(command.args.slice(0, 2)).toEqual(['+login', 'alice'])
       expect(command.args).toContain('+workshop_build_item')
       expect(command.args.at(-1)).toBe('+quit')

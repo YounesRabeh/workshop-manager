@@ -1,4 +1,5 @@
 import { access, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -716,6 +717,250 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(vi.mocked(spawn).mock.calls[1]?.[2]).toEqual(
       expect.objectContaining({ shell: false, windowsHide: true })
     )
+  })
+
+  it('uses script-mode workshop commands after login when execution mode is script', async () => {
+    const originalExecutionMode = process.env['STEAMCMD_EXECUTION_MODE']
+    process.env['STEAMCMD_EXECUTION_MODE'] = 'script'
+
+    try {
+      const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-workshop-script-'))
+      const store = new RunLogStore(join(root, 'runs'))
+      let capturedWorkshopScript = ''
+
+      ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === '+runscript' && typeof args[1] === 'string') {
+          const scriptContent = readFileSync(args[1], 'utf8')
+          if (/workshop_build_item/i.test(scriptContent)) {
+            capturedWorkshopScript = scriptContent
+            return createOneShotFakeChild({
+              lines: ['Published File Id: 777', 'Success.']
+            })
+          }
+          return createOneShotFakeChild({
+            lines: [
+              "Logging in user 'alice' [U:1:42] to Steam Public...",
+              'Waiting for user info...OK'
+            ]
+          })
+        }
+
+        throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+      })
+
+      const runtime = new SteamCmdRuntimeService(
+        async () => 'C:\\steamcmd\\steamcmd.exe',
+        store,
+        join(root, 'runtime'),
+        'windows'
+      )
+      await runtime.login('alice', 'secret')
+
+      const result = await runtime.upload(
+        {
+          appId: '480',
+          contentFolder: '/mods',
+          previewFile: '/mods/preview.png',
+          title: 'My Mod'
+        },
+        'upload'
+      )
+
+      expect(result.success).toBe(true)
+      expect(spawn).toHaveBeenCalledTimes(2)
+      const uploadArgs = vi.mocked(spawn).mock.calls[1]?.[1]
+      expect(uploadArgs?.[0]).toBe('+runscript')
+      expect(uploadArgs).not.toContain('+workshop_build_item')
+      expect(capturedWorkshopScript).toContain('@ShutdownOnFailedCommand 1')
+      expect(capturedWorkshopScript).toContain('@NoPromptForPassword 1')
+      expect(capturedWorkshopScript).toContain('login alice')
+      expect(capturedWorkshopScript).toContain('workshop_build_item')
+    } finally {
+      if (originalExecutionMode === undefined) {
+        delete process.env['STEAMCMD_EXECUTION_MODE']
+      } else {
+        process.env['STEAMCMD_EXECUTION_MODE'] = originalExecutionMode
+      }
+    }
+  })
+
+  it('uses script-mode workshop commands on Linux profile', async () => {
+    const originalExecutionMode = process.env['STEAMCMD_EXECUTION_MODE']
+    process.env['STEAMCMD_EXECUTION_MODE'] = 'script'
+
+    try {
+      const root = await mkdtemp(join(tmpdir(), 'runtime-service-linux-workshop-script-'))
+      const store = new RunLogStore(join(root, 'runs'))
+      const capturedScripts: string[] = []
+
+      ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+          throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+        }
+
+        const scriptContent = readFileSync(args[1], 'utf8')
+        capturedScripts.push(scriptContent)
+        if (/workshop_build_item/i.test(scriptContent)) {
+          return createOneShotFakeChild({
+            lines: ['Published File Id: 888', 'Success.']
+          })
+        }
+
+        return createOneShotFakeChild({
+          lines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...",
+            'Waiting for user info...OK'
+          ]
+        })
+      })
+
+      const runtime = new SteamCmdRuntimeService(
+        async () => '/usr/bin/steamcmd',
+        store,
+        join(root, 'runtime'),
+        'linux'
+      )
+      await runtime.login('alice', 'secret')
+      const result = await runtime.upload(
+        {
+          appId: '480',
+          contentFolder: '/mods',
+          previewFile: '/mods/preview.png',
+          title: 'My Linux Mod'
+        },
+        'upload'
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.publishedFileId).toBe('888')
+      expect(spawn).toHaveBeenCalledTimes(2)
+      expect(vi.mocked(spawn).mock.calls[0]?.[1]?.[0]).toBe('+runscript')
+      expect(vi.mocked(spawn).mock.calls[1]?.[1]?.[0]).toBe('+runscript')
+      expect(capturedScripts[1]).toContain('workshop_build_item')
+      expect(capturedScripts[1]).toContain('@NoPromptForPassword 1')
+    } finally {
+      if (originalExecutionMode === undefined) {
+        delete process.env['STEAMCMD_EXECUTION_MODE']
+      } else {
+        process.env['STEAMCMD_EXECUTION_MODE'] = originalExecutionMode
+      }
+    }
+  })
+
+  it('checks stored auth via script mode using runscript', async () => {
+    const originalExecutionMode = process.env['STEAMCMD_EXECUTION_MODE']
+    process.env['STEAMCMD_EXECUTION_MODE'] = 'script'
+
+    try {
+      const root = await mkdtemp(join(tmpdir(), 'runtime-service-script-stored-auth-'))
+      const store = new RunLogStore(join(root, 'runs'))
+      let capturedScript = ''
+
+      ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+          throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+        }
+        capturedScript = readFileSync(args[1], 'utf8')
+        return createOneShotFakeChild({
+          lines: ['Logging in using cached credentials.']
+        })
+      })
+
+      const runtime = new SteamCmdRuntimeService(
+        async () => '/usr/bin/steamcmd',
+        store,
+        join(root, 'runtime'),
+        'linux'
+      )
+      const hasStoredAuth = await runtime.hasStoredAuthFor('alice')
+
+      expect(hasStoredAuth).toBe(true)
+      expect(spawn).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(spawn).mock.calls[0]?.[1]?.[0]).toBe('+runscript')
+      expect(capturedScript).toContain('@NoPromptForPassword 1')
+      expect(capturedScript).toContain('login alice')
+      expect(capturedScript).toContain('\nquit\n')
+    } finally {
+      if (originalExecutionMode === undefined) {
+        delete process.env['STEAMCMD_EXECUTION_MODE']
+      } else {
+        process.env['STEAMCMD_EXECUTION_MODE'] = originalExecutionMode
+      }
+    }
+  })
+
+  it('uses script-mode login retry flow with submitSteamGuardCode', async () => {
+    const originalExecutionMode = process.env['STEAMCMD_EXECUTION_MODE']
+    process.env['STEAMCMD_EXECUTION_MODE'] = 'script'
+
+    try {
+      const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-script-'))
+      const store = new RunLogStore(join(root, 'runs'))
+      const generatedScripts: string[] = []
+
+      ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+          throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+        }
+
+        const scriptContent = readFileSync(args[1], 'utf8')
+        generatedScripts.push(scriptContent)
+
+        if (/login alice secret 12345/i.test(scriptContent)) {
+          return createOneShotFakeChild({
+            lines: [
+              "Logging in user 'alice' [U:1:42] to Steam Public...",
+              'Waiting for user info...OK'
+            ]
+          })
+        }
+
+        return createOneShotFakeChild({
+          lines: ['Steam Guard code:'],
+          closeCode: 0
+        })
+      })
+
+      const runtime = new SteamCmdRuntimeService(
+        async () => 'C:\\steamcmd\\steamcmd.exe',
+        store,
+        join(root, 'runtime'),
+        'windows'
+      )
+
+      let activeRunId = ''
+      let sawGuardPrompt = false
+      runtime.on('run-event', (event) => {
+        if (event.type === 'run_started' && event.phase === 'login') {
+          activeRunId = event.runId
+        }
+        if (event.type === 'steam_guard_required' && event.phase === 'login') {
+          sawGuardPrompt = true
+        }
+      })
+
+      const loginPromise = runtime.login('alice', 'secret')
+
+      await vi.waitFor(() => {
+        expect(activeRunId).not.toBe('')
+        expect(sawGuardPrompt).toBe(true)
+      })
+
+      runtime.submitSteamGuardCode(activeRunId, '12345')
+      const loginResult = await loginPromise
+
+      expect(loginResult.sessionId).toBe(activeRunId)
+      expect(spawn).toHaveBeenCalledTimes(2)
+      expect(generatedScripts[0]).toContain('login alice secret')
+      expect(generatedScripts[0]).not.toContain('12345')
+      expect(generatedScripts[1]).toContain('login alice secret 12345')
+    } finally {
+      if (originalExecutionMode === undefined) {
+        delete process.env['STEAMCMD_EXECUTION_MODE']
+      } else {
+        process.env['STEAMCMD_EXECUTION_MODE'] = originalExecutionMode
+      }
+    }
   })
 
   it('accepts a successful Windows one-shot workshop run even when SteamCMD omits an explicit success line', async () => {

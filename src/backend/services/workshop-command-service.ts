@@ -10,18 +10,14 @@ import { AppError } from '@backend/utils/errors'
 import { validateDraft } from '@backend/utils/validation'
 import { listContentFolderFiles } from './content-folder-scanner'
 import { buildWorkshopArgs } from './steam-output-parser'
-import {
-  getSteamCmdPlatformBehavior,
-  type SteamCmdPlatformBehavior,
-  type SteamCmdPlatformProfile
-} from './steamcmd-platform-profile'
+import type { SteamCmdPlatformProfile } from './steamcmd-platform-profile'
 import { generateWorkshopVdf } from './vdf-generator'
 
 export interface PreparedWorkshopCommand {
   runId: string
   args: string[]
+  vdfPath: string
   publishedFileId?: string
-  execution: 'interactive' | 'one_shot'
 }
 
 function createRunId(): string {
@@ -51,13 +47,11 @@ async function ensureUpdateContentFolderHasFiles(draft: UploadDraft): Promise<vo
 }
 
 export class WorkshopCommandService {
-  private readonly platformBehavior: SteamCmdPlatformBehavior
-
   constructor(
     private readonly runtimeDir: string,
-    platformProfile: SteamCmdPlatformProfile
+    _platformProfile: SteamCmdPlatformProfile
   ) {
-    this.platformBehavior = getSteamCmdPlatformBehavior(platformProfile)
+    // Compatibility constructor parameter kept during migration to avoid broad call-site churn.
   }
 
   async prepare(
@@ -78,8 +72,8 @@ export class WorkshopCommandService {
     return {
       runId,
       args: buildWorkshopArgs(username, undefined, vdfPath),
-      publishedFileId: draft.publishedFileId,
-      execution: this.platformBehavior.workshopExecution
+      vdfPath,
+      publishedFileId: draft.publishedFileId
     }
   }
 }

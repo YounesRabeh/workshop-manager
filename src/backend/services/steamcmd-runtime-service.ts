@@ -52,10 +52,21 @@ import {
 } from './steam-identity-resolver'
 import { WorkshopCommandService } from './workshop-command-service'
 import type { WorkshopWebApiAccessState } from './workshop-fetch-service'
+import {
+  resolveSteamCmdExecutionPolicy,
+  type SteamCmdExecutionPolicy
+} from './steamcmd-execution-policy'
+import { SteamCmdScriptRunner } from './steamcmd-script-runner'
+import { buildSteamCmdLoginScript, buildSteamCmdWorkshopScript } from './steamcmd-script-builder'
 
 interface LoginState {
   username: string
   steamId64?: string
+}
+
+interface PendingScriptSteamGuardChallenge {
+  resolve: (code: string) => void
+  reject: (error: Error) => void
 }
 
 function createRunId(): string {
@@ -116,6 +127,9 @@ export class SteamCmdRuntimeService extends EventEmitter {
   private readonly workshopCommandService: WorkshopCommandService
   private readonly steamIdentityResolver: SteamIdentityResolver
   private readonly platformBehavior: SteamCmdPlatformBehavior
+  private readonly executionPolicy: SteamCmdExecutionPolicy
+  private readonly scriptRunner: SteamCmdScriptRunner
+  private readonly pendingScriptSteamGuard = new Map<string, PendingScriptSteamGuardChallenge>()
   private timeoutSettings = DEFAULT_STEAMCMD_TIMEOUT_SETTINGS
 
   constructor(
@@ -126,6 +140,8 @@ export class SteamCmdRuntimeService extends EventEmitter {
   ) {
     super()
     this.platformBehavior = getSteamCmdPlatformBehavior(platformProfile)
+    this.executionPolicy = resolveSteamCmdExecutionPolicy()
+    this.scriptRunner = new SteamCmdScriptRunner(this.runtimeDir)
     this.processSession = new SteamCmdProcessSession({
       steamCmdExecutablePath: this.steamCmdExecutablePath,
       runLogStore: this.runLogStore,
@@ -140,6 +156,14 @@ export class SteamCmdRuntimeService extends EventEmitter {
       getLoginState: () => this.loginState
     })
     this.workshopCommandService = new WorkshopCommandService(this.runtimeDir, platformProfile)
+  }
+
+  getExecutionPolicy(): SteamCmdExecutionPolicy {
+    return this.executionPolicy
+  }
+
+  async purgeStaleScriptArtifacts(): Promise<void> {
+    await this.scriptRunner.purgeStaleScripts()
   }
 
   setTimeoutSettings(settings: SteamCmdTimeoutSettings): void {
@@ -312,17 +336,25 @@ export class SteamCmdRuntimeService extends EventEmitter {
       return { sessionId: runId }
     }
 
-    const result = this.platformBehavior.loginExecution === 'one_shot'
-      ? await this.processSession.runOneShot(runId, args, {
-          phase: 'login',
-          timeoutMs,
-          emitOutputEvents: true
+    const result = this.executionPolicy.mode === 'script'
+      ? await this.loginWithScriptMode({
+          runId,
+          username: normalizedUsername,
+          password,
+          useStoredAuth,
+          timeoutMs
         })
-      : await this.processSession.run(runId, args, {
-          phase: 'login',
-          timeoutMs,
-          emitOutputEvents: true
-        })
+      : this.platformBehavior.profile === 'windows'
+        ? await this.processSession.runOneShot(runId, args, {
+            phase: 'login',
+            timeoutMs,
+            emitOutputEvents: true
+          })
+        : await this.processSession.run(runId, args, {
+            phase: 'login',
+            timeoutMs,
+            emitOutputEvents: true
+          })
     tempOtpRuntimeLog('runtime login command finished', {
       runId,
       exitCode: result.exitCode,
@@ -392,6 +424,10 @@ export class SteamCmdRuntimeService extends EventEmitter {
     this.loginState = null
     if (options?.clearStoredAuth) {
       this.lastAuthenticatedState = null
+      for (const [runId, pending] of this.pendingScriptSteamGuard.entries()) {
+        pending.reject(new AppError('command_failed', 'SteamCMD run cancelled by user.'))
+        this.pendingScriptSteamGuard.delete(runId)
+      }
       this.processSession.resetPersistentSession()
       return
     }
@@ -431,65 +467,91 @@ export class SteamCmdRuntimeService extends EventEmitter {
       return false
     }
 
-    const args = ['+login', normalizedUsername, '+quit']
+    const args =
+      this.executionPolicy.mode === 'script'
+        ? undefined
+        : ['+login', normalizedUsername, '+quit']
+    const scriptContent =
+      this.executionPolicy.mode === 'script'
+        ? buildSteamCmdLoginScript({
+            username: normalizedUsername
+          })
+        : undefined
+    const runId = createRunId()
 
-    return await new Promise<boolean>((resolve) => {
-      const child = spawn(executablePath, args, {
-        cwd: this.runtimeDir,
-        stdio: 'pipe',
-        shell: this.platformBehavior.useShellHost,
-        windowsHide: this.platformBehavior.hideWindowsConsole,
-        env: buildSteamCmdChildEnv(this.runtimeDir, this.platformBehavior)
-      })
+    const executeCheck = async (spawnArgs: string[]): Promise<boolean> => {
+      return await new Promise<boolean>((resolve) => {
+        const child = spawn(executablePath, spawnArgs, {
+          cwd: this.runtimeDir,
+          stdio: 'pipe',
+          shell: this.platformBehavior.useShellHost,
+          windowsHide: this.platformBehavior.hideWindowsConsole,
+          env: buildSteamCmdChildEnv(this.runtimeDir, this.platformBehavior)
+        })
 
-      let stdout = ''
-      let stderr = ''
-      const timeout = setTimeout(() => {
-        child.kill('SIGTERM')
-        resolve(false)
-      }, 6_000)
+        let stdout = ''
+        let stderr = ''
+        const timeout = setTimeout(() => {
+          child.kill('SIGTERM')
+          resolve(false)
+        }, 6_000)
 
-      const decide = (exitCode: number | null): boolean => {
-        const lines = `${stdout}\n${stderr}`
-          .split(/\r?\n/)
-          .map((line) => stripAnsi(line).trim())
-          .filter((line) => line.length > 0)
+        const decide = (exitCode: number | null): boolean => {
+          const lines = `${stdout}\n${stderr}`
+            .split(/\r?\n/)
+            .map((line) => stripAnsi(line).trim())
+            .filter((line) => line.length > 0)
 
-        const joined = lines.join('\n')
+          const joined = lines.join('\n')
 
-        if (/cached credentials not found|no cached credentials/i.test(joined)) {
-          return false
+          if (/cached credentials not found|no cached credentials/i.test(joined)) {
+            return false
+          }
+          if (/logging in using cached credentials/i.test(joined)) {
+            return true
+          }
+          if (lines.some((line) => isSteamGuardMobilePrompt(line) || isSteamGuardPrompt(line))) {
+            return true
+          }
+
+          const parsedFailure = parseSteamLoginFailure(lines)
+          if (parsedFailure?.code === 'auth') {
+            return false
+          }
+
+          return exitCode === 0
         }
-        if (/logging in using cached credentials/i.test(joined)) {
-          return true
-        }
-        if (lines.some((line) => isSteamGuardMobilePrompt(line) || isSteamGuardPrompt(line))) {
-          return true
-        }
 
-        const parsedFailure = parseSteamLoginFailure(lines)
-        if (parsedFailure?.code === 'auth') {
-          return false
-        }
+        child.stdout.on('data', (chunk: Buffer) => {
+          stdout += chunk.toString('utf8')
+        })
+        child.stderr.on('data', (chunk: Buffer) => {
+          stderr += chunk.toString('utf8')
+        })
+        child.once('error', () => {
+          clearTimeout(timeout)
+          resolve(false)
+        })
+        child.once('close', (exitCode) => {
+          clearTimeout(timeout)
+          resolve(decide(exitCode))
+        })
+      })
+    }
 
-        return exitCode === 0
-      }
+    if (args) {
+      return await executeCheck(args)
+    }
 
-      child.stdout.on('data', (chunk: Buffer) => {
-        stdout += chunk.toString('utf8')
+    try {
+      return await this.scriptRunner.runWithEphemeralScript({
+        runId,
+        scriptContent: scriptContent!,
+        execute: async (scriptPath) => await executeCheck(['+runscript', scriptPath])
       })
-      child.stderr.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString('utf8')
-      })
-      child.once('error', () => {
-        clearTimeout(timeout)
-        resolve(false)
-      })
-      child.once('close', (exitCode) => {
-        clearTimeout(timeout)
-        resolve(decide(exitCode))
-      })
-    })
+    } catch {
+      return false
+    }
   }
 
   async getCurrentProfile(): Promise<SteamProfileSummary> {
@@ -514,11 +576,88 @@ export class SteamCmdRuntimeService extends EventEmitter {
         codeLength: code.trim().length
       })}\n`
     )
+    const pendingScriptChallenge = this.pendingScriptSteamGuard.get(sessionId)
+    if (pendingScriptChallenge) {
+      this.pendingScriptSteamGuard.delete(sessionId)
+      pendingScriptChallenge.resolve(code.trim())
+      return
+    }
     this.processSession.submitSteamGuardCode(sessionId, code)
   }
 
   cancelRun(runId: string): void {
+    const pendingScriptChallenge = this.pendingScriptSteamGuard.get(runId)
+    if (pendingScriptChallenge) {
+      this.pendingScriptSteamGuard.delete(runId)
+      pendingScriptChallenge.reject(new AppError('command_failed', 'SteamCMD run cancelled by user.'))
+      this.emitRunEvent({ runId, ts: Date.now(), type: 'run_cancelled', phase: 'cancelled' })
+      return
+    }
     this.processSession.cancelRun(runId)
+  }
+
+  private async loginWithScriptMode(options: {
+    runId: string
+    username: string
+    password: string
+    useStoredAuth: boolean
+    timeoutMs: number
+  }): Promise<{ lines: string[]; exitCode: number }> {
+    const passwordForScript = options.useStoredAuth ? undefined : options.password
+    let guardCode: string | undefined
+    let emitRunEvents = true
+
+    while (true) {
+      const scriptContent = buildSteamCmdLoginScript({
+        username: options.username,
+        password: passwordForScript,
+        steamGuardCode: guardCode
+      })
+
+      const attemptResult = await this.scriptRunner.runWithEphemeralScript({
+        runId: options.runId,
+        scriptContent,
+        execute: async (scriptPath) =>
+          await this.processSession.runOneShot(options.runId, ['+runscript', scriptPath], {
+            phase: 'login',
+            timeoutMs: options.timeoutMs,
+            emitOutputEvents: true,
+            emitRunEvents,
+            disableSteamGuardPromptHandling: true
+          })
+      })
+
+      emitRunEvents = false
+      const parsedFailure = parseSteamLoginFailure(attemptResult.lines)
+      const requiresSteamGuardCode =
+        !isSteamGuardMobileTimeout(attemptResult.lines) &&
+        attemptResult.lines.some((line) => isSteamGuardPrompt(line)) &&
+        !attemptResult.lines.some((line) => isLoginSuccessLine(line)) &&
+        parsedFailure?.code !== 'auth'
+
+      if (!requiresSteamGuardCode) {
+        return attemptResult
+      }
+
+      this.emitRunEvent({
+        runId: options.runId,
+        ts: Date.now(),
+        type: 'steam_guard_required',
+        phase: 'login',
+        promptType: 'steam_guard_code'
+      })
+      guardCode = await this.waitForScriptModeSteamGuardCode(options.runId)
+    }
+  }
+
+  private async waitForScriptModeSteamGuardCode(runId: string): Promise<string> {
+    if (this.pendingScriptSteamGuard.has(runId)) {
+      throw new AppError('steam_guard', 'A Steam Guard code is already pending for this login session.')
+    }
+
+    return await new Promise<string>((resolve, reject) => {
+      this.pendingScriptSteamGuard.set(runId, { resolve, reject })
+    })
   }
 
   private async resolveWorkshopLoginState(): Promise<LoginState> {
@@ -531,7 +670,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
       throw new AppError('auth', 'You must login before uploading or updating mods')
     }
 
-    if (this.platformBehavior.workshopExecution === 'interactive') {
+    if (this.platformBehavior.profile === 'linux') {
       await this.login(rememberedState.username, '', true)
       if (!this.loginState) {
         throw new AppError('auth', 'Saved Steam session is not available. Enter password to sign in again.')
@@ -550,18 +689,35 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
     let commandResult: { lines: string[]; exitCode: number }
     try {
-      commandResult =
-        prepared.execution === 'one_shot'
-          ? await this.processSession.runOneShot(prepared.runId, prepared.args, {
+      if (this.executionPolicy.mode === 'script') {
+        const scriptContent = buildSteamCmdWorkshopScript({
+          username: loginState.username,
+          vdfPath: prepared.vdfPath
+        })
+        commandResult = await this.scriptRunner.runWithEphemeralScript({
+          runId: prepared.runId,
+          scriptContent,
+          execute: async (scriptPath) =>
+            await this.processSession.runOneShot(prepared.runId, ['+runscript', scriptPath], {
               phase: mode,
               timeoutMs: this.timeoutSettings.workshopTimeoutMs,
               emitOutputEvents: true
             })
-          : await this.processSession.run(prepared.runId, prepared.args, {
-              phase: mode,
-              timeoutMs: this.timeoutSettings.workshopTimeoutMs,
-              emitOutputEvents: true
-            })
+        })
+      } else {
+        commandResult =
+          this.platformBehavior.profile === 'windows'
+            ? await this.processSession.runOneShot(prepared.runId, prepared.args, {
+                phase: mode,
+                timeoutMs: this.timeoutSettings.workshopTimeoutMs,
+                emitOutputEvents: true
+              })
+            : await this.processSession.run(prepared.runId, prepared.args, {
+                phase: mode,
+                timeoutMs: this.timeoutSettings.workshopTimeoutMs,
+                emitOutputEvents: true
+              })
+      }
     } catch (error) {
       const runError =
         error instanceof AppError ? error : new AppError('command_failed', errorMessage(error))
