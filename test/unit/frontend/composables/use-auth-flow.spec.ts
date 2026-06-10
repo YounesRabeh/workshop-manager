@@ -16,6 +16,7 @@ describe('useAuthFlow composable', () => {
     login: vi.fn(async () => ({ ok: true })),
     logout: vi.fn(async () => ({ ok: true })),
     clearStoredSession: vi.fn(async () => ({ ok: true })),
+    savePreferredAuthMode: vi.fn(async () => ({ ok: true })),
     submitSteamGuardCode: vi.fn(async () => ({ ok: true })),
     ensureSteamCmdInstalled: vi.fn(async () => ({
       installed: true,
@@ -377,6 +378,22 @@ describe('useAuthFlow composable', () => {
         preferredAuthMode: 'steam_guard_mobile'
       })
     )
+  })
+
+  it('persists preferred auth mode as soon as it changes', async () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.setPreferredAuthMode('steam_guard_mobile')
+    await vi.waitFor(() => {
+      expect(workshop.savePreferredAuthMode).toHaveBeenCalledWith({
+        preferredAuthMode: 'steam_guard_mobile'
+      })
+    })
   })
 
   it('does not switch to OTP challenge when steam requests OTP while mobile is preferred', () => {

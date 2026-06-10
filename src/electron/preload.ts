@@ -29,6 +29,7 @@ export interface WorkshopApi {
   quitApp: () => Promise<{ ok: true }>
   logout: () => Promise<{ ok: true }>
   clearStoredSession: () => Promise<{ ok: true }>
+  savePreferredAuthMode: (payload: { preferredAuthMode: PreferredAuthMode }) => Promise<{ ok: true }>
   submitSteamGuardCode: (payload: { sessionId: string; code: string }) => Promise<{ ok: true }>
   uploadMod: (payload: UploadInput) => Promise<RunResult>
   updateMod: (payload: UploadInput) => Promise<RunResult>
@@ -68,6 +69,7 @@ const api: WorkshopApi = {
   quitApp: () => ipcRenderer.invoke(IPC_CHANNELS.quitApp),
   logout: () => ipcRenderer.invoke(IPC_CHANNELS.logout),
   clearStoredSession: () => ipcRenderer.invoke(IPC_CHANNELS.clearStoredSession),
+  savePreferredAuthMode: (payload) => ipcRenderer.invoke(IPC_CHANNELS.savePreferredAuthMode, payload),
   submitSteamGuardCode: (payload) => ipcRenderer.invoke(IPC_CHANNELS.submitSteamGuardCode, payload),
   uploadMod: (payload) => ipcRenderer.invoke(IPC_CHANNELS.uploadMod, payload),
   updateMod: (payload) => ipcRenderer.invoke(IPC_CHANNELS.updateMod, payload),

@@ -16,6 +16,7 @@ const workshop = {
   quitApp: vi.fn(async () => ({ ok: true })),
   logout: vi.fn(async () => ({ ok: true })),
   clearStoredSession: vi.fn(async () => ({ ok: true })),
+  savePreferredAuthMode: vi.fn(async () => ({ ok: true })),
   submitSteamGuardCode: vi.fn(async () => ({ ok: true })),
   uploadMod: vi.fn(async () => ({ runId: 'r1', success: true, publishedFileId: undefined as string | undefined })),
   updateMod: vi.fn(async () => ({ runId: 'r2', success: true })),

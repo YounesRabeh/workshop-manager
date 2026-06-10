@@ -11,6 +11,7 @@ import type {
   AdvancedSettings,
   LoginInput,
   ModProfile,
+  PreferredAuthMode,
   SaveAdvancedSettingsInput,
   SteamGuardInput,
   UploadInput,
@@ -251,6 +252,12 @@ app.whenReady().then(async () => {
     // Explicit clear must invalidate SteamCMD cached auth.
     runtimeService.logout({ clearStoredAuth: true })
     await profileStore.setRememberAuth(false)
+    return { ok: true }
+  })
+
+  handleIpc(IPC_CHANNELS.savePreferredAuthMode, async (payload: { preferredAuthMode?: PreferredAuthMode }) => {
+    const preferredAuthMode = payload.preferredAuthMode === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp'
+    await profileStore.setPreferredAuthMode(preferredAuthMode)
     return { ok: true }
   })
 

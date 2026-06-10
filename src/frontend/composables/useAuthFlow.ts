@@ -111,7 +111,11 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   const accountDisplayName = computed(() => accountPersonaName.value || loginForm.username.trim() || 'Steam account')
 
   function setPreferredAuthMode(value: PreferredAuthMode): void {
-    preferredAuthMode.value = normalizePreferredAuthMode(value)
+    const normalized = normalizePreferredAuthMode(value)
+    preferredAuthMode.value = normalized
+    void window.workshop.savePreferredAuthMode({ preferredAuthMode: normalized }).catch((error) => {
+      logError('useAuthFlow::setPreferredAuthMode', normalizeSharedError(error))
+    })
   }
 
   async function clearStoredSession(): Promise<void> {

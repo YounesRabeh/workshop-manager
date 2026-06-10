@@ -9,6 +9,7 @@ export const IPC_CHANNELS = {
   quitApp: 'workshop:quitApp',
   logout: 'workshop:logout',
   clearStoredSession: 'workshop:clearStoredSession',
+  savePreferredAuthMode: 'workshop:savePreferredAuthMode',
   submitSteamGuardCode: 'workshop:submitSteamGuardCode',
   uploadMod: 'workshop:uploadMod',
   updateMod: 'workshop:updateMod',
