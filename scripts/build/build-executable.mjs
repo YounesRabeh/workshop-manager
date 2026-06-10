@@ -19,6 +19,61 @@ export function resolvePnpmCommand(platform = process.platform) {
   return platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 }
 
+export function resolvePnpmCliPath(env = process.env) {
+  const npmExecPath = env?.npm_execpath
+  if (typeof npmExecPath === 'string' && npmExecPath.toLowerCase().includes('pnpm')) {
+    return npmExecPath
+  }
+
+  return undefined
+}
+
+export function quoteWindowsCommandArg(value) {
+  const normalized = String(value)
+  if (/^[A-Za-z0-9_./:=@+-]+$/.test(normalized)) {
+    return normalized
+  }
+
+  return `"${normalized.replace(/(["^&|<>%])/g, '^$1')}"`
+}
+
+export function createPnpmInvocation(args = [], platform = process.platform, env = process.env) {
+  const normalizedArgs = Array.isArray(args) ? args : []
+  const pnpmCliPath = resolvePnpmCliPath(env)
+
+  if (pnpmCliPath) {
+    return {
+      command: process.execPath,
+      args: [pnpmCliPath, ...normalizedArgs]
+    }
+  }
+
+  const pnpmCommand = resolvePnpmCommand(platform)
+  if (platform === 'win32') {
+    return {
+      command: env?.ComSpec || 'cmd.exe',
+      args: [
+        '/d',
+        '/s',
+        '/c',
+        [pnpmCommand, ...normalizedArgs].map(quoteWindowsCommandArg).join(' ')
+      ]
+    }
+  }
+
+  return {
+    command: pnpmCommand,
+    args: normalizedArgs
+  }
+}
+
+export function createPnpmStep(label, args, platform = process.platform, env = process.env) {
+  return {
+    label,
+    ...createPnpmInvocation(args, platform, env)
+  }
+}
+
 /**
  * Maps the current host platform to the electron-builder target this repo ships.
  */
@@ -93,26 +148,17 @@ export function parseBuildExecutableOptions(argv = []) {
  * Builds the exact sequence used by the executable packaging scripts, including optional icon sync.
  */
 export function buildStepsForPlatform(platform, options = {}) {
-  const pnpmCommand = resolvePnpmCommand(platform)
   const targetPlatform = options.targetPlatform
     ? normalizeBuildTargetPlatform(options.targetPlatform)
     : platform
   const steps = []
 
   if (options.skipKillInstance !== true) {
-    steps.push({
-      label: 'Kill old app instance',
-      command: pnpmCommand,
-      args: ['kill:instance']
-    })
+    steps.push(createPnpmStep('Kill old app instance', ['kill:instance'], platform))
   }
 
   steps.push(
-    {
-      label: 'Build app bundles',
-      command: pnpmCommand,
-      args: [NATIVE_BUNDLE_SCRIPT]
-    },
+    createPnpmStep('Build app bundles', [NATIVE_BUNDLE_SCRIPT], platform),
     {
       label: 'Package executable artifacts',
       command: process.execPath,
@@ -122,11 +168,7 @@ export function buildStepsForPlatform(platform, options = {}) {
 
   if (options.generateIcon) {
     const iconStepIndex = options.skipKillInstance === true ? 0 : 1
-    steps.splice(iconStepIndex, 0, {
-      label: 'Sync icon assets',
-      command: pnpmCommand,
-      args: ['icon']
-    })
+    steps.splice(iconStepIndex, 0, createPnpmStep('Sync icon assets', ['icon'], platform))
   }
 
   return steps

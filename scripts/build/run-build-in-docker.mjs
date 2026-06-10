@@ -9,7 +9,7 @@ import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { resolvePnpmCommand, SKIP_KILL_INSTANCE_FLAG } from './build-executable.mjs'
+import { createPnpmStep, SKIP_KILL_INSTANCE_FLAG } from './build-executable.mjs'
 
 export const SUPPORTED_INTERNAL_BUILD_SCRIPTS = ['build:bundle:native', 'build:exe:native']
 export const DEFAULT_DOCKERFILE_PATH = 'docker/builder.Dockerfile'
@@ -133,15 +133,10 @@ export function createContainerForwardedArgs(scriptName, forwardedArgs = []) {
 
 export function createHostPreflightSteps(scriptName, platform = process.platform) {
   const normalizedScript = normalizeInternalBuildScript(scriptName)
-  const pnpmCommand = resolvePnpmCommand(platform)
 
   if (normalizedScript === 'build:bundle:native' || normalizedScript === 'build:exe:native') {
     return [
-      {
-        label: 'Kill old host app instance',
-        command: pnpmCommand,
-        args: ['kill:instance']
-      }
+      createPnpmStep('Kill old host app instance', ['kill:instance'], platform)
     ]
   }
 

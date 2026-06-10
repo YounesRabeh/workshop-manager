@@ -6,7 +6,7 @@
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { resolvePnpmCommand } from './build-executable.mjs'
+import { createPnpmStep } from './build-executable.mjs'
 
 export const DEFAULT_BUILD_TARGET = 'bundle'
 export const RELEASE_BUILD_TARGETS = ['linux', 'win']
@@ -72,16 +72,11 @@ export function createDockerBuildStep(target, { icons = true } = {}) {
 
 export function createBuildPlatformSteps(options = {}, platform = process.platform) {
   const target = normalizeBuildTarget(options.target)
-  const pnpmCommand = resolvePnpmCommand(platform)
   const steps = []
 
   if (target === 'bundle') {
     if (options.icons !== false) {
-      steps.push({
-        label: 'Generate icon assets',
-        command: pnpmCommand,
-        args: ['icon']
-      })
+      steps.push(createPnpmStep('Generate icon assets', ['icon'], platform))
     }
     steps.push(createDockerBuildStep('bundle', options))
   } else {
@@ -92,11 +87,7 @@ export function createBuildPlatformSteps(options = {}, platform = process.platfo
   }
 
   if (options.checksums) {
-    steps.push({
-      label: 'Generate release checksums',
-      command: pnpmCommand,
-      args: ['checksums']
-    })
+    steps.push(createPnpmStep('Generate release checksums', ['checksums'], platform))
   }
 
   return steps

@@ -27,6 +27,11 @@ export interface BuildStep {
   env?: Record<string, string>
 }
 
+export interface PnpmInvocation {
+  command: string
+  args: string[]
+}
+
 /** Internal native bundle script used to avoid recursive docker invocation. */
 export const NATIVE_BUNDLE_SCRIPT: 'build:bundle:native'
 /** Internal flag used when host cleanup already ran outside Docker. */
@@ -34,6 +39,27 @@ export const SKIP_KILL_INSTANCE_FLAG: '--skip-kill-instance'
 
 /** Resolves the correct pnpm executable for the requested platform. */
 export function resolvePnpmCommand(platform?: string): string
+
+/** Resolves pnpm's JavaScript CLI entry when the current process was started by pnpm. */
+export function resolvePnpmCliPath(env?: NodeJS.ProcessEnv): string | undefined
+
+/** Quotes one argument for the Windows cmd.exe fallback. */
+export function quoteWindowsCommandArg(value: string): string
+
+/** Creates a spawn-safe pnpm command and argument list for the requested platform. */
+export function createPnpmInvocation(
+  args?: string[],
+  platform?: string,
+  env?: NodeJS.ProcessEnv
+): PnpmInvocation
+
+/** Creates a labeled build step that runs pnpm safely on Windows and Linux. */
+export function createPnpmStep(
+  label: string,
+  args: string[],
+  platform?: string,
+  env?: NodeJS.ProcessEnv
+): BuildStep
 
 /** Returns the electron-builder target tuple supported by this repository. */
 export function getPackagingTargetForPlatform(platform: string): PackagingTarget

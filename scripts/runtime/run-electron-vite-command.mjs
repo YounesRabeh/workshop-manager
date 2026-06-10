@@ -4,10 +4,12 @@
  *  Linux desktop entry hint when needed, and delegates to the local pnpm CLI.
  */
 import { spawn } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { resolvePnpmCommand } from '../build/build-executable.mjs'
+import { createPnpmInvocation } from '../build/build-executable.mjs'
 
+const require = createRequire(import.meta.url)
 export const SUPPORTED_ELECTRON_VITE_COMMANDS = ['dev', 'preview']
 
 export function normalizeElectronViteCommand(commandName) {
@@ -38,6 +40,143 @@ export function createElectronViteEnv(platform = process.platform, env = process
   return normalizedEnv
 }
 
+export function resolveElectronBinaryPath(requireImpl = require) {
+  const electronPath = requireImpl('electron')
+  if (typeof electronPath !== 'string' || electronPath.length === 0) {
+    throw new Error('Electron package did not resolve to a binary path.')
+  }
+
+  return electronPath
+}
+
+export function createElectronRebuildArgs() {
+  return ['rebuild', 'electron']
+}
+
+export function resolveElectronInstallScriptPath(requireImpl = require) {
+  if (typeof requireImpl.resolve !== 'function') {
+    throw new Error('Electron installer path requires a require implementation with resolve().')
+  }
+
+  return requireImpl.resolve('electron/install.js')
+}
+
+export function createElectronRebuildEnv(env = process.env) {
+  const normalizedEnv = { ...env }
+
+  delete normalizedEnv.ELECTRON_RUN_AS_NODE
+  delete normalizedEnv.ELECTRON_SKIP_BINARY_DOWNLOAD
+
+  normalizedEnv.force_no_cache = 'true'
+
+  return normalizedEnv
+}
+
+function runChildCommand(command, args, options = {}, deps = {}) {
+  const spawnImpl = deps.spawnImpl ?? spawn
+
+  return new Promise((resolveResult) => {
+    const child = spawnImpl(command, args, {
+      stdio: options.stdio ?? 'inherit',
+      shell: false,
+      env: options.env ?? process.env
+    })
+
+    child.once('error', (error) => {
+      resolveResult({
+        status: null,
+        error
+      })
+    })
+
+    child.once('close', (status, signal) => {
+      resolveResult({
+        status,
+        signal
+      })
+    })
+  })
+}
+
+function runPnpmCommand(args, options = {}, deps = {}) {
+  const platform = options.platform ?? process.platform
+  const pnpmInvocation = createPnpmInvocation(args, platform, options.baseEnv ?? process.env)
+
+  return runChildCommand(pnpmInvocation.command, pnpmInvocation.args, options, deps)
+}
+
+function runElectronInstallScript(options = {}, deps = {}) {
+  const requireImpl = deps.requireImpl ?? require
+  return runChildCommand(
+    process.execPath,
+    [resolveElectronInstallScriptPath(requireImpl)],
+    options,
+    deps
+  )
+}
+
+export async function ensureElectronBinaryInstalled(options = {}, deps = {}) {
+  const requireImpl = deps.requireImpl ?? require
+  const rebuildEnv = createElectronRebuildEnv(options.env ?? process.env)
+
+  try {
+    resolveElectronBinaryPath(requireImpl)
+    return
+  } catch (initialError) {
+    console.warn('Electron binary is missing or incomplete. Running `pnpm rebuild electron`...')
+
+    const rebuildResult = await runPnpmCommand(
+      createElectronRebuildArgs(),
+      {
+        platform: options.platform,
+        baseEnv: deps.baseEnv ?? process.env,
+        env: rebuildEnv
+      },
+      deps
+    )
+
+    if (rebuildResult?.error) {
+      throw rebuildResult.error
+    }
+
+    if (rebuildResult?.status !== 0) {
+      throw new Error(`Electron rebuild failed with exit code ${rebuildResult?.status ?? 1}.`)
+    }
+
+    try {
+      resolveElectronBinaryPath(requireImpl)
+      return
+    } catch {
+      console.warn('Electron is still missing after rebuild. Running Electron installer directly...')
+    }
+
+    const installResult = await runElectronInstallScript(
+      {
+        env: rebuildEnv
+      },
+      deps
+    )
+
+    if (installResult?.error) {
+      throw installResult.error
+    }
+
+    if (installResult?.status !== 0) {
+      throw new Error(`Electron direct install failed with exit code ${installResult?.status ?? 1}.`)
+    }
+
+    try {
+      resolveElectronBinaryPath(requireImpl)
+    } catch {
+      throw new Error(
+        `Electron is still missing after rebuild and direct install. Original error: ${
+          initialError instanceof Error ? initialError.message : String(initialError)
+        }. Try deleting node_modules and reinstalling if Electron could not be downloaded.`
+      )
+    }
+  }
+}
+
 export function runElectronViteCommand(options = {}, deps = {}) {
   const commandName = normalizeElectronViteCommand(options.commandName)
   const platform = options.platform ?? process.platform
@@ -48,7 +187,12 @@ export function runElectronViteCommand(options = {}, deps = {}) {
     createElectronViteEnv(platform, deps.baseEnv ?? process.env)
 
   return new Promise((resolveResult) => {
-    const child = spawnImpl(resolvePnpmCommand(platform), createElectronViteArgs(commandName, forwardedArgs), {
+    const pnpmInvocation = createPnpmInvocation(
+      createElectronViteArgs(commandName, forwardedArgs),
+      platform,
+      deps.baseEnv ?? process.env
+    )
+    const child = spawnImpl(pnpmInvocation.command, pnpmInvocation.args, {
       stdio: 'inherit',
       shell: false,
       env
@@ -97,6 +241,8 @@ async function main(argv = process.argv.slice(2)) {
       `Missing electron-vite command argument. Expected one of: ${SUPPORTED_ELECTRON_VITE_COMMANDS.join(', ')}`
     )
   }
+
+  await ensureElectronBinaryInstalled()
 
   const result = await runElectronViteCommand({
     commandName,
