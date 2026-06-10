@@ -304,6 +304,13 @@ function createOneShotGuardChallengeChild(options: {
   return emitter
 }
 
+function readRunScriptArg(args: string[]): string | undefined {
+  if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+    return undefined
+  }
+  return readFileSync(args[1], 'utf8')
+}
+
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
     status,
@@ -592,12 +599,15 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(childRef?.commands.filter((command) => command.startsWith('login '))).toHaveLength(1)
   })
 
-  it('uses a single one-shot Windows login without restoring a persistent workshop session', async () => {
+  it('uses a single Windows script login without restoring a persistent workshop session', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-'))
     const store = new RunLogStore(join(root, 'runs'))
+    let loginScript = ''
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-      if (args.join(' ') === '+login alice secret +quit') {
+      const scriptContent = readRunScriptArg(args)
+      if (scriptContent?.includes('login alice secret')) {
+        loginScript = scriptContent
         return createOneShotFakeChild({
           lines: [
             "Logging in user 'alice' [U:1:42] to Steam Public...",
@@ -621,20 +631,21 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(spawn).toHaveBeenNthCalledWith(
       1,
       'C:\\steamcmd\\steamcmd.exe',
-      ['+login', 'alice', 'secret', '+quit'],
+      expect.arrayContaining(['+runscript']),
       expect.objectContaining({ shell: false, windowsHide: true })
     )
     expect(spawn).toHaveBeenCalledTimes(1)
+    expect(loginScript).toContain('login alice secret\nquit\n')
     const persisted = await store.list()
     expect(persisted[0]?.lines.join('\n')).toContain('Waiting for confirmation on your Steam Guard Mobile Authenticator...')
   })
 
-  it('accepts Windows one-shot login success when output reaches waiting for client config', async () => {
+  it('accepts Windows script login success when output reaches waiting for client config', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-client-config-login-'))
     const store = new RunLogStore(join(root, 'runs'))
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-      if (args.join(' ') === '+login alice secret +quit') {
+      if (readRunScriptArg(args)?.includes('login alice secret')) {
         return createOneShotFakeChild({
           lines: [
             "Logging in using username/password.",
@@ -659,12 +670,12 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(spawn).toHaveBeenCalledTimes(1)
   })
 
-  it('accepts Windows one-shot login success when login user line ends with OK', async () => {
+  it('accepts Windows script login success when login user line ends with OK', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-user-ok-'))
     const store = new RunLogStore(join(root, 'runs'))
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-      if (args.join(' ') === '+login alice secret +quit') {
+      if (readRunScriptArg(args)?.includes('login alice secret')) {
         return createOneShotFakeChild({
           lines: ["Logging in user 'alice' to Steam Public...OK"],
           closeCode: 0
@@ -685,12 +696,12 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(spawn).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps Windows login state available for workshop fetches after a one-shot login', async () => {
+  it('keeps Windows login state available for workshop fetches after script login', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-workshop-fetch-'))
     const store = new RunLogStore(join(root, 'runs'))
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-      if (args.join(' ') === '+login alice secret +quit') {
+      if (readRunScriptArg(args)?.includes('login alice secret')) {
         return createOneShotFakeChild({
           lines: [
             "Logging in user 'alice' [U:1:42] to Steam Public...",
@@ -751,12 +762,14 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     fetchSpy.mockRestore()
   })
 
-  it('uses one-shot Windows workshop commands after login', async () => {
+  it('uses script Windows workshop commands after login', async () => {
     const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-workshop-'))
     const store = new RunLogStore(join(root, 'runs'))
+    let capturedWorkshopScript = ''
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-      if (args.join(' ') === '+login alice secret +quit') {
+      const scriptContent = readRunScriptArg(args)
+      if (scriptContent?.includes('login alice secret')) {
         return createOneShotFakeChild({
           lines: [
             "Logging in user 'alice' [U:1:42] to Steam Public...",
@@ -766,7 +779,8 @@ describe('SteamCmdRuntimeService lifecycle', () => {
         })
       }
 
-      if (args.includes('+workshop_build_item')) {
+      if (scriptContent?.includes('workshop_build_item')) {
+        capturedWorkshopScript = scriptContent
         return createOneShotFakeChild({
           lines: ['Published File Id: 777', 'Success.']
         })
@@ -796,9 +810,11 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(result.success).toBe(true)
     expect(spawn).toHaveBeenCalledTimes(2)
     const uploadArgs = vi.mocked(spawn).mock.calls[1]?.[1]
-    expect(uploadArgs).toEqual(
-      expect.arrayContaining(['+login', 'alice', '+workshop_build_item', '+quit'])
-    )
+    expect(uploadArgs).toEqual(expect.arrayContaining(['+runscript']))
+    expect(uploadArgs).not.toContain('+workshop_build_item')
+    expect(capturedWorkshopScript).toContain('@NoPromptForPassword 1')
+    expect(capturedWorkshopScript).toContain('login alice')
+    expect(capturedWorkshopScript).toContain('workshop_build_item')
     expect(vi.mocked(spawn).mock.calls[1]?.[2]).toEqual(
       expect.objectContaining({ shell: false, windowsHide: true })
     )
@@ -1106,7 +1122,8 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     const store = new RunLogStore(join(root, 'runs'))
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-      if (args.join(' ') === '+login alice secret +quit') {
+      const scriptContent = readRunScriptArg(args)
+      if (scriptContent?.includes('login alice secret')) {
         return createOneShotFakeChild({
           lines: [
             "Logging in user 'alice' [U:1:42] to Steam Public...",
@@ -1115,7 +1132,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
         })
       }
 
-      if (args.includes('+workshop_build_item')) {
+      if (scriptContent?.includes('workshop_build_item')) {
         return createOneShotFakeChild({
           lines: ['Published File Id: 777']
         })
@@ -1154,7 +1171,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     await writeFile(join(runtimeDir, 'logs', 'connection_log.txt'), 'SetSteamID( [U:1:42] )\n', 'utf8')
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-      if (args.join(' ') === '+login alice secret +quit') {
+      if (readRunScriptArg(args)?.includes('login alice secret')) {
         return createOneShotFakeChild({
           lines: [
             "Logging in user 'alice' [U:1:0] to Steam Public...",
@@ -1674,7 +1691,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     const store = new RunLogStore(join(root, 'runs'))
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-      if (args.join(' ') === '+login alice wrong +quit') {
+      if (readRunScriptArg(args)?.includes('login alice wrong')) {
         return createOneShotFakeChild({
           lines: [
             "Logging in user 'alice' to Steam Public...",
@@ -1701,7 +1718,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(spawn).toHaveBeenCalledTimes(1)
     expect(spawn).toHaveBeenCalledWith(
       'C:\\steamcmd\\steamcmd.exe',
-      ['+login', 'alice', 'wrong', '+quit'],
+      expect.arrayContaining(['+runscript']),
       expect.objectContaining({ shell: false, windowsHide: true })
     )
   })

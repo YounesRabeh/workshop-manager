@@ -75,7 +75,7 @@ export class PublishProgressTracker {
         this.applyProgress(parsedProgress.percent, parsedProgress.label)
         return
       }
-      if (/error|failed/i.test(event.line)) {
+      if (this.phase.value !== 'visibility' && /error|failed/i.test(event.line)) {
         this.label.value = 'Steam reported an issue. Waiting for final status...'
       }
       return

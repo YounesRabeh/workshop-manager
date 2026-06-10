@@ -155,6 +155,10 @@ export class SteamCmdRuntimeService extends EventEmitter {
     return this.executionPolicy
   }
 
+  private shouldUseSteamCmdScripts(): boolean {
+    return this.executionPolicy.mode === 'script' || this.platformBehavior.profile === 'windows'
+  }
+
   async purgeStaleScriptArtifacts(): Promise<void> {
     await this.scriptRunner.purgeStaleScripts()
   }
@@ -313,7 +317,8 @@ export class SteamCmdRuntimeService extends EventEmitter {
       return { sessionId: runId }
     }
 
-    const result = this.executionPolicy.mode === 'script'
+    const useScriptLogin = this.shouldUseSteamCmdScripts()
+    const result = useScriptLogin
       ? await this.loginWithScriptMode({
           runId,
           username: normalizedUsername,
@@ -433,12 +438,13 @@ export class SteamCmdRuntimeService extends EventEmitter {
       return false
     }
 
+    const useScriptStoredAuthCheck = this.shouldUseSteamCmdScripts()
     const args =
-      this.executionPolicy.mode === 'script'
+      useScriptStoredAuthCheck
         ? undefined
         : ['+login', normalizedUsername, '+quit']
     const scriptContent =
-      this.executionPolicy.mode === 'script'
+      useScriptStoredAuthCheck
         ? buildSteamCmdLoginScript({
             username: normalizedUsername
           })
@@ -618,7 +624,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
     let commandResult: { lines: string[]; exitCode: number }
     try {
-      if (this.executionPolicy.mode === 'script') {
+      if (this.shouldUseSteamCmdScripts()) {
         const scriptContent = buildSteamCmdWorkshopScript({
           username: loginState.username,
           vdfPath: prepared.vdfPath
