@@ -222,6 +222,7 @@ function createOneShotFakeChild(response: InteractiveResponse): EventEmitter & {
 function createOneShotGuardChallengeChild(options: {
   promptLines: string[]
   promptWithoutNewline?: string
+  promptStream?: 'stdout' | 'stderr'
   successLines: string[]
   expectedGuardCode: string
 }): EventEmitter & {
@@ -289,11 +290,12 @@ function createOneShotGuardChallengeChild(options: {
     if (closed) {
       return
     }
+    const promptOutput = options.promptStream === 'stderr' ? emitter.stderr : emitter.stdout
     for (const line of options.promptLines) {
-      emitter.stdout.write(`${line}\n`)
+      promptOutput.write(`${line}\n`)
     }
     if (options.promptWithoutNewline) {
-      emitter.stdout.write(options.promptWithoutNewline)
+      promptOutput.write(options.promptWithoutNewline)
     }
   })
 
@@ -1129,6 +1131,83 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       expect(spawn).toHaveBeenCalledTimes(1)
       expect(generatedScripts[0]).toContain('login alice secret')
       expect(generatedScripts[0]).not.toContain('12345')
+      expect(childRef?.commands).toContain('12345')
+    } finally {
+      if (originalExecutionMode === undefined) {
+        delete process.env['STEAMCMD_EXECUTION_MODE']
+      } else {
+        process.env['STEAMCMD_EXECUTION_MODE'] = originalExecutionMode
+      }
+    }
+  })
+
+  it('handles Windows script-mode OTP prompts emitted on stderr without a newline', async () => {
+    const originalExecutionMode = process.env['STEAMCMD_EXECUTION_MODE']
+    process.env['STEAMCMD_EXECUTION_MODE'] = 'script'
+
+    try {
+      const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-stderr-otp-'))
+      const store = new RunLogStore(join(root, 'runs'))
+      let childRef:
+        | (EventEmitter & {
+            stdout: PassThrough
+            stderr: PassThrough
+            stdin: PassThrough
+            commands: string[]
+            kill: () => void
+          })
+        | undefined
+
+      ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+          throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+        }
+
+        childRef = createOneShotGuardChallengeChild({
+          promptLines: [
+            'This computer has not been authenticated for your account using Steam Guard.',
+            "You can also enter this code at any time using 'set_steam_guard_code'"
+          ],
+          promptWithoutNewline: 'Steam Guard code:',
+          promptStream: 'stderr',
+          expectedGuardCode: '12345',
+          successLines: [
+            "Logging in user 'alice' [U:1:42] to Steam Public...OK",
+            'Waiting for user info...OK'
+          ]
+        })
+        return childRef
+      })
+
+      const runtime = new SteamCmdRuntimeService(
+        async () => 'C:\\steamcmd\\steamcmd.exe',
+        store,
+        join(root, 'runtime'),
+        'windows'
+      )
+
+      let activeRunId = ''
+      let sawGuardPrompt = false
+      runtime.on('run-event', (event) => {
+        if (event.type === 'run_started' && event.phase === 'login') {
+          activeRunId = event.runId
+        }
+        if (event.type === 'steam_guard_required' && event.phase === 'login') {
+          sawGuardPrompt = true
+        }
+      })
+
+      const loginPromise = runtime.login('alice', 'secret', false, 'otp')
+
+      await vi.waitFor(() => {
+        expect(activeRunId).not.toBe('')
+        expect(sawGuardPrompt).toBe(true)
+      })
+
+      runtime.submitSteamGuardCode(activeRunId, '12345')
+      const loginResult = await loginPromise
+
+      expect(loginResult.sessionId).toBe(activeRunId)
       expect(childRef?.commands).toContain('12345')
     } finally {
       if (originalExecutionMode === undefined) {

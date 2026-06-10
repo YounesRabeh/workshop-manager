@@ -99,6 +99,10 @@ class SteamCmdOutputProcessor {
     for (const part of parts) {
       this.routeLineToActiveRun(part, 'stderr')
     }
+    if (isTrailingSteamGuardPromptBuffer(this.stderrBuffer)) {
+      this.routeLineToActiveRun(this.stderrBuffer, 'stderr')
+      this.stderrBuffer = ''
+    }
   }
 
   handleOneShotProcessChunk(
@@ -114,9 +118,9 @@ class SteamCmdOutputProcessor {
     for (const part of parts) {
       this.routeLineToActiveRun(part, stream)
     }
-    if (stream === 'stdout' && isTrailingSteamGuardPromptBuffer(buffers.stdout)) {
-      this.routeLineToActiveRun(buffers.stdout, stream)
-      buffers.stdout = ''
+    if (isTrailingSteamGuardPromptBuffer(buffers[key])) {
+      this.routeLineToActiveRun(buffers[key], stream)
+      buffers[key] = ''
     }
   }
 
