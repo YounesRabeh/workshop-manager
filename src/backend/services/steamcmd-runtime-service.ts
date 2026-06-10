@@ -450,6 +450,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
           })
         : undefined
     const runId = createRunId()
+    const timeoutMs = resolveLoginTimeoutMs(true, this.timeoutSettings)
 
     const executeCheck = async (spawnArgs: string[]): Promise<boolean> => {
       return await new Promise<boolean>((resolve) => {
@@ -463,10 +464,27 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
         let stdout = ''
         let stderr = ''
-        const timeout = setTimeout(() => {
-          child.kill('SIGTERM')
-          resolve(false)
-        }, 6_000)
+        let timeout: ReturnType<typeof setTimeout> | null = null
+        let settled = false
+
+        const settle = (value: boolean): void => {
+          if (settled) {
+            return
+          }
+          settled = true
+          if (timeout) {
+            clearTimeout(timeout)
+            timeout = null
+          }
+          resolve(value)
+        }
+
+        if (timeoutMs > 0) {
+          timeout = setTimeout(() => {
+            child.kill('SIGTERM')
+            settle(false)
+          }, timeoutMs)
+        }
 
         const decide = (exitCode: number | null): boolean => {
           const lines = `${stdout}\n${stderr}`
@@ -501,12 +519,10 @@ export class SteamCmdRuntimeService extends EventEmitter {
           stderr += chunk.toString('utf8')
         })
         child.once('error', () => {
-          clearTimeout(timeout)
-          resolve(false)
+          settle(false)
         })
         child.once('close', (exitCode) => {
-          clearTimeout(timeout)
-          resolve(decide(exitCode))
+          settle(decide(exitCode))
         })
       })
     }

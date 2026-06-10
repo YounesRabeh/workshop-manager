@@ -990,6 +990,72 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     }
   })
 
+  it('uses the configured stored-session timeout when checking saved auth', async () => {
+    const originalExecutionMode = process.env['STEAMCMD_EXECUTION_MODE']
+    process.env['STEAMCMD_EXECUTION_MODE'] = 'script'
+    vi.useFakeTimers()
+
+    try {
+      const root = await mkdtemp(join(tmpdir(), 'runtime-service-script-slow-stored-auth-'))
+      const store = new RunLogStore(join(root, 'runs'))
+      let childKill: ReturnType<typeof vi.fn> | undefined
+
+      ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
+        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+          throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
+        }
+
+        const emitter = new EventEmitter() as EventEmitter & {
+          stdout: PassThrough
+          stderr: PassThrough
+          stdin: PassThrough
+          kill: () => void
+        }
+        emitter.stdout = new PassThrough()
+        emitter.stderr = new PassThrough()
+        emitter.stdin = new PassThrough()
+        childKill = vi.fn(() => {
+          emitter.emit('close', 1)
+        })
+        emitter.kill = childKill
+        setTimeout(() => {
+          emitter.stdout.write('Logging in using cached credentials.\n')
+          emitter.emit('close', 0)
+        }, 8_000)
+        return emitter
+      })
+
+      const runtime = new SteamCmdRuntimeService(
+        async () => '/usr/bin/steamcmd',
+        store,
+        join(root, 'runtime'),
+        'linux'
+      )
+      runtime.setTimeoutSettings({
+        loginTimeoutMs: 60_000,
+        storedSessionTimeoutMs: 10_000,
+        workshopTimeoutMs: 60_000
+      })
+
+      const authCheck = runtime.hasStoredAuthFor('alice')
+      await vi.waitFor(() => {
+        expect(spawn).toHaveBeenCalledTimes(1)
+      })
+      await vi.advanceTimersByTimeAsync(6_000)
+      expect(childKill).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(2_000)
+
+      await expect(authCheck).resolves.toBe(true)
+    } finally {
+      vi.useRealTimers()
+      if (originalExecutionMode === undefined) {
+        delete process.env['STEAMCMD_EXECUTION_MODE']
+      } else {
+        process.env['STEAMCMD_EXECUTION_MODE'] = originalExecutionMode
+      }
+    }
+  })
+
   it('uses script-mode login prompt handling with submitSteamGuardCode on Linux-style trailing prompt output', async () => {
     const originalExecutionMode = process.env['STEAMCMD_EXECUTION_MODE']
     process.env['STEAMCMD_EXECUTION_MODE'] = 'script'
