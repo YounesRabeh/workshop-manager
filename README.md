@@ -1,4 +1,4 @@
-# Workshop Manager
+![banner](.github/WkM.png)
 
 Workshop Manager is a desktop app for creating, updating, and maintaining Steam Workshop items. It is built with Electron, Vue 3, TypeScript, and Tailwind, and wraps the SteamCMD workflow in a more guided UI.
 
