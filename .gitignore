@@ -36,7 +36,6 @@ npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-docs/
 
 
 # Environment / local secrets
@@ -55,6 +54,3 @@ docs/
 # OS files
 .DS_Store
 Thumbs.db
-
-# Local tool metadata
-.codex

@@ -1,13 +1,17 @@
 {
   "name": "workshop-manager",
   "productName": "Workshop Manager",
-  "version": "1.5.9",
+  "version": "1.6.0",
   "description": "Create and update items for Steam's Workshop.",
   "author": "Younes Rabeh",
   "license": "MIT",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": "22.x || 24.x",
+    "pnpm": "11.x"
+  },
   "main": "out/main/index.js",
   "build": {
     "appId": "com.workshop.manager",
@@ -64,7 +68,7 @@
   "scripts": {
     "clean": "node scripts/maintenance/clean.mjs",
     "kill:instance": "node scripts/runtime/kill-old-instance.mjs",
-    "predev": "pnpm icon && pnpm kill:instance",
+    "predev": "pnpm kill:instance",
     "dev": "node scripts/runtime/run-electron-vite-command.mjs dev",
     "dev:icon": "pnpm icon && pnpm dev",
     "icon": "node scripts/build/sync-app-icon.mjs",
@@ -95,7 +99,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "build": "^0.1.4",
     "extract-zip": "^2.0.1",
+    "release": "^6.3.1",
     "vue": "^3.5.13"
   },
   "devDependencies": {

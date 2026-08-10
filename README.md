@@ -30,7 +30,7 @@ Workshop Manager is a desktop app for creating, updating, and maintaining Steam 
 
 | Use case | Requirement |
 | --- | --- |
-| Development | Node.js `22.x` |
+| Development | Node.js `22.x` or `24.x` (`22.22.0` in CI) |
 | Development | `pnpm` `11.x` |
 | Packaging builds | Docker on a Linux or Windows host |
 
@@ -98,7 +98,7 @@ Run the container matching the Docker engine's operating system:
 
 Windows containers require a Windows kernel. A Linux Docker engine cannot execute the Windows image, and Wine is intentionally not treated as equivalent because it does not exercise Node's native `win32` child-process behavior. The Windows definition can be run on a Windows development machine or Windows CI runner.
 
-The current execution selection is intentionally captured before changing behavior: Windows always uses a multi-line `+runscript` file, while Linux defaults to the persistent interactive path (and can opt into script mode with `STEAMCMD_EXECUTION_MODE=script`). This difference is the main target for the credentialed comparison.
+The application currently forces multi-line `+runscript` execution on both platforms during the script-mode soak window. The lower-level Linux compatibility path remains covered so interactive and script behavior can still be compared, while Windows always uses script mode. Native Windows container results remain the release-relevant command contract.
 
 ## Verifying Release Downloads
 
@@ -148,6 +148,22 @@ For this portfolio project, the checksum pipeline is the intended release-integr
 | `scripts` | Local tooling for cleanup, icon sync, packaging, and Docker build orchestration |
 | `docker` | Docker image used for reproducible packaging builds |
 | `test` | Unit and integration tests |
+
+## Documentation
+
+Detailed documentation is organized by capability in [`docs/`](docs/README.md):
+
+| Topic | Document |
+| --- | --- |
+| Process boundaries and code ownership | [Architecture](docs/architecture.md) |
+| Login, saved sessions, and Steam Guard | [Authentication](docs/authentication.md) |
+| Installation and cross-platform execution | [SteamCMD runtime](docs/steamcmd-runtime.md) |
+| Create, update, visibility, and item discovery | [Workshop management](docs/workshop-management.md) |
+| Profiles, Web API, paths, and timeout settings | [Profiles and settings](docs/profiles-and-settings.md) |
+| Run logs and diagnosis | [Logging and troubleshooting](docs/logging-and-troubleshooting.md) |
+| Local development, tests, and containers | [Development and testing](docs/development-and-testing.md) |
+| Packaging, checksums, CI, and releases | [Builds and releases](docs/builds-and-releases.md) |
+| Secret handling and application boundaries | [Security](docs/security.md) |
 
 ## Data And Security Notes
 
