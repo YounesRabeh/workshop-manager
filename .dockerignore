@@ -1,8 +1,12 @@
 .git
+.codex
+.agents
 node_modules
 .pnpm-store
-dist
 out
+dist
 coverage
+.vite
+artifacts
+*.log
 *.tsbuildinfo
-pnpm-debug.log*

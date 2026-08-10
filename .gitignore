@@ -6,6 +6,7 @@ node_modules/
 out/
 dist/
 coverage/
+artifacts/
 .vite/
 *.tsbuildinfo
 squashfs-root/
@@ -37,10 +38,12 @@ yarn-debug.log*
 yarn-error.log*
 docs/
 
+
 # Environment / local secrets
 .env
 .env.*
 !.env.example
+.secrets/
 
 # Editor / IDE
 .vscode/

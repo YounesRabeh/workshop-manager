@@ -133,12 +133,12 @@ describe('run-build-in-docker script helpers', () => {
     ])
   })
 
-  it('uses the Windows pnpm shim for dockerized preflight steps on win32 hosts', () => {
+  it('hosts the Windows pnpm shim through cmd.exe for dockerized preflight steps', () => {
     expect(createHostPreflightSteps('build:exe:native', 'win32')).toEqual([
       {
         label: 'Kill old host app instance',
-        command: 'pnpm.cmd',
-        args: ['kill:instance']
+        command: 'cmd.exe',
+        args: ['/d', '/s', '/c', 'pnpm.cmd kill:instance']
       }
     ])
   })

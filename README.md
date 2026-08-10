@@ -79,6 +79,27 @@ Persistent Docker build caches live under `~/.cache/workshop-manager/docker-buil
 Output artifacts are written to `dist/`.
 Use `pnpm build:platform all --checksums` when you want the generic build command plus checksum generation.
 
+## SteamCMD Cross-Platform Contract Test
+
+The runtime contract test records how Node passes SteamCMD arguments and stdin on each native OS. It uses placeholder account data only; no Steam connection or credentials are required. Reports are written to `artifacts/steamcmd-contract/<platform>/steamcmd-command-contract.json` and contain:
+
+- the observed `+runscript` argv boundaries, including a script path with spaces;
+- the generated SteamCMD script encoding, line endings, and command lines;
+- the interactive compatibility-mode stdin bytes and line ending;
+- the native Node platform and selected SteamCMD executable/profile.
+
+Run the container matching the Docker engine's operating system:
+
+| Docker host | Command | Container |
+| --- | --- | --- |
+| Linux | `pnpm container:test:steamcmd:linux` | Debian-based Node image using the Linux profile |
+| Windows, Windows-containers mode | `pnpm container:test:steamcmd:windows` | Windows Server Core using the Windows profile |
+| Either | `pnpm container:test:steamcmd` | Auto-selects the engine-native target |
+
+Windows containers require a Windows kernel. A Linux Docker engine cannot execute the Windows image, and Wine is intentionally not treated as equivalent because it does not exercise Node's native `win32` child-process behavior. The Windows definition can be run on a Windows development machine or Windows CI runner.
+
+The current execution selection is intentionally captured before changing behavior: Windows always uses a multi-line `+runscript` file, while Linux defaults to the persistent interactive path (and can opt into script mode with `STEAMCMD_EXECUTION_MODE=script`). This difference is the main target for the credentialed comparison.
+
 ## Verifying Release Downloads
 
 Each public release artifact is accompanied by its own checksum file in `dist/`:

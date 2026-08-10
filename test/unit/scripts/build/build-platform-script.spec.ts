@@ -88,8 +88,8 @@ describe('build-platform script helpers', () => {
       },
       {
         label: 'Generate release checksums',
-        command: 'pnpm.cmd',
-        args: ['checksums']
+        command: 'cmd.exe',
+        args: ['/d', '/s', '/c', 'pnpm.cmd checksums']
       }
     ])
   })

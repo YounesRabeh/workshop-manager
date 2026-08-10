@@ -88,8 +88,13 @@ describe('run-electron-vite-command helpers', () => {
       status: 0,
       signal: null
     })
-    expect(capturedCommandName).toBe('pnpm.cmd')
-    expect(capturedArgs).toEqual(['exec', 'electron-vite', 'dev', '--host'])
+    expect(capturedCommandName).toBe('cmd.exe')
+    expect(capturedArgs).toEqual([
+      '/d',
+      '/s',
+      '/c',
+      'pnpm.cmd exec electron-vite dev --host'
+    ])
     expect(capturedEnv).toEqual({
       PATH: 'C:\\pnpm'
     })

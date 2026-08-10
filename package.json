@@ -1,7 +1,7 @@
 {
   "name": "workshop-manager",
   "productName": "Workshop Manager",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Create and update items for Steam's Workshop.",
   "author": "Younes Rabeh",
   "license": "MIT",
@@ -84,6 +84,10 @@
     "preview:icon": "pnpm icon && pnpm preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.renderer.json && vue-tsc --noEmit -p tsconfig.renderer-tests.json",
     "test": "vitest run",
+    "test:steamcmd:contract": "vitest run test/integration/steamcmd-command-contract.spec.ts",
+    "container:test:steamcmd": "node scripts/runtime/run-steamcmd-contract-containers.mjs native",
+    "container:test:steamcmd:linux": "node scripts/runtime/run-steamcmd-contract-containers.mjs linux",
+    "container:test:steamcmd:windows": "node scripts/runtime/run-steamcmd-contract-containers.mjs windows",
     "test:watch": "vitest"
   },
   "dependencies": {
