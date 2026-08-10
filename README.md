@@ -65,8 +65,8 @@ Packaging commands always run inside the repo's Docker builder image, even when 
 | Build any target explicitly | `pnpm build:platform <bundle\|linux\|win\|all>` | Generic build entry point |
 | Build Linux and Windows | `pnpm build:all` | Runs both platform packaging commands |
 | Generate icons only | `pnpm icon` | Regenerates derived icon assets |
-| Write checksums for existing release artifacts | `pnpm checksums` | Scans `dist/` and writes one `.checksum.txt` file per artifact |
-| Release bundle with checksums | `pnpm release` | Builds Linux and Windows artifacts with icons, then writes per-artifact checksum files |
+| Write checksums for existing release artifacts | `pnpm checksums` | Scans `dist/` and writes one `SHA256SUMS` manifest |
+| Release bundle with checksums | `pnpm release` | Builds Linux and Windows artifacts with icons, then writes a `SHA256SUMS` manifest |
 
 > [!IMPORTANT]
 > Docker is build-only. The generated `.AppImage` and `.exe` run natively after packaging.
@@ -102,31 +102,30 @@ The current execution selection is intentionally captured before changing behavi
 
 ## Verifying Release Downloads
 
-Each public release artifact is accompanied by its own checksum file in `dist/`:
+Each public release includes one standard `SHA256SUMS` manifest in `dist/`:
 
 - `Workshop Manager-<version>-linux-x86_64.AppImage`
-- `Workshop Manager-<version>-linux-x86_64.AppImage.checksum.txt`
 - `Workshop Manager-<version>-win-x64.exe`
-- `Workshop Manager-<version>-win-x64.exe.checksum.txt`
+- `SHA256SUMS`
 
-Each checksum file contains the SHA-256 hash for its matching artifact. Upload the app files and their `.checksum.txt` companions together on GitHub Releases.
+The manifest contains the SHA-256 hash and filename for every release artifact. Upload it with the app files on GitHub Releases.
 
-You can generate those checksum files in two ways:
+You can generate the checksum manifest in two ways:
 
 - `pnpm release` to build fresh Linux and Windows artifacts and then write checksums
-- `pnpm checksums` to only write checksum files for artifacts that already exist in `dist/`
+- `pnpm checksums` to only write the manifest for artifacts that already exist in `dist/`
 
 On Linux, users can verify a download with:
 
 ```bash
-sha256sum -c "Workshop Manager-<version>-linux-x86_64.AppImage.checksum.txt"
+sha256sum -c SHA256SUMS
 ```
 
 On Windows PowerShell, users can compare the file hash with:
 
 ```powershell
 Get-FileHash ".\Workshop Manager-<version>-win-x64.exe" -Algorithm SHA256
-Get-Content ".\Workshop Manager-<version>-win-x64.exe.checksum.txt"
+Get-Content .\SHA256SUMS
 ```
 
 For this portfolio project, the checksum pipeline is the intended release-integrity mechanism. Native Windows code signing is optional and not required for the published demo builds.

@@ -63,9 +63,9 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          assets=(dist/*.AppImage dist/*.exe dist/*.checksum.txt)
-          if [[ "${#assets[@]}" -ne 4 ]]; then
-            printf 'Expected an AppImage, an .exe, and two checksum files; found:\n' >&2
+          assets=(dist/*.AppImage dist/*.exe)
+          if [[ "${#assets[@]}" -ne 2 || ! -f dist/SHA256SUMS ]]; then
+            printf 'Expected an AppImage, an .exe, and SHA256SUMS; found:\n' >&2
             printf '  %s\n' "${assets[@]:-<none>}" >&2
             exit 1
           fi
@@ -77,7 +77,7 @@ jobs:
           path: |
             dist/*.AppImage
             dist/*.exe
-            dist/*.checksum.txt
+            dist/SHA256SUMS
           if-no-files-found: error
 
       - name: Create GitHub draft release
@@ -97,4 +97,4 @@ jobs:
             --title "Workshop Manager ${TAG}" \
             dist/*.AppImage \
             dist/*.exe \
-            dist/*.checksum.txt
+            dist/SHA256SUMS

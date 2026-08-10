@@ -1,15 +1,16 @@
 /**
- * Overview: Generates per-artifact checksum files for packaged desktop artifacts.
+ * Overview: Generates a standard SHA-256 checksum manifest for release artifacts.
  * Responsibility: Scans the top-level `dist/` output directory for downloadable
- * release files and writes deterministic `<artifact>.checksum.txt` files beside them.
+ * release files and writes deterministic `SHA256SUMS` output beside them.
  */
 import { createHash } from 'node:crypto'
-import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { readdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const DEFAULT_RELEASE_DIR = 'dist'
-export const CHECKSUM_FILE_SUFFIX = '.checksum.txt'
+export const CHECKSUM_MANIFEST_FILE_NAME = 'SHA256SUMS'
+export const LEGACY_CHECKSUM_FILE_SUFFIX = '.checksum.txt'
 export const RELEASE_CHECKSUM_EXTENSIONS = ['.AppImage', '.exe', '.dmg', '.deb', '.rpm', '.msi', '.zip']
 
 export function isChecksummedReleaseArtifact(filename) {
@@ -24,11 +25,7 @@ export async function listChecksummedReleaseArtifacts(releaseDir = DEFAULT_RELEA
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
     .filter(isChecksummedReleaseArtifact)
-    .sort((left, right) => left.localeCompare(right))
-}
-
-export function getChecksumFileName(artifactName) {
-  return `${artifactName}${CHECKSUM_FILE_SUFFIX}`
+    .sort()
 }
 
 export async function createChecksumEntries(releaseDir = DEFAULT_RELEASE_DIR) {
@@ -41,7 +38,6 @@ export async function createChecksumEntries(releaseDir = DEFAULT_RELEASE_DIR) {
     const sha256 = createHash('sha256').update(bytes).digest('hex')
     entries.push({
       artifactName,
-      checksumFileName: getChecksumFileName(artifactName),
       content: `${sha256}  ${artifactName}\n`
     })
   }
@@ -49,18 +45,25 @@ export async function createChecksumEntries(releaseDir = DEFAULT_RELEASE_DIR) {
   return entries
 }
 
-export async function writeChecksumFiles(releaseDir = DEFAULT_RELEASE_DIR) {
+export async function writeChecksumManifest(releaseDir = DEFAULT_RELEASE_DIR) {
   const resolvedReleaseDir = resolve(releaseDir)
   const entries = await createChecksumEntries(resolvedReleaseDir)
+  const existingFiles = await readdir(resolvedReleaseDir, { withFileTypes: true })
+  const legacyChecksumFiles = existingFiles
+    .filter((entry) => entry.isFile() && entry.name.endsWith(LEGACY_CHECKSUM_FILE_SUFFIX))
+    .map((entry) => unlink(join(resolvedReleaseDir, entry.name)))
 
-  for (const entry of entries) {
-    await writeFile(join(resolvedReleaseDir, entry.checksumFileName), entry.content, 'utf8')
-  }
+  await Promise.all(legacyChecksumFiles)
+  await writeFile(
+    join(resolvedReleaseDir, CHECKSUM_MANIFEST_FILE_NAME),
+    entries.map((entry) => entry.content).join(''),
+    'utf8'
+  )
 
   return {
     releaseDir: resolvedReleaseDir,
     artifactCount: entries.length,
-    checksumFiles: entries.map((entry) => entry.checksumFileName)
+    checksumFileName: CHECKSUM_MANIFEST_FILE_NAME
   }
 }
 
@@ -74,9 +77,9 @@ function isCliEntrypoint() {
 
 async function main(argv = process.argv.slice(2)) {
   const releaseDir = argv[0] ?? DEFAULT_RELEASE_DIR
-  const result = await writeChecksumFiles(releaseDir)
+  const result = await writeChecksumManifest(releaseDir)
   console.log(
-    `[checksums] Wrote ${result.checksumFiles.length} checksum file(s) in ${resolve(releaseDir)}`
+    `[checksums] Wrote ${result.checksumFileName} for ${result.artifactCount} artifact(s) in ${resolve(releaseDir)}`
   )
 }
 

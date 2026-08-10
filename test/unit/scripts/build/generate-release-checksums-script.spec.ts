@@ -4,12 +4,11 @@ import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import {
-  CHECKSUM_FILE_SUFFIX,
+  CHECKSUM_MANIFEST_FILE_NAME,
   createChecksumEntries,
-  getChecksumFileName,
   isChecksummedReleaseArtifact,
   listChecksummedReleaseArtifacts,
-  writeChecksumFiles
+  writeChecksumManifest
 } from '../../../../scripts/build/generate-release-checksums.mjs'
 
 describe('generate-release-checksums script helpers', () => {
@@ -31,7 +30,7 @@ describe('generate-release-checksums script helpers', () => {
     expect(artifacts).toEqual(['alpha.AppImage', 'zeta.exe'])
   })
 
-  it('writes deterministic per-artifact checksum files', async () => {
+  it('writes one deterministic standard checksum manifest', async () => {
     const root = await mkdtemp(join(tmpdir(), 'release-checksums-'))
     const appImageName = 'Workshop Manager-1.0.9-linux-x86_64.AppImage'
     const exeName = 'Workshop Manager-1.0.9-win-x64.exe'
@@ -41,32 +40,28 @@ describe('generate-release-checksums script helpers', () => {
     const expectedAppImageHash = createHash('sha256').update('linux-bytes').digest('hex')
     const expectedExeHash = createHash('sha256').update('windows-bytes').digest('hex')
 
-    expect(getChecksumFileName(appImageName)).toBe(`${appImageName}${CHECKSUM_FILE_SUFFIX}`)
-
     const entries = await createChecksumEntries(root)
     expect(entries).toEqual([
       {
         artifactName: appImageName,
-        checksumFileName: `${appImageName}${CHECKSUM_FILE_SUFFIX}`,
         content: `${expectedAppImageHash}  ${appImageName}\n`
       },
       {
         artifactName: exeName,
-        checksumFileName: `${exeName}${CHECKSUM_FILE_SUFFIX}`,
         content: `${expectedExeHash}  ${exeName}\n`
       }
     ])
 
-    const result = await writeChecksumFiles(root)
-    expect(result.artifactCount).toBe(2)
-    expect(result.checksumFiles).toEqual([
-      `${appImageName}${CHECKSUM_FILE_SUFFIX}`,
-      `${exeName}${CHECKSUM_FILE_SUFFIX}`
-    ])
+    await writeFile(join(root, `${appImageName}.checksum.txt`), 'legacy checksum')
 
-    const appImageOutput = await readFile(join(root, `${appImageName}${CHECKSUM_FILE_SUFFIX}`), 'utf8')
-    const exeOutput = await readFile(join(root, `${exeName}${CHECKSUM_FILE_SUFFIX}`), 'utf8')
-    expect(appImageOutput).toBe(`${expectedAppImageHash}  ${appImageName}\n`)
-    expect(exeOutput).toBe(`${expectedExeHash}  ${exeName}\n`)
+    const result = await writeChecksumManifest(root)
+    expect(result.artifactCount).toBe(2)
+    expect(result.checksumFileName).toBe(CHECKSUM_MANIFEST_FILE_NAME)
+    await expect(readFile(join(root, `${appImageName}.checksum.txt`), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT'
+    })
+    expect(await readFile(join(root, CHECKSUM_MANIFEST_FILE_NAME), 'utf8')).toBe(
+      `${expectedAppImageHash}  ${appImageName}\n${expectedExeHash}  ${exeName}\n`
+    )
   })
 })

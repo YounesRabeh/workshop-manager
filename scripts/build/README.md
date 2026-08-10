@@ -10,7 +10,7 @@ Common entry points:
 - `pnpm build:linux`: package the Linux AppImage
 - `pnpm build:win`: package the portable Windows `.exe`
 - `pnpm build:all`: package Linux and Windows artifacts
-- `pnpm checksums`: generate per-artifact `.checksum.txt` files in `dist/`
+- `pnpm checksums`: generate one `SHA256SUMS` manifest in `dist/`
 - `pnpm release`: build Linux and Windows release artifacts with icons, then generate checksums
 
 Notable scripts:
@@ -18,7 +18,7 @@ Notable scripts:
 - `build-platform.mjs`: normalizes public build targets and orchestrates icon/checksum behavior
 - `run-build-in-docker.mjs`: runs the selected build command inside the project Docker image
 - `build-executable.mjs`: executes the Electron Builder packaging step
-- `generate-release-checksums.mjs`: writes one SHA-256 checksum file per release artifact
+- `generate-release-checksums.mjs`: writes one standard SHA-256 checksum manifest
 - `sync-app-icon.mjs`: syncs icon assets derived from `resources/img/app-icon.png`
 - `electron-builder-before-build.mjs`: pre-build hook used by Electron Builder
 - `after-sign.mjs`: optional post-sign hook for notarization/signing workflows
