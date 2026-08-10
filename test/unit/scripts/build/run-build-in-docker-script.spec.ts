@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { SKIP_KILL_INSTANCE_FLAG } from '../../../../scripts/build/build-executable.mjs'
 import {
@@ -23,6 +24,17 @@ import {
 } from '../../../../scripts/build/run-build-in-docker.mjs'
 
 describe('run-build-in-docker script helpers', () => {
+  it('excludes local credentials from every Docker build context', () => {
+    const ignoredEntries = readFileSync(
+      new URL('../../../../.dockerignore', import.meta.url),
+      'utf8'
+    )
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+
+    expect(ignoredEntries).toContain('.secrets')
+  })
+
   it('adds the internal skip-kill flag only for containerized packaging runs', () => {
     expect(createContainerForwardedArgs('build:bundle:native')).toEqual([])
     expect(createContainerForwardedArgs('build:exe:native', ['--win'])).toEqual([

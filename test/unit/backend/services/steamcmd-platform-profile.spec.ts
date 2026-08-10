@@ -20,6 +20,7 @@ describe('steamcmd platform profile', () => {
     expect(getSteamCmdPlatformBehavior('linux')).toMatchObject({
       expectedExecutableName: 'steamcmd.sh',
       archiveKind: 'tar.gz',
+      interactiveLineEnding: '\n',
       identityResolution: 'steamcmd_output'
     })
 
@@ -27,6 +28,7 @@ describe('steamcmd platform profile', () => {
       expectedExecutableName: 'steamcmd.exe',
       archiveKind: 'zip',
       useShellHost: false,
+      interactiveLineEnding: '\n',
       identityResolution: 'steamcmd_output_then_custom_profile'
     })
   })

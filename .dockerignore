@@ -1,6 +1,7 @@
 .git
 .codex
 .agents
+.secrets
 node_modules
 .pnpm-store
 out

@@ -219,31 +219,29 @@ function createOneShotFakeChild(response: InteractiveResponse): EventEmitter & {
   return emitter
 }
 
+type OneShotGuardChallengeChild = EventEmitter & {
+  stdout: PassThrough
+  stderr: PassThrough
+  stdin: PassThrough
+  commands: string[]
+  stdinChunks: Buffer[]
+  kill: () => void
+}
+
 function createOneShotGuardChallengeChild(options: {
   promptLines: string[]
   promptWithoutNewline?: string
   promptStream?: 'stdout' | 'stderr'
   successLines: string[]
   expectedGuardCode: string
-}): EventEmitter & {
-  stdout: PassThrough
-  stderr: PassThrough
-  stdin: PassThrough
-  commands: string[]
-  kill: () => void
-} {
-  const emitter = new EventEmitter() as EventEmitter & {
-    stdout: PassThrough
-    stderr: PassThrough
-    stdin: PassThrough
-    commands: string[]
-    kill: () => void
-  }
+}): OneShotGuardChallengeChild {
+  const emitter = new EventEmitter() as OneShotGuardChallengeChild
 
   emitter.stdout = new PassThrough()
   emitter.stderr = new PassThrough()
   emitter.stdin = new PassThrough()
   emitter.commands = []
+  emitter.stdinChunks = []
   let closed = false
   let stdinBuffer = ''
 
@@ -256,6 +254,7 @@ function createOneShotGuardChallengeChild(options: {
   }
 
   emitter.stdin.on('data', (chunk: Buffer) => {
+    emitter.stdinChunks.push(Buffer.from(chunk))
     stdinBuffer += chunk.toString('utf8')
     const commands = stdinBuffer.split(/\r?\n/)
     stdinBuffer = commands.pop() ?? ''
@@ -1066,15 +1065,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-script-'))
       const store = new RunLogStore(join(root, 'runs'))
       const generatedScripts: string[] = []
-      let childRef:
-        | (EventEmitter & {
-            stdout: PassThrough
-            stderr: PassThrough
-            stdin: PassThrough
-            commands: string[]
-            kill: () => void
-          })
-        | undefined
+      let childRef: OneShotGuardChallengeChild | undefined
 
       ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
         if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
@@ -1132,6 +1123,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       expect(generatedScripts[0]).toContain('login alice secret')
       expect(generatedScripts[0]).not.toContain('12345')
       expect(childRef?.commands).toContain('12345')
+      expect(Buffer.concat(childRef?.stdinChunks ?? []).toString('utf8')).toBe('12345\n')
     } finally {
       if (originalExecutionMode === undefined) {
         delete process.env['STEAMCMD_EXECUTION_MODE']
@@ -1148,15 +1140,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     try {
       const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-stderr-otp-'))
       const store = new RunLogStore(join(root, 'runs'))
-      let childRef:
-        | (EventEmitter & {
-            stdout: PassThrough
-            stderr: PassThrough
-            stdin: PassThrough
-            commands: string[]
-            kill: () => void
-          })
-        | undefined
+      let childRef: OneShotGuardChallengeChild | undefined
 
       ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
         if (args[0] !== '+runscript' || typeof args[1] !== 'string') {

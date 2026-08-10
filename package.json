@@ -1,13 +1,13 @@
 {
   "name": "workshop-manager",
   "productName": "Workshop Manager",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "Create and update items for Steam's Workshop.",
   "author": "Younes Rabeh",
   "license": "MIT",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.4.0",
+  "packageManager": "pnpm@11.21.0",
   "main": "out/main/index.js",
   "build": {
     "appId": "com.workshop.manager",
@@ -85,8 +85,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.renderer.json && vue-tsc --noEmit -p tsconfig.renderer-tests.json",
     "test": "vitest run",
     "test:steamcmd:contract": "vitest run test/integration/steamcmd-command-contract.spec.ts",
+    "test:steamcmd:live": "vitest run test/integration/steamcmd-live-login.spec.ts",
     "container:test:steamcmd": "node scripts/runtime/run-steamcmd-contract-containers.mjs native",
     "container:test:steamcmd:linux": "node scripts/runtime/run-steamcmd-contract-containers.mjs linux",
+    "container:test:steamcmd:linux:live": "node scripts/runtime/run-steamcmd-live-linux.mjs",
+    "container:test:steamcmd:linux:script-live": "node scripts/runtime/run-steamcmd-live-linux.mjs --script-mode",
+    "container:test:steamcmd:windows:wine": "node scripts/runtime/run-steamcmd-live-linux.mjs --windows-wine",
     "container:test:steamcmd:windows": "node scripts/runtime/run-steamcmd-contract-containers.mjs windows",
     "test:watch": "vitest"
   },

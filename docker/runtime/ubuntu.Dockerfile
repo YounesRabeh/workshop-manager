@@ -8,6 +8,16 @@ ENV CI=true \
 
 WORKDIR /project
 
+RUN dpkg --add-architecture i386 \
+  && apt-get update \
+  && apt-get install --no-install-recommends -y \
+    ca-certificates \
+    libc6:i386 \
+    libgcc-s1:i386 \
+    libstdc++6:i386 \
+    tar \
+  && rm -rf /var/lib/apt/lists/*
+
 RUN corepack enable \
   && corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
@@ -17,4 +27,3 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 CMD ["pnpm", "run", "test:steamcmd:contract"]
-

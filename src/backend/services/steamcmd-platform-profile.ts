@@ -46,7 +46,10 @@ const STEAMCMD_PLATFORM_BEHAVIORS: Record<SteamCmdPlatformProfile, SteamCmdPlatf
     requiresExecutableBit: false,
     useShellHost: false,
     hideWindowsConsole: true,
-    interactiveLineEnding: '\r\n',
+    // SteamCMD reads interactive responses from a redirected stdin pipe. Use
+    // the protocol delimiter it expects, not the Windows text-file delimiter,
+    // so the submitted Steam Guard token does not retain a trailing `\r`.
+    interactiveLineEnding: '\n',
     identityResolution: 'steamcmd_output_then_custom_profile',
     waitForPromptBeforeInteractiveLogin: false,
     enableInteractiveLoginRetry: false,
