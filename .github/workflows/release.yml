@@ -1,0 +1,100 @@
+name: Draft release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  ci:
+    name: CI for release tag
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  build-and-draft-release:
+    name: Build artifacts and create draft
+    needs: ci
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.21.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.22.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Validate tag matches package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node --input-type=module -e \"import manifest from './package.json' with { type: 'json' }; console.log(manifest.version)\")"
+          expected_tag="v${version}"
+          if [[ "${GITHUB_REF_NAME}" != "${expected_tag}" ]]; then
+            echo "Tag ${GITHUB_REF_NAME} must match package version ${expected_tag}." >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Linux and Windows artifacts with SHA-256 checksums
+        run: pnpm release
+
+      - name: Verify release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(dist/*.AppImage dist/*.exe dist/*.checksum.txt)
+          if [[ "${#assets[@]}" -ne 4 ]]; then
+            printf 'Expected an AppImage, an .exe, and two checksum files; found:\n' >&2
+            printf '  %s\n' "${assets[@]:-<none>}" >&2
+            exit 1
+          fi
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: workshop-manager-${{ github.ref_name }}
+          path: |
+            dist/*.AppImage
+            dist/*.exe
+            dist/*.checksum.txt
+          if-no-files-found: error
+
+      - name: Create GitHub draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "A release for ${TAG} already exists; refusing to create another one." >&2
+            exit 1
+          fi
+          gh release create "${TAG}" \
+            --draft \
+            --generate-notes \
+            --title "Workshop Manager ${TAG}" \
+            dist/*.AppImage \
+            dist/*.exe \
+            dist/*.checksum.txt
