@@ -45,7 +45,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="$(node -p \"require('./package.json').version\")"
+          version="$(node -p 'require("./package.json").version')"
           expected_tag="v${version}"
           if [[ "${GITHUB_REF_NAME}" != "${expected_tag}" ]]; then
             echo "Tag ${GITHUB_REF_NAME} must match package version ${expected_tag}." >&2
