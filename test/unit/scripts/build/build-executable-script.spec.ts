@@ -3,6 +3,7 @@ import {
   NATIVE_BUNDLE_SCRIPT,
   SKIP_KILL_INSTANCE_FLAG,
   buildStepsForPlatform,
+  createPnpmInvocation,
   getElectronBuilderArgsForPlatform,
   getPackagingTargetForPlatform,
   normalizeBuildTargetPlatform,
@@ -48,6 +49,15 @@ describe('build-executable script helpers', () => {
     expect(resolvePnpmCommand('win32')).toBe('pnpm.cmd')
     expect(resolvePnpmCommand('linux')).toBe('pnpm')
     expect(resolvePnpmCommand('darwin')).toBe('pnpm')
+  })
+
+  it('uses pnpm\'s CLI path when the package manager supplies it', () => {
+    expect(
+      createPnpmInvocation(['icon'], 'linux', { npm_execpath: '/tools/pnpm/bin/pnpm.mjs' })
+    ).toEqual({
+      command: process.execPath,
+      args: ['/tools/pnpm/bin/pnpm.mjs', 'icon']
+    })
   })
 
   it('builds steps in required default order for linux', () => {
