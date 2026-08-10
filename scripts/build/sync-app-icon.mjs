@@ -12,14 +12,27 @@ import { spawnSync } from 'node:child_process'
 
 const thisDir = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(thisDir, '..', '..')
-const iconDir = resolve(projectRoot, 'resources/img')
-const sourceIconPath = resolve(iconDir, 'app-icon.png')
-const normalizedIconPath = resolve(iconDir, 'app-icon.normalized.png')
-const sourceIcoPath = resolve(iconDir, 'app-icon.ico')
-const sourceIcnsPath = resolve(iconDir, 'app-icon.icns')
-const targetIconPaths = [
-  resolve(projectRoot, 'src/renderer/public/app-icon.png')
-]
+
+export function resolveIconAssetPaths(rootPath) {
+  const iconDir = resolve(rootPath, 'resources/img')
+  return {
+    sourceIconPath: resolve(iconDir, 'app-icon.png'),
+    normalizedIconPath: resolve(iconDir, 'app-icon.normalized.png'),
+    sourceIcoPath: resolve(iconDir, 'app-icon.ico'),
+    sourceIcnsPath: resolve(iconDir, 'app-icon.icns'),
+    targetIconPaths: [resolve(rootPath, 'src/renderer/public/app-icon.png')],
+    sourceMarkerPath: resolve(rootPath, 'resources/.icon-source')
+  }
+}
+
+const {
+  sourceIconPath,
+  normalizedIconPath,
+  sourceIcoPath,
+  sourceIcnsPath,
+  targetIconPaths,
+  sourceMarkerPath
+} = resolveIconAssetPaths(projectRoot)
 
 async function assertReadable(path) {
   await stat(path)
@@ -174,7 +187,7 @@ async function syncIcon() {
   await generateIcns(effectiveIconPath)
 
   await writeFile(
-    resolve(projectRoot, 'resources/.icon-source'),
+    sourceMarkerPath,
     'Single source of truth: resources/img/app-icon.png\n',
     'utf8'
   )
