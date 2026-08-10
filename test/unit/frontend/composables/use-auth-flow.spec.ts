@@ -630,7 +630,7 @@ describe('useAuthFlow composable', () => {
     })
   })
 
-  it('queues OTP entered before login run id is available and submits when challenge arrives', async () => {
+  it('queues OTP entered before login run id is available and submits when the run starts', async () => {
     const flow = useAuthFlow({
       onShowTimeoutLogs: vi.fn(async () => undefined),
       onHideTimeoutLogs: vi.fn(),
@@ -653,13 +653,6 @@ describe('useAuthFlow composable', () => {
       type: 'run_started',
       phase: 'login'
     })
-    flow.handleRunEvent({
-      runId: 'r1',
-      ts: Date.now(),
-      type: 'steam_guard_required',
-      phase: 'login',
-      promptType: 'steam_guard_code'
-    })
 
     await vi.waitFor(() => {
       expect(workshop.submitSteamGuardCode).toHaveBeenCalledWith({
@@ -667,6 +660,34 @@ describe('useAuthFlow composable', () => {
         code: '123456'
       })
     })
+  })
+
+  it('submits OTP for an active OTP login before SteamCMD exposes its prompt', async () => {
+    const flow = useAuthFlow({
+      onShowTimeoutLogs: vi.fn(async () => undefined),
+      onHideTimeoutLogs: vi.fn(),
+      onSignedIn: vi.fn(async () => undefined),
+      onSignedOut: vi.fn()
+    })
+
+    flow.isLoginSubmitting.value = true
+    flow.setPreferredAuthMode('otp')
+    flow.handleRunEvent({
+      runId: 'r1',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'login'
+    })
+
+    flow.setSteamGuardCode('123456')
+    await flow.submitSteamGuardCode()
+
+    expect(workshop.submitSteamGuardCode).toHaveBeenCalledWith({
+      sessionId: 'r1',
+      code: '123456'
+    })
+    expect(flow.steamGuardCode.value).toBe('')
+    expect(flow.statusMessage.value).toContain('submitted. Waiting for Steam')
   })
 
   it('requires password when keep-signed-in is turned off, even if a saved session exists', async () => {

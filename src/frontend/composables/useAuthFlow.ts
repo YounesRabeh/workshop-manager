@@ -352,6 +352,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
         : preferredAuthMode.value === 'otp'
           ? 'Sign-in request sent. Enter OTP / Email code to continue.'
           : 'Signing in to Steam...'
+      void submitQueuedOtpIfReady(event.runId)
     }
 
     if (event.phase !== 'login' || event.runId !== activeLoginRunId.value) {

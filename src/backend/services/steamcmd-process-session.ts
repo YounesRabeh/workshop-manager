@@ -429,11 +429,41 @@ export class SteamCmdProcessSession {
   }
 
   submitSteamGuardCode(sessionId: string, code: string): void {
-    const pending = this.state.pendingSteamGuard.get(sessionId)
-    if (!pending) {
-      throw new AppError('steam_guard', 'No Steam Guard prompt is currently waiting for this session')
+    const normalizedCode = code.trim()
+    if (!normalizedCode) {
+      throw new AppError('steam_guard', 'Steam Guard code is required')
     }
-    pending.resolve(code.trim())
+
+    const pending = this.state.pendingSteamGuard.get(sessionId)
+    if (pending) {
+      pending.resolve(normalizedCode)
+      return
+    }
+
+    const activeRun = this.state.activeInteractiveRun
+    if (
+      !activeRun ||
+      activeRun.runId !== sessionId ||
+      activeRun.phase !== 'login' ||
+      !activeRun.commandDispatched
+    ) {
+      throw new AppError('steam_guard', 'No active Steam login is available for this session')
+    }
+
+    // Native Windows SteamCMD can wait for email OTP input without exposing
+    // its prompt through redirected stdout/stderr. Writing while the login is
+    // active is safe: the pipe buffers the code until SteamCMD reads it.
+    activeRun.lastSubmittedGuardCode = normalizedCode
+    activeRun.guardCodeSubmissionCount += 1
+    if (activeRun.persistLogs) {
+      this.logger.appendLineNoThrow(
+        activeRun.runId,
+        this.logger.formatRunMeta(
+          'steam guard code submitted by UI before prompt detection'
+        )
+      )
+    }
+    activeRun.writeInput(normalizedCode)
   }
 
   cancelRun(runId: string): void {

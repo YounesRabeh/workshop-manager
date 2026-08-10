@@ -34,7 +34,9 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
   }
 
   function isNoPendingPromptError(message: string): boolean {
-    return /no steam guard prompt is currently waiting for this session/i.test(message)
+    return /no steam guard prompt is currently waiting for this session|no active steam login is available for this session/i.test(
+      message
+    )
   }
 
   function setChallengeState(mode: ActiveChallengeMode): void {
@@ -94,7 +96,10 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
     bindQueuedOtpToRun(runId)
 
     if (
-      steamGuardPromptType.value !== 'steam_guard_code' ||
+      (
+        steamGuardPromptType.value !== 'steam_guard_code' &&
+        activeChallengeMode.value !== 'otp'
+      ) ||
       steamGuardSessionId.value !== runId ||
       queuedOtpCode.value.trim().length === 0 ||
       queuedOtpRunId.value !== runId
@@ -133,7 +138,7 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
     const shouldQueueOtp =
       options.isLoginSubmitting.value &&
       (activeChallengeMode.value === 'otp' || options.preferredAuthMode.value === 'otp')
-    if (!sessionId || steamGuardPromptType.value !== 'steam_guard_code') {
+    if (!sessionId) {
       if (!shouldQueueOtp) {
         return
       }
@@ -141,9 +146,14 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
       queuedOtpCode.value = code
       queuedOtpRunId.value = sessionId
       steamGuardCode.value = ''
-      options.statusMessage.value = sessionId
-        ? 'OTP / Email code saved. Waiting for Steam challenge...'
-        : 'OTP / Email code saved. Waiting for login session...'
+      options.statusMessage.value = 'OTP / Email code saved. Waiting for login session...'
+      return
+    }
+
+    if (
+      steamGuardPromptType.value !== 'steam_guard_code' &&
+      !shouldQueueOtp
+    ) {
       return
     }
 
