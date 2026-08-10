@@ -1,10 +1,9 @@
 /**
- * Overview: Keeps app icon assets in sync across the renderer, packaging targets,
- *  and Linux launcher integrations.
+ * Overview: Keeps app icon assets in sync across the renderer and packaging targets.
  * Responsibility: Treats `resources/img/app-icon.png` as the single source of truth,
- *  derives platform-specific icon formats, and refreshes desktop launcher metadata.
+ *  and derives platform-specific icon formats without modifying the user's desktop.
  */
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -48,49 +47,6 @@ function runCommand(command, args) {
   if (result.status !== 0) {
     throw new Error(result.stderr?.trim() || result.stdout?.trim() || `${command} failed`)
   }
-}
-
-export function escapeSingleQuotesForBash(value) {
-  return value.replace(/'/g, "'\"'\"'")
-}
-
-/**
- * Produces a Linux desktop entry that launches the project from source with the
- * correct icon and WM class metadata.
- */
-export function buildLinuxLauncherContent({ displayName, projectRootPath, appId, iconAbsolutePath }) {
-  const escapedRoot = escapeSingleQuotesForBash(projectRootPath)
-  return `[Desktop Entry]
-Type=Application
-Version=1.0
-Name=${displayName}
-Comment=Steam Workshop upload and update tool
-GenericName=Workshop Mod Manager
-Terminal=false
-Categories=Utility;Development;
-Keywords=workshop;steam;mod;mods;upload;update;publisher;manager;
-StartupNotify=true
-StartupWMClass=${appId}
-Icon=${iconAbsolutePath}
-Exec=/bin/bash -lc "cd '${escapedRoot}' && env CHROME_DESKTOP=${appId}.desktop -u ELECTRON_RUN_AS_NODE pnpm dev"
-`
-}
-
-/**
- * Updates only the launcher fields this project owns while preserving the rest
- * of an existing `.desktop` file.
- */
-export function rewriteDesktopEntryMappings(original, { displayName, appId, iconAbsolutePath }) {
-  const withName = /^Name=.*$/m.test(original)
-    ? original.replace(/^Name=.*$/m, `Name=${displayName}`)
-    : `${original.trimEnd()}\nName=${displayName}\n`
-  const withIcon = /^Icon=.*$/m.test(withName)
-    ? withName.replace(/^Icon=.*$/m, `Icon=${iconAbsolutePath}`)
-    : `${withName.trimEnd()}\nIcon=${iconAbsolutePath}\n`
-  const withWmClass = /^StartupWMClass=.*$/m.test(withIcon)
-    ? withIcon.replace(/^StartupWMClass=.*$/m, `StartupWMClass=${appId}`)
-    : `${withIcon.trimEnd()}\nStartupWMClass=${appId}\n`
-  return withWmClass
 }
 
 async function generateNormalizedPng() {
@@ -197,116 +153,6 @@ async function generateIcns(inputIconPath) {
   }
 }
 
-async function syncLinuxDesktopIcon(inputIconPath) {
-  if (process.platform !== 'linux') {
-    return
-  }
-
-  const homeDir = process.env['HOME']
-  if (!homeDir) {
-    return
-  }
-
-  try {
-    const appId = 'workshop-manager'
-    const displayName = 'Workshop Manager'
-    const iconSizes = [512, 256, 128, 64, 48, 32]
-    const iconName = `${appId}.png`
-
-    for (const size of iconSizes) {
-      const outDir = resolve(homeDir, `.local/share/icons/hicolor/${size}x${size}/apps`)
-      const outPath = resolve(outDir, iconName)
-      try {
-        await mkdir(outDir, { recursive: true })
-        const imageMagickCommand = resolveImageMagickCommand()
-        if (imageMagickCommand) {
-          try {
-            runCommand(imageMagickCommand, [inputIconPath, '-resize', `${size}x${size}`, outPath])
-          } catch {
-            await cp(inputIconPath, outPath, { force: true, errorOnExist: false })
-          }
-        } else {
-          await cp(inputIconPath, outPath, { force: true, errorOnExist: false })
-        }
-      } catch {
-        // Best effort only.
-      }
-    }
-    console.log(`Synced Linux icon theme entries for ${appId}`)
-
-    const iconAbsolutePath = resolve(homeDir, `.local/share/icons/hicolor/512x512/apps/${iconName}`)
-    const launcherContent = buildLinuxLauncherContent({
-      displayName,
-      projectRootPath: projectRoot,
-      appId,
-      iconAbsolutePath
-    })
-
-    const canonicalDesktopFiles = [
-      resolve(homeDir, '.local/share/applications/workshop-manager.desktop'),
-      resolve(homeDir, 'Desktop/Workshop-Manager.desktop')
-    ]
-
-    for (const desktopPath of canonicalDesktopFiles) {
-      try {
-        await mkdir(dirname(desktopPath), { recursive: true })
-        await writeFile(desktopPath, launcherContent, 'utf8')
-        await chmod(desktopPath, 0o755)
-        console.log(`Wrote canonical launcher: ${desktopPath}`)
-      } catch {
-        // Best effort only.
-      }
-    }
-
-    const legacyDesktopFiles = [
-      resolve(homeDir, '.local/share/applications/steam-workshop-manager.desktop'),
-      resolve(homeDir, 'Desktop/Steam-Workshop-Manager.desktop')
-    ]
-
-    const desktopFiles = [
-      resolve(homeDir, '.local/share/applications/steam-workshop-manager.desktop'),
-      resolve(homeDir, 'Desktop/Steam-Workshop-Manager.desktop'),
-      resolve(homeDir, '.local/share/applications/workshop-manager.desktop'),
-      resolve(homeDir, 'Desktop/Workshop-Manager.desktop')
-    ]
-
-    for (const desktopPath of desktopFiles) {
-      try {
-        await stat(desktopPath)
-        const original = await readFile(desktopPath, 'utf8')
-        const rewritten = rewriteDesktopEntryMappings(original, {
-          displayName,
-          appId,
-          iconAbsolutePath
-        })
-        await writeFile(desktopPath, rewritten, 'utf8')
-        console.log(`Updated launcher icon mapping: ${desktopPath}`)
-      } catch {
-        // Ignore if launcher file does not exist.
-      }
-    }
-
-    for (const desktopPath of legacyDesktopFiles) {
-      try {
-        await rm(desktopPath, { force: true })
-        console.log(`Removed legacy launcher: ${desktopPath}`)
-      } catch {
-        // Best effort only.
-      }
-    }
-
-    if (hasCommand('gtk-update-icon-cache')) {
-      try {
-        runCommand('gtk-update-icon-cache', ['-f', '-t', resolve(homeDir, '.local/share/icons/hicolor')])
-      } catch {
-        // Best effort only.
-      }
-    }
-  } catch {
-    // Best effort only.
-  }
-}
-
 /**
  * Main sync routine used by `pnpm sync:icon`.
  */
@@ -326,7 +172,6 @@ async function syncIcon() {
 
   await generateIco(effectiveIconPath)
   await generateIcns(effectiveIconPath)
-  await syncLinuxDesktopIcon(effectiveIconPath)
 
   await writeFile(
     resolve(projectRoot, 'resources/.icon-source'),
