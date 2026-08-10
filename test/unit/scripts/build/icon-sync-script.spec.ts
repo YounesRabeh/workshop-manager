@@ -23,4 +23,17 @@ describe('sync-app-icon script', () => {
       expect(projectRelativePath.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)).toBe(false)
     }
   })
+
+  it('resolves the complete icon asset map from roots containing spaces and quotes', () => {
+    const projectRoot = resolve('/tmp', "Workshop Manager O'Brien")
+
+    expect(resolveIconAssetPaths(projectRoot)).toEqual({
+      sourceIconPath: resolve(projectRoot, 'resources/img/app-icon.png'),
+      normalizedIconPath: resolve(projectRoot, 'resources/img/app-icon.normalized.png'),
+      sourceIcoPath: resolve(projectRoot, 'resources/img/app-icon.ico'),
+      sourceIcnsPath: resolve(projectRoot, 'resources/img/app-icon.icns'),
+      targetIconPaths: [resolve(projectRoot, 'src/renderer/public/app-icon.png')],
+      sourceMarkerPath: resolve(projectRoot, 'resources/.icon-source')
+    })
+  })
 })

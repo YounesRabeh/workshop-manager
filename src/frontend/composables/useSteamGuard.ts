@@ -166,6 +166,7 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
       if (options.isLoginSubmitting.value && isNoPendingPromptError(parsed.message)) {
         queuedOtpCode.value = code
         queuedOtpRunId.value = sessionId
+        steamGuardCode.value = ''
         options.statusMessage.value = 'OTP / Email code saved. Waiting for Steam challenge...'
         options.authIssue.value = null
         return

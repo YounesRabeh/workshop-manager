@@ -1231,9 +1231,13 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     )
 
     let activeRunId = ''
+    let sawGuardPrompt = false
     runtime.on('run-event', (event) => {
       if (event.type === 'run_started' && event.phase === 'login') {
         activeRunId = event.runId
+      }
+      if (event.type === 'steam_guard_required' && event.phase === 'login') {
+        sawGuardPrompt = true
       }
     })
 
@@ -1243,10 +1247,11 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       expect(activeRunId).not.toBe('')
     })
 
-    runtime.submitSteamGuardCode(activeRunId, '12345')
+    runtime.submitSteamGuardCode(activeRunId, '  12345\r\n')
     const loginResult = await loginPromise
 
     expect(loginResult.sessionId).toBe(activeRunId)
+    expect(sawGuardPrompt).toBe(false)
     expect(Buffer.concat(childRef?.stdinChunks ?? []).toString('utf8')).toBe('12345\n')
     expect(childRef?.commands).toContain('12345')
 
@@ -1254,6 +1259,57 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     expect(run?.lines).toContain(
       '[RUN_META] steam guard code submitted by UI before prompt detection'
     )
+    expect(run?.lines.join('\n')).not.toContain('12345')
+    expect(run?.lines.join('\n')).not.toContain('secret')
+  })
+
+  it('does not write invalid or mismatched OTP submissions to a hidden-prompt Windows login', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'runtime-service-win32-login-rejected-otp-'))
+    const store = new RunLogStore(join(root, 'runs'))
+    let childRef: OneShotGuardChallengeChild | undefined
+
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      childRef = createOneShotGuardChallengeChild({
+        promptLines: [],
+        expectedGuardCode: '12345',
+        successLines: [
+          "Logging in user 'alice' [U:1:42] to Steam Public...OK",
+          'Waiting for user info...OK'
+        ]
+      })
+      return childRef
+    })
+
+    const runtime = new SteamCmdRuntimeService(
+      async () => 'C:\\steamcmd\\steamcmd.exe',
+      store,
+      join(root, 'runtime'),
+      'windows'
+    )
+
+    let activeRunId = ''
+    runtime.on('run-event', (event) => {
+      if (event.type === 'run_started' && event.phase === 'login') {
+        activeRunId = event.runId
+      }
+    })
+
+    const loginPromise = runtime.login('alice', 'secret', false, 'otp')
+    await vi.waitFor(() => {
+      expect(activeRunId).not.toBe('')
+    })
+
+    expect(() => runtime.submitSteamGuardCode(activeRunId, ' \r\n ')).toThrow(
+      'Steam Guard code is required'
+    )
+    expect(() => runtime.submitSteamGuardCode('different-run', '12345')).toThrow(
+      'No active Steam login is available for this session'
+    )
+    expect(childRef?.stdinChunks).toEqual([])
+
+    runtime.submitSteamGuardCode(activeRunId, '12345')
+    await loginPromise
+    expect(Buffer.concat(childRef?.stdinChunks ?? []).toString('utf8')).toBe('12345\n')
   })
 
   it('fails fast in script mode when mobile auth is preferred but Steam requests OTP/email code', async () => {
