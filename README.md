@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/YounesRabeh/workshop-manager">
-    <img src=".github/img/WkM.png" alt="Workshop Manager" width="640">
+    <img src=".github/img/WkM.png" alt="Workshop Manager">
   </a>
 
   <p align="center">
