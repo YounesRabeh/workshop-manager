@@ -1,6 +1,5 @@
 # Builds and releases
-
-[Documentation index](README.md) · [Project README](../README.md)
+[< Back to Workshop Manager](../README.md) • [Documentation index](README.md)
 
 Public packaging is Docker-based so Linux AppImage and Windows portable executable builds use a consistent toolchain. Generated applications run natively; Docker is not required by end users.
 

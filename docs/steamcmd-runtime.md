@@ -1,6 +1,5 @@
 # SteamCMD runtime
-
-[Documentation index](README.md) · [Project README](../README.md)
+[< Back to Workshop Manager](../README.md) • [Documentation index](README.md)
 
 The SteamCMD runtime owns executable discovery, installation, platform behavior, script generation, process input/output, login state, and Workshop command execution.
 

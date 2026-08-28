@@ -1,6 +1,5 @@
 # Authentication
-
-[Documentation index](README.md) · [Project README](../README.md)
+[< Back to Workshop Manager](../README.md) • [Documentation index](README.md)
 
 Workshop Manager signs in through SteamCMD and supports password login, cached Steam sessions, email/OTP challenges, and Steam mobile-app approval.
 

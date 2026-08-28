@@ -1,6 +1,5 @@
 # Logging and troubleshooting
-
-[Documentation index](README.md) · [Project README](../README.md)
+[< Back to Workshop Manager](../README.md) • [Documentation index](README.md)
 
 Workshop Manager keeps dedicated SteamCMD output and installation logs so failures can be diagnosed without exposing credentials in normal metadata.
 

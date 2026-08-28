@@ -1,6 +1,5 @@
 # Profiles and settings
-
-[Documentation index](README.md) · [Project README](../README.md)
+[< Back to Workshop Manager](../README.md) • [Documentation index](README.md)
 
 Workshop Manager keeps reusable mod profiles, remembered-login preferences, advanced settings, SteamCMD files, and current-session logs beneath Electron’s stable `workshop-manager` application-data directory.
 

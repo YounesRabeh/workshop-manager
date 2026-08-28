@@ -1,6 +1,5 @@
 # Workshop Manager documentation
-
-[< Project README](../README.md)
+[< Back to Workshop Manager](../README.md)
 
 Use this hub to find the shortest path to the information you need. Commands are run from the repository root unless a guide says otherwise.
 

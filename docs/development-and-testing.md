@@ -1,6 +1,5 @@
 # Development and testing
-
-[Documentation index](README.md) · [Project README](../README.md)
+[< Back to Workshop Manager](../README.md) • [Documentation index](README.md)
 
 ## Requirements
 
