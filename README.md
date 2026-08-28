@@ -1,175 +1,76 @@
-![banner](.github/img/WkM.png)
+<div align="center">
+  <a href="https://github.com/YounesRabeh/workshop-manager">
+    <img src=".github/img/WkM.png" alt="Workshop Manager" width="640">
+  </a>
 
-Workshop Manager is a desktop app for creating, updating, and maintaining Steam Workshop items. It is built with Electron, Vue 3, TypeScript, and Tailwind, and wraps the SteamCMD workflow in a more guided UI.
+  <p id="tech-stack" align="center">
+    <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-blue?style=for-the-badge" alt="Platform: Linux and Windows">
+    <img src="https://img.shields.io/badge/Electron-35%2B-191919?style=for-the-badge&amp;logo=electron" alt="Electron 35 or later">
+    <img src="https://img.shields.io/badge/Node.js-22%20%7C%2024-5FA04E?style=for-the-badge&amp;logo=nodedotjs&amp;logoColor=white" alt="Node.js 22 or 24">
+    <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License">
+  </p>
 
-> [!NOTE]
-> `pnpm dev`, `pnpm preview`, `pnpm test`, and `pnpm typecheck` run natively on the host.
-> Packaging commands run through Docker. `pnpm icon` is the standalone icon-generation command.
+  <p align="center">
+    <a href="#features">Features</a> •
+    <a href="#screenshots">Screenshots</a> •
+    <a href="#quick-start">Quick Start</a> •
+    <a href="#tech-stack">Tech Stack</a> •
+    <a href="#documentation">Documentation</a> •
+    <a href="https://github.com/YounesRabeh/workshop-manager/releases/latest">Latest Release</a>
+  </p>
+
+  <p>
+    A desktop app for creating, updating, and maintaining Steam Workshop items
+    <br>
+    <a href="https://github.com/YounesRabeh/workshop-manager/releases/latest"><strong>Download the latest release</strong></a>
+    ·
+    <a href="docs/README.md"><strong>Explore the documentation</strong></a>
+  </p>
+</div>
+
+## Features
+
+- Sign in through SteamCMD with email codes, OTP, or Steam Mobile approval.
+- Create Workshop items and update their content, preview image, metadata, or visibility.
+- Reuse profiles and optionally load published items through the Steam Web API.
+- Inspect local run logs and manage SteamCMD without exposing Node.js to the renderer.
 
 ## Screenshots
 
-| Screenshot 1 | Screenshot 2 |
+| Publish workflow | Workshop item management |
 | --- | --- |
-| ![Workshop Manager Screenshot 1](.github/img/photo01.png) | ![Workshop Manager Screenshot 2](.github/img/photo02.png) |
+| ![Workshop Manager publish workflow](.github/img/photo01.png) | ![Workshop Manager item management](.github/img/photo02.png) |
 
-## What It Does
+## Quick start
 
-- Signs in to Steam, including Steam Guard flows
-- Installs or detects SteamCMD automatically, with a manual fallback path
-- Creates new Workshop items
-- Updates existing Workshop items
-- Changes Workshop item visibility
-- Persists profiles, settings, and run logs locally
-- Keeps the Electron boundary locked down with `nodeIntegration: false`, `contextIsolation: true`, and a preload bridge
-
-> [!IMPORTANT]
-> Authentication supports Steam Guard mobile approvals and OTP/email-code prompts.
-> The login UI auto-detects the challenge Steam requests and adapts accordingly.
-
-## Requirements
-
-| Use case | Requirement |
-| --- | --- |
-| Development | Node.js `22.x` or `24.x` (`22.22.0` in CI) |
-| Development | `pnpm` `11.x` |
-| Packaging builds | Docker on a Linux or Windows host |
-
-
-Packaging commands always run inside the repo's Docker builder image, even when launched from Windows.
-
-> [!TIP]
-> Use `pnpm dev:icon` or `pnpm preview:icon` only when you want to regenerate icon assets first.
-
-## Getting Started
-
-| Step | Command | Notes |
-| --- | --- | --- |
-| Install dependencies | `pnpm install` | Required once after cloning |
-| Start development mode | `pnpm dev` | Fast local dev path on Linux and Windows |
-| Start development mode with icon sync | `pnpm dev:icon` | Regenerates icon assets first |
-| Run tests | `pnpm test` | Runs Vitest |
-| Run type checks | `pnpm typecheck` | Checks Node, renderer, and test TS configs |
-| Preview production renderer | `pnpm preview` | Local preview path on Linux and Windows |
-| Preview with icon sync | `pnpm preview:icon` | Regenerates icon assets first |
-
-> [!NOTE]
-> On Windows, the native `Choose Content Folder` dialog is a directory picker, not a normal file browser. It may not show the files inside a folder while you are navigating, but the app will still scan the selected folder and show its files afterward in the in-app Content Explorer.
-
-## Build And Package
-
-| Goal | Command | Output / Notes |
-| --- | --- | --- |
-| Build production bundle only | `pnpm build` | Writes compiled app output to `out/` |
-| Build Linux package | `pnpm build:linux` | Produces Linux `.AppImage` artifacts |
-| Build Windows package | `pnpm build:win` | Produces a portable Windows `.exe` artifact, not an installer |
-| Build any target explicitly | `pnpm build:platform <bundle\|linux\|win\|all>` | Generic build entry point |
-| Build Linux and Windows | `pnpm build:all` | Runs both platform packaging commands |
-| Generate icons only | `pnpm icon` | Regenerates derived icon assets |
-| Write checksums for existing release artifacts | `pnpm checksums` | Scans `dist/` and writes one `SHA256SUMS` manifest |
-| Release bundle with checksums | `pnpm release` | Builds Linux and Windows artifacts with icons, then writes a `SHA256SUMS` manifest |
-
-> [!IMPORTANT]
-> Docker is build-only. The generated `.AppImage` and `.exe` run natively after packaging.
-> Dockerized builds are currently supported on Linux and Windows hosts.
-
-Packaging commands include icon generation and rebuild the app bundle first so artifacts do not ship stale `out/` code.
-The wrapper performs host-side cleanup before entering Docker so stale local Electron processes do not interfere with packaging.
-Docker packaging runs with `CI=true` inside the container so `pnpm` can rebuild the mounted dependency cache without an interactive prompt.
-Persistent Docker build caches live under `~/.cache/workshop-manager/docker-build`.
-Output artifacts are written to `dist/`.
-Use `pnpm build:platform all --checksums` when you want the generic build command plus checksum generation.
-
-## SteamCMD Cross-Platform Contract Test
-
-The runtime contract test records how Node passes SteamCMD arguments and stdin on each native OS. It uses placeholder account data only; no Steam connection or credentials are required. Reports are written to `artifacts/steamcmd-contract/<platform>/steamcmd-command-contract.json` and contain:
-
-- the observed `+runscript` argv boundaries, including a script path with spaces;
-- the generated SteamCMD script encoding, line endings, and command lines;
-- the interactive compatibility-mode stdin bytes and line ending;
-- the native Node platform and selected SteamCMD executable/profile.
-
-Run the container matching the Docker engine's operating system:
-
-| Docker host | Command | Container |
-| --- | --- | --- |
-| Linux | `pnpm container:test:steamcmd:linux` | Debian-based Node image using the Linux profile |
-| Windows, Windows-containers mode | `pnpm container:test:steamcmd:windows` | Windows Server Core using the Windows profile |
-| Either | `pnpm container:test:steamcmd` | Auto-selects the engine-native target |
-
-Windows containers require a Windows kernel. A Linux Docker engine cannot execute the Windows image, and Wine is intentionally not treated as equivalent because it does not exercise Node's native `win32` child-process behavior. The Windows definition can be run on a Windows development machine or Windows CI runner.
-
-The application currently forces multi-line `+runscript` execution on both platforms during the script-mode soak window. The lower-level Linux compatibility path remains covered so interactive and script behavior can still be compared, while Windows always uses script mode. Native Windows container results remain the release-relevant command contract.
-
-## Verifying Release Downloads
-
-Each public release includes one standard `SHA256SUMS` manifest in `dist/`:
-
-- `Workshop Manager-<version>-linux-x86_64.AppImage`
-- `Workshop Manager-<version>-win-x64.exe`
-- `SHA256SUMS`
-
-The manifest contains the SHA-256 hash and filename for every release artifact. Upload it with the app files on GitHub Releases.
-
-You can generate the checksum manifest in two ways:
-
-- `pnpm release` to build fresh Linux and Windows artifacts and then write checksums
-- `pnpm checksums` to only write the manifest for artifacts that already exist in `dist/`
-
-On Linux, users can verify a download with:
+Requires [Node.js 22 or 24](https://nodejs.org/) and [pnpm 11](https://pnpm.io/).
 
 ```bash
-sha256sum -c SHA256SUMS
+git clone https://github.com/YounesRabeh/workshop-manager.git
+cd workshop-manager
+pnpm install
+pnpm dev
 ```
 
-On Windows PowerShell, users can compare the file hash with:
-
-```powershell
-Get-FileHash ".\Workshop Manager-<version>-win-x64.exe" -Algorithm SHA256
-Get-Content .\SHA256SUMS
-```
-
-For this portfolio project, the checksum pipeline is the intended release-integrity mechanism. Native Windows code signing is optional and not required for the published demo builds.
-
-## Changing The App Icon
-
-`resources/img/app-icon.png` is the single source of truth for the app icon used by both the app and packaged builds.
-
-> [!NOTE]
-> `pnpm icon` is the manual icon-only step. Packaging commands run icon sync as part of the build path.
-
-## Project Layout
-
-| Path | Purpose |
+| Need | Command |
 | --- | --- |
-| `src/electron` | Electron main process and preload bridge |
-| `src/backend` | SteamCMD services, persistence stores, and Workshop-related backend logic |
-| `src/shared` | IPC contracts and shared domain types |
-| `src/frontend` | Vue renderer application |
-| `scripts` | Local tooling for cleanup, icon sync, packaging, and Docker build orchestration |
-| `docker` | Docker image used for reproducible packaging builds |
-| `test` | Unit and integration tests |
+| Run tests | `pnpm test` |
+| Check types | `pnpm typecheck` |
+| Build the app | `pnpm build` |
+| Package a release | `pnpm release` |
+
+Packaging runs in Docker and writes artifacts to `dist/`. See [build and release instructions](docs/builds-and-releases.md).
 
 ## Documentation
 
-Detailed documentation is organized by capability in [`docs/`](docs/README.md):
+The [documentation hub](docs/README.md) organizes every guide by task:
 
-| Topic | Document |
+| I want to… | Start here |
 | --- | --- |
-| Process boundaries and code ownership | [Architecture](docs/architecture.md) |
-| Login, saved sessions, and Steam Guard | [Authentication](docs/authentication.md) |
-| Installation and cross-platform execution | [SteamCMD runtime](docs/steamcmd-runtime.md) |
-| Create, update, visibility, and item discovery | [Workshop management](docs/workshop-management.md) |
-| Profiles, Web API, paths, and timeout settings | [Profiles and settings](docs/profiles-and-settings.md) |
-| Run logs and diagnosis | [Logging and troubleshooting](docs/logging-and-troubleshooting.md) |
-| Local development, tests, and containers | [Development and testing](docs/development-and-testing.md) |
-| Packaging, checksums, CI, and releases | [Builds and releases](docs/builds-and-releases.md) |
-| Secret handling and application boundaries | [Security](docs/security.md) |
+| Use the app | [Authentication](docs/authentication.md) · [Workshop management](docs/workshop-management.md) · [Profiles and settings](docs/profiles-and-settings.md) |
+| Diagnose a problem | [Logging and troubleshooting](docs/logging-and-troubleshooting.md) · [SteamCMD runtime](docs/steamcmd-runtime.md) |
+| Develop or release it | [Architecture](docs/architecture.md) · [Development and testing](docs/development-and-testing.md) · [Builds and releases](docs/builds-and-releases.md) · [Security](docs/security.md) |
 
-## Data And Security Notes
+## License
 
-| Item | Behavior |
-| --- | --- |
-| Username/session preferences | Can be persisted when enabled |
-| Passwords | Not stored as plain local config values |
-| Steam Web API keys | Stored through Electron secure storage when available |
-| Run logs | Stored locally so failed SteamCMD runs can be inspected later |
+Distributed under the [MIT License](LICENSE).

@@ -1,5 +1,7 @@
 # Profiles and settings
 
+[Documentation index](README.md) · [Project README](../README.md)
+
 Workshop Manager keeps reusable mod profiles, remembered-login preferences, advanced settings, SteamCMD files, and current-session logs beneath Electron’s stable `workshop-manager` application-data directory.
 
 Typical roots are `%APPDATA%\workshop-manager` on Windows and the Electron application-data location on Linux. Always use the path shown by the application or Electron rather than assuming a fixed home directory.

@@ -1,5 +1,7 @@
 # Architecture
 
+[Documentation index](README.md) · [Project README](../README.md)
+
 Workshop Manager is an Electron application with a Vue renderer and a Node backend hosted by the Electron main process. Shared contracts keep IPC payloads and domain models consistent across those boundaries.
 
 ## Runtime flow

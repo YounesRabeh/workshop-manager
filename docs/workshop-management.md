@@ -1,5 +1,7 @@
 # Workshop management
 
+[Documentation index](README.md) · [Project README](../README.md)
+
 Workshop Manager supports creating Workshop items, updating existing items, changing visibility, previewing local content, and loading the signed-in user’s published items.
 
 ## Create an item

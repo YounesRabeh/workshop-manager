@@ -1,5 +1,7 @@
 # Development and testing
 
+[Documentation index](README.md) · [Project README](../README.md)
+
 ## Requirements
 
 - Node.js `22.x` or `24.x` (`.nvmrc` pins the CI version, `22.22.0`)

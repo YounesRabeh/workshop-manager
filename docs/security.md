@@ -1,5 +1,7 @@
 # Security
 
+[Documentation index](README.md) · [Project README](../README.md)
+
 Workshop Manager handles Steam credentials, cached authentication, optional Web API access, local filesystem paths, and process output. These boundaries must remain explicit in code and tests.
 
 ## Electron boundary
