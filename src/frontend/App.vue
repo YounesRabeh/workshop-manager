@@ -273,6 +273,12 @@ const workshopItems = workshopStore.workshopItems
 const selectedWorkshopItemId = workshopStore.selectedWorkshopItemId
 const workshopListMessage = workshopStore.workshopListMessage
 const filteredWorkshopItems = workshopStore.filteredWorkshopItems
+const paginatedWorkshopItems = workshopStore.paginatedWorkshopItems
+const workshopItemsPage = workshopStore.workshopItemsPage
+const workshopItemsTotalPages = workshopStore.workshopItemsTotalPages
+const workshopItemsPageStart = workshopStore.workshopItemsPageStart
+const workshopItemsPageEnd = workshopStore.workshopItemsPageEnd
+const goToWorkshopItemsPage = workshopStore.goToWorkshopItemsPage
 const onChangeAppId = workshopStore.onChangeAppId
 const onChangeWorkshopVisibilityFilter = workshopStore.onChangeWorkshopVisibilityFilter
 const selectedWorkshopItem = workshopStore.selectedWorkshopItem
@@ -595,7 +601,7 @@ async function pickUpdatePreviewFile(): Promise<void> {
       <div class="app-shell">
         <div
           v-if="activeToast"
-          class="pointer-events-none fixed left-1/2 top-4 z-[70] w-[340px] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg border px-4 py-3 text-center shadow-2xl backdrop-blur-sm"
+          class="pointer-events-none fixed left-1/2 top-4 z-70 w-85 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg border px-4 py-3 text-center shadow-2xl backdrop-blur-sm"
           :class="toastToneClass(activeToast.tone)"
         >
           <p class="text-sm font-bold">{{ activeToast.title }}</p>
@@ -642,14 +648,20 @@ async function pickUpdatePreviewFile(): Promise<void> {
         <WorkshopItemsSection
           v-if="flowStep === 'mods'"
           :app-id="workshopFilterAppId"
-          :workshop-items="filteredWorkshopItems"
+          :workshop-items="paginatedWorkshopItems"
           :all-items-count="workshopItems.length"
+          :filtered-items-count="filteredWorkshopItems.length"
+          :current-page="workshopItemsPage"
+          :total-pages="workshopItemsTotalPages"
+          :page-start="workshopItemsPageStart"
+          :page-end="workshopItemsPageEnd"
           :visibility-filter="workshopVisibilityFilter"
           :selected-workshop-item-id="selectedWorkshopItemId"
           :empty-state-message="workshopItemsEmptyStateMessage"
           :show-empty-state="shouldShowWorkshopItemsEmptyState"
           @change-app-id="onChangeAppId"
           @change-visibility-filter="onChangeWorkshopVisibilityFilter"
+          @change-page="goToWorkshopItemsPage"
           @reset-filter="resetWorkshopAppIdFilter"
           @refresh="loadWorkshopItems"
           @select-item="selectWorkshopItem"

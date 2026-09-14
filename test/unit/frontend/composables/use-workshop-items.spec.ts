@@ -50,6 +50,43 @@ describe('useWorkshopItems composable', () => {
     expect(statuses.at(-1)).toBe('Loaded 1 workshop item(s).')
   })
 
+  it('paginates fetched items and resets the page when filters change', async () => {
+    workshop.getMyWorkshopItems.mockResolvedValueOnce(
+      Array.from({ length: 25 }, (_, index) => ({
+        publishedFileId: String(index + 1),
+        title: `Item ${index + 1}`,
+        appId: '480',
+        visibility: index < 13 ? 0 : 2
+      }))
+    )
+    const store = useWorkshopItems({
+      canAccessMods: () => true,
+      normalizeError: () => ({ code: 'command_failed', message: 'failed' }),
+      setStatusMessage: () => undefined,
+      onSelectWorkshopItem: () => undefined
+    })
+
+    await store.loadWorkshopItems()
+
+    expect(store.paginatedWorkshopItems.value).toHaveLength(12)
+    expect(store.workshopItemsTotalPages.value).toBe(3)
+    expect(store.workshopItemsPageStart.value).toBe(1)
+    expect(store.workshopItemsPageEnd.value).toBe(12)
+
+    store.goToWorkshopItemsPage(2)
+    expect(store.paginatedWorkshopItems.value[0]?.publishedFileId).toBe('13')
+    expect(store.workshopItemsPageStart.value).toBe(13)
+    expect(store.workshopItemsPageEnd.value).toBe(24)
+
+    store.onChangeWorkshopVisibilityFilter('hidden')
+    expect(store.workshopItemsPage.value).toBe(1)
+    expect(store.filteredWorkshopItems.value).toHaveLength(12)
+    expect(store.workshopItemsTotalPages.value).toBe(1)
+
+    store.goToWorkshopItemsPage(99)
+    expect(store.workshopItemsPage.value).toBe(1)
+  })
+
   it('keeps selection and rehydrates callback on refresh', async () => {
     const onSelectWorkshopItem = vi.fn()
     const store = useWorkshopItems({

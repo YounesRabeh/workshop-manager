@@ -12,6 +12,11 @@ const props = defineProps<{
   appId: string
   workshopItems: WorkshopItemSummary[]
   allItemsCount: number
+  filteredItemsCount: number
+  currentPage: number
+  totalPages: number
+  pageStart: number
+  pageEnd: number
   visibilityFilter: WorkshopVisibilityFilter
   selectedWorkshopItemId: string
   showEmptyState: boolean
@@ -21,6 +26,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'change-app-id', value: string): void
   (e: 'change-visibility-filter', value: WorkshopVisibilityFilter): void
+  (e: 'change-page', value: number): void
   (e: 'reset-filter'): void
   (e: 'refresh'): void
   (e: 'select-item', item: WorkshopItemSummary): void
@@ -111,7 +117,12 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
       </div>
 
       <p v-if="allItemsCount > 0" class="mt-2 text-xs text-slate-500">
-        Showing {{ workshopItems.length }} of {{ allItemsCount }} item(s).
+        <template v-if="filteredItemsCount === allItemsCount">
+          Showing {{ pageStart }}<template v-if="pageEnd !== pageStart">–{{ pageEnd }}</template> of {{ allItemsCount }} item(s).
+        </template>
+        <template v-else>
+          Showing {{ pageStart }}<template v-if="pageEnd !== pageStart">–{{ pageEnd }}</template> of {{ filteredItemsCount }} matching item(s) ({{ allItemsCount }} total).
+        </template>
       </p>
 
       <div
@@ -155,6 +166,30 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
           </div>
         </button>
       </div>
+
+      <nav
+        v-if="filteredItemsCount > 0 && totalPages > 1"
+        class="mt-4 flex items-center justify-center gap-3"
+        aria-label="Workshop item pages"
+      >
+        <button
+          class="steam-btn-muted rounded px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+          :disabled="currentPage <= 1"
+          @click="emit('change-page', currentPage - 1)"
+        >
+          Previous
+        </button>
+        <span class="text-xs font-semibold text-slate-600" aria-live="polite">
+          Page {{ currentPage }} of {{ totalPages }}
+        </span>
+        <button
+          class="steam-btn-muted rounded px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+          :disabled="currentPage >= totalPages"
+          @click="emit('change-page', currentPage + 1)"
+        >
+          Next
+        </button>
+      </nav>
     </article>
   </section>
 </template>

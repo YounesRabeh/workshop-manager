@@ -51,6 +51,7 @@ After Steam ID resolution, item discovery can use two sources in parallel:
 - Steam Community pages as the normal fallback/source.
 
 Results are normalized and merged by published file ID. Public item details are fetched in batches of up to 100 IDs. An optional App ID filters the result.
+The item browser displays the fetched results in pages of 12 cards. Changing the App ID or visibility filter returns the browser to the first page, and the active page is clamped when a refresh reduces the result count.
 
 ## Main implementation files
 

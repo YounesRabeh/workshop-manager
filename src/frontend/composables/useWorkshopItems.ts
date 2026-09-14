@@ -3,7 +3,7 @@
  * Responsibility: Loads items from IPC, applies app/visibility filters, 
  * tracks selection, and exposes open/refresh actions with status updates.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { WorkshopItemSummary } from '@shared/contracts'
 import type { WorkshopVisibilityFilter } from '../types/ui'
 
@@ -19,6 +19,8 @@ interface UseWorkshopItemsOptions {
   onSelectWorkshopItem: (item: WorkshopItemSummary) => void
 }
 
+const WORKSHOP_ITEMS_PAGE_SIZE = 12
+
 export function useWorkshopItems(options: UseWorkshopItemsOptions) {
   const workshopFilterAppId = ref('')
   const workshopVisibilityFilter = ref<WorkshopVisibilityFilter>('all')
@@ -26,6 +28,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
   const selectedWorkshopItemId = ref('')
   const workshopListMessage = ref('')
   const hasWorkshopItemsError = ref(false)
+  const workshopItemsPage = ref(1)
 
   const selectedWorkshopItem = computed(() =>
     workshopItems.value.find((item) => item.publishedFileId === selectedWorkshopItemId.value)
@@ -53,12 +56,49 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     })
   })
 
+  const workshopItemsTotalPages = computed(() =>
+    Math.max(1, Math.ceil(filteredWorkshopItems.value.length / WORKSHOP_ITEMS_PAGE_SIZE))
+  )
+
+  const paginatedWorkshopItems = computed(() => {
+    const startIndex = (workshopItemsPage.value - 1) * WORKSHOP_ITEMS_PAGE_SIZE
+    return filteredWorkshopItems.value.slice(startIndex, startIndex + WORKSHOP_ITEMS_PAGE_SIZE)
+  })
+
+  const workshopItemsPageStart = computed(() =>
+    filteredWorkshopItems.value.length === 0
+      ? 0
+      : (workshopItemsPage.value - 1) * WORKSHOP_ITEMS_PAGE_SIZE + 1
+  )
+
+  const workshopItemsPageEnd = computed(() =>
+    Math.min(workshopItemsPage.value * WORKSHOP_ITEMS_PAGE_SIZE, filteredWorkshopItems.value.length)
+  )
+
+  watch(workshopItemsTotalPages, (totalPages) => {
+    if (workshopItemsPage.value > totalPages) {
+      workshopItemsPage.value = totalPages
+    }
+  })
+
   function onChangeAppId(value: string): void {
     workshopFilterAppId.value = value
+    workshopItemsPage.value = 1
   }
 
   function onChangeWorkshopVisibilityFilter(value: WorkshopVisibilityFilter): void {
     workshopVisibilityFilter.value = value
+    workshopItemsPage.value = 1
+  }
+
+  function goToWorkshopItemsPage(page: number): void {
+    if (!Number.isFinite(page)) {
+      return
+    }
+    workshopItemsPage.value = Math.min(
+      workshopItemsTotalPages.value,
+      Math.max(1, Math.trunc(page))
+    )
   }
 
   function selectWorkshopItem(item: WorkshopItemSummary): void {
@@ -87,6 +127,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     try {
       const items = await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value || undefined })
       workshopItems.value = items
+      workshopItemsPage.value = 1
       reconcileSelection(items)
       hasWorkshopItemsError.value = false
       if (items.length === 0) {
@@ -110,6 +151,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     }
 
     workshopFilterAppId.value = ''
+    workshopItemsPage.value = 1
     if (options.canAccessMods()) {
       await loadWorkshopItems()
       return
@@ -181,6 +223,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     workshopFilterAppId.value = ''
     workshopVisibilityFilter.value = 'all'
     workshopItems.value = []
+    workshopItemsPage.value = 1
     selectedWorkshopItemId.value = ''
     workshopListMessage.value = ''
     hasWorkshopItemsError.value = false
@@ -195,8 +238,14 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     hasWorkshopItemsError,
     selectedWorkshopItem,
     filteredWorkshopItems,
+    paginatedWorkshopItems,
+    workshopItemsPage,
+    workshopItemsTotalPages,
+    workshopItemsPageStart,
+    workshopItemsPageEnd,
     onChangeAppId,
     onChangeWorkshopVisibilityFilter,
+    goToWorkshopItemsPage,
     selectWorkshopItem,
     loadWorkshopItems,
     resetAppIdFilter,

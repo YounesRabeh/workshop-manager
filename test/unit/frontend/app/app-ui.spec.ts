@@ -198,6 +198,40 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).not.toContain('Loaded 1 workshop item(s).')
   })
 
+  it('pages through fetched workshop items twelve at a time', async () => {
+    workshop.getMyWorkshopItems.mockResolvedValueOnce(
+      Array.from({ length: 13 }, (_, index) => ({
+        publishedFileId: String(index + 1),
+        title: `Paged Item ${index + 1}`,
+        appId: '480',
+        previewUrl: `https://example.invalid/preview-${index + 1}.jpg`,
+        visibility: 0 as const
+      }))
+    )
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.find('input').setValue('alice')
+    await wrapper.find('input[type="password"]').setValue('secret')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Showing 1–12 of 13 item(s).')
+    expect(wrapper.text()).toContain('Page 1 of 2')
+    expect(wrapper.findAll('.workshop-card')).toHaveLength(12)
+    expect(wrapper.findAll('.workshop-card').some((card) => card.text().includes('Paged Item 13'))).toBe(false)
+
+    const nextButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Next')
+    expect(nextButton).toBeDefined()
+    await nextButton?.trigger('click')
+
+    expect(wrapper.text()).toContain('Showing 13 of 13 item(s).')
+    expect(wrapper.text()).toContain('Page 2 of 2')
+    const secondPageCards = wrapper.findAll('.workshop-card')
+    expect(secondPageCards).toHaveLength(1)
+    expect(secondPageCards[0]?.text()).toContain('Paged Item 13')
+  })
+
   it('keeps readiness layout tweaks: top row App ID + Title, separator visible, and no Published File ID in update', async () => {
     const wrapper = mount(App)
     await flushPromises()
