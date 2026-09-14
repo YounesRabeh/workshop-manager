@@ -79,4 +79,4 @@ export interface PublishChecklistItem {
   optional?: boolean
 }
 
-export type WorkshopVisibilityFilter = 'all' | 'public' | 'friends' | 'hidden' | 'unlisted' | 'unknown'
+export type { WorkshopVisibilityFilter } from '@shared/contracts'

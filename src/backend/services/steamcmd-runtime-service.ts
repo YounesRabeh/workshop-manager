@@ -13,7 +13,9 @@ import type {
   RunResult,
   SteamProfileSummary,
   UploadDraft,
-  WorkshopItemSummary
+  WorkshopItemSummary,
+  WorkshopItemsPage,
+  WorkshopItemsPageInput
 } from '@shared/contracts'
 import {
   DEFAULT_STEAMCMD_TIMEOUT_SETTINGS,
@@ -556,6 +558,14 @@ export class SteamCmdRuntimeService extends EventEmitter {
     } = {}
   ): Promise<WorkshopItemSummary[]> {
     return await this.workshopFetchService.getMyWorkshopItems(appId, savedWebApiKey, options)
+  }
+
+  async getMyWorkshopItemsPage(
+    input: WorkshopItemsPageInput,
+    savedWebApiKey?: string,
+    options: { allowWebApi?: boolean; webApiAccess?: WorkshopWebApiAccessState } = {}
+  ): Promise<WorkshopItemsPage> {
+    return await this.workshopFetchService.getMyWorkshopItemsPage(input, savedWebApiKey, options)
   }
 
   submitSteamGuardCode(sessionId: string, code: string): void {

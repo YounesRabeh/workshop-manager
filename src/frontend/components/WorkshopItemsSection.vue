@@ -118,12 +118,7 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
       </div>
 
       <p v-if="allItemsCount > 0" class="mt-2 text-xs text-slate-500">
-        <template v-if="filteredItemsCount === allItemsCount">
-          Showing {{ pageStart }}<template v-if="pageEnd !== pageStart">–{{ pageEnd }}</template> of {{ allItemsCount }} item(s).
-        </template>
-        <template v-else>
-          Showing {{ pageStart }}<template v-if="pageEnd !== pageStart">–{{ pageEnd }}</template> of {{ filteredItemsCount }} matching item(s) ({{ allItemsCount }} total).
-        </template>
+        Showing {{ pageStart }}<template v-if="pageEnd !== pageStart">–{{ pageEnd }}</template> of {{ allItemsCount }} item(s).
       </p>
 
       <div

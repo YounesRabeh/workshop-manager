@@ -65,7 +65,10 @@ describe('SteamIdentityResolver', () => {
     const steamId64 = await resolver.resolveFromCustomProfile('https://steamcommunity.com/id/alice')
 
     expect(steamId64).toBe('76561198000000042')
-    expect(globalThis.fetch).toHaveBeenCalledWith('https://steamcommunity.com/id/alice/?xml=1')
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://steamcommunity.com/id/alice/?xml=1',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
   })
 
   it('does not probe a guessed vanity URL from a plain Steam account name', async () => {

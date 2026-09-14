@@ -43,6 +43,7 @@ interface UsePublishActionsOptions {
   setStatusMessage: (message: string) => void
   showToast: (toast: ToastInput) => void
   onSelectWorkshopItem: (item: WorkshopItemSummary) => void
+  reloadWorkshopPage?: () => Promise<void>
 }
 
 function actionFailureTitle(operation: 'upload' | 'update' | 'visibility'): string {
@@ -196,6 +197,11 @@ export function usePublishActions(options: UsePublishActionsOptions) {
   }
 
   async function refreshWorkshopItems(afterRefresh?: (items: WorkshopItemSummary[]) => void): Promise<void> {
+    if (options.reloadWorkshopPage) {
+      await options.reloadWorkshopPage()
+      afterRefresh?.(options.workshopItems.value)
+      return
+    }
     const refreshedItems = await window.workshop.getMyWorkshopItems({
       appId: options.workshopFilterAppId.value || undefined
     })

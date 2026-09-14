@@ -7,6 +7,37 @@ describe('WorkshopFetchService', () => {
     vi.restoreAllMocks()
   })
 
+  it('fetches only the requested Web API page and returns paging metadata', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+      response: {
+        total: 25,
+        publishedfiledetails: [{
+          publishedfileid: '13',
+          title: 'Page two item',
+          consumer_appid: '480',
+          visibility: 0
+        }]
+      }
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    const service = new WorkshopFetchService({
+      getLoginState: () => ({ username: 'Alice', steamId64: '76561198000000000' })
+    })
+
+    const result = await service.getMyWorkshopItemsPage(
+      { appId: '480', page: 2, pageSize: 12, visibility: 'public' },
+      'api-key',
+      { allowWebApi: true }
+    )
+
+    expect(result).toMatchObject({ page: 2, pageSize: 12, totalItems: 25, hasNext: true })
+    expect(result.items.map((item) => item.publishedFileId)).toEqual(['13'])
+    const requestedUrl = String(fetchSpy.mock.calls[0]?.[0])
+    expect(requestedUrl).toContain('page=2')
+    expect(requestedUrl).toContain('numperpage=12')
+    expect(requestedUrl).toContain('privacy=0')
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
   it('throws auth error when not logged in', async () => {
     const service = new WorkshopFetchService({
       getLoginState: () => null

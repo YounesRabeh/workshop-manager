@@ -14,7 +14,8 @@ import type {
   SaveAdvancedSettingsInput,
   SteamGuardInput,
   UploadInput,
-  VisibilityUpdateInput
+  VisibilityUpdateInput,
+  WorkshopItemsPageInput
 } from '@shared/contracts'
 import { normalizeSteamCmdTimeoutSettings } from '@shared/runtime-settings'
 import { AppError } from '@backend/utils/errors'
@@ -350,15 +351,6 @@ app.whenReady().then(async () => {
     return await getAdvancedSettings()
   })
 
-  handleIpc(IPC_CHANNELS.getSavedWebApiKey, async () => {
-    const resolvedKey = await resolveSavedWebApiKey()
-    if (!resolvedKey.hasUsableKey || !resolvedKey.key) {
-      throw new AppError('command_failed', 'Saved Steam Web API key is unavailable. Re-enter it in Advanced Options.')
-    }
-
-    return { webApiKey: resolvedKey.key }
-  })
-
   handleIpc(IPC_CHANNELS.saveProfile, async (payload: { profile: ModProfile }) => {
     return await profileStore.saveProfile(payload.profile)
   })
@@ -396,6 +388,18 @@ app.whenReady().then(async () => {
     }
 
     return await runtimeService.getMyWorkshopItems(payload.appId, allowWebApi ? resolvedKey.key : undefined, {
+      allowWebApi,
+      webApiAccess
+    })
+  })
+
+  handleIpc(IPC_CHANNELS.getMyWorkshopItemsPage, async (payload: WorkshopItemsPageInput) => {
+    const encryptedKey = await profileStore.getWebApiKeyEncrypted()
+    const storedWebApiEnabled = await profileStore.getWebApiEnabled()
+    const resolvedKey = await resolveSavedWebApiKey()
+    const allowWebApi = storedWebApiEnabled && resolvedKey.hasUsableKey
+    const webApiAccess = allowWebApi ? 'active' : encryptedKey?.trim() ? 'configured_unavailable' : 'disabled'
+    return await runtimeService.getMyWorkshopItemsPage(payload, allowWebApi ? resolvedKey.key : undefined, {
       allowWebApi,
       webApiAccess
     })
@@ -461,9 +465,16 @@ app.whenReady().then(async () => {
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      void createWindow()
+      void createWindow().catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        dialog.showErrorBox('Workshop Manager', `Failed to create the application window: ${message}`)
+      })
     }
   })
+}).catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  dialog.showErrorBox('Workshop Manager failed to start', message)
+  app.exit(1)
 })
 
 app.on('window-all-closed', () => {

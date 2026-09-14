@@ -1152,7 +1152,7 @@ describe('App UI validation gates', () => {
     })
   })
 
-  it('retrieves a saved web api key when revealing it from credentials', async () => {
+  it('does not expose a saved web api key to the renderer when revealing the input', async () => {
     workshop.getAdvancedSettings.mockResolvedValueOnce({
       webApiEnabled: true,
       hasWebApiKey: true,
@@ -1188,8 +1188,8 @@ describe('App UI validation gates', () => {
     await revealButton?.trigger('click')
     await flushPromises()
 
-    expect(workshop.getSavedWebApiKey).toHaveBeenCalledTimes(1)
-    expect((apiKeyInput.element as HTMLInputElement).value).toBe('saved-dev-key')
+    expect(workshop.getSavedWebApiKey).not.toHaveBeenCalled()
+    expect((apiKeyInput.element as HTMLInputElement).value).toBe('')
     expect((apiKeyInput.element as HTMLInputElement).type).toBe('text')
   })
 

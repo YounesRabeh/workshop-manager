@@ -48,12 +48,25 @@ function resolveWindowIconPath(): string | undefined {
 }
 
 function resolveAllowedNavigationTarget(): URL {
-  const devServerUrl = process.env['ELECTRON_RENDERER_URL']
+  const devServerUrl = resolveDevServerUrl()
   if (devServerUrl) {
     return new URL(devServerUrl)
   }
 
   return new URL(pathToFileURL(join(__dirname, '../renderer/index.html')).toString())
+}
+
+function resolveDevServerUrl(): string | undefined {
+  if (app.isPackaged) return undefined
+  const value = process.env['ELECTRON_RENDERER_URL']?.trim()
+  if (!value) return undefined
+
+  const url = new URL(value)
+  const isLocalHost = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1'
+  if ((url.protocol !== 'http:' && url.protocol !== 'https:') || !isLocalHost) {
+    throw new Error('ELECTRON_RENDERER_URL must use HTTP(S) on localhost')
+  }
+  return url.toString()
 }
 
 function isAllowedRendererNavigation(targetUrl: string): boolean {
@@ -116,8 +129,9 @@ export async function createMainWindow(): Promise<BrowserWindow> {
     }
   })
 
-  if (process.env['ELECTRON_RENDERER_URL']) {
-    await mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  const devServerUrl = resolveDevServerUrl()
+  if (devServerUrl) {
+    await mainWindow.loadURL(devServerUrl)
   } else {
     await mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }

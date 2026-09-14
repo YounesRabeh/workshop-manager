@@ -4,9 +4,10 @@
  *  and performs OS-aware download/extraction when SteamCMD is missing.
  */
 import { constants, createWriteStream } from 'node:fs'
-import { access, appendFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { access, appendFile, mkdir, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import type { IncomingMessage } from 'node:http'
 import { get } from 'node:https'
+import type { ClientRequest } from 'node:http'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 import extractZip from 'extract-zip'
@@ -17,6 +18,11 @@ import {
   getSteamCmdPlatformBehavior,
   type SteamCmdPlatformProfile
 } from './steamcmd-platform-profile'
+
+const DOWNLOAD_TIMEOUT_MS = 30_000
+const MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024
+const MAX_DOWNLOAD_REDIRECTS = 3
+const TRUSTED_DOWNLOAD_HOSTS = new Set(['steamcdn-a.akamaihd.net'])
 
 function toInstallError(prefix: string, error: unknown): AppError {
   if (error instanceof AppError) {
@@ -165,15 +171,18 @@ function download(url: string, targetPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     let settled = false
     let activeResponse: IncomingMessage | null = null
+    let activeRequest: ClientRequest | null = null
     let file: ReturnType<typeof createWriteStream> | null = null
+    let receivedBytes = 0
 
     const rejectOnce = (error: AppError) => {
       if (settled) {
         return
       }
       settled = true
-      activeResponse?.destroy()
-      file?.destroy()
+      activeResponse?.destroy?.()
+      activeRequest?.destroy?.()
+      file?.destroy?.()
       void rm(targetPath, { force: true })
         .catch(() => undefined)
         .finally(() => reject(error))
@@ -188,6 +197,12 @@ function download(url: string, targetPath: string): Promise<void> {
     }
 
     const requestDownload = (currentUrl: string, redirectsRemaining: number) => {
+      const parsedUrl = new URL(currentUrl)
+      if (parsedUrl.protocol !== 'https:' || !TRUSTED_DOWNLOAD_HOSTS.has(parsedUrl.hostname)) {
+        rejectOnce(new AppError('install', 'SteamCMD download redirected to an untrusted source'))
+        return
+      }
+
       const request = get(currentUrl, (res) => {
         activeResponse = res
         const statusCode = res.statusCode ?? 0
@@ -213,6 +228,12 @@ function download(url: string, targetPath: string): Promise<void> {
           return
         }
 
+        const declaredLength = Number(res.headers?.['content-length'])
+        if (Number.isFinite(declaredLength) && declaredLength > MAX_DOWNLOAD_BYTES) {
+          rejectOnce(new AppError('install', 'SteamCMD download exceeds the allowed archive size'))
+          return
+        }
+
         res.once('error', (error) => {
           rejectOnce(toInstallError('SteamCMD download failed', error))
         })
@@ -222,6 +243,12 @@ function download(url: string, targetPath: string): Promise<void> {
           rejectOnce(toInstallError('SteamCMD download failed', error))
         })
 
+        res.on('data', (chunk: Buffer) => {
+          receivedBytes += chunk.length
+          if (receivedBytes > MAX_DOWNLOAD_BYTES) {
+            rejectOnce(new AppError('install', 'SteamCMD download exceeds the allowed archive size'))
+          }
+        })
         res.pipe(file)
         file.on('finish', () => {
           file?.close((error) => {
@@ -233,14 +260,34 @@ function download(url: string, targetPath: string): Promise<void> {
           })
         })
       })
+      activeRequest = request
+
+      request.setTimeout?.(DOWNLOAD_TIMEOUT_MS, () => {
+        rejectOnce(new AppError('timeout', 'SteamCMD download timed out'))
+      })
 
       request.once('error', (error) => {
         rejectOnce(toInstallError('SteamCMD download failed', error))
       })
     }
 
-    requestDownload(url, 3)
+    requestDownload(url, MAX_DOWNLOAD_REDIRECTS)
   })
+}
+
+async function validateArchiveSignature(path: string, kind: 'tar.gz' | 'zip'): Promise<void> {
+  const header = Buffer.alloc(4)
+  const file = await open(path, 'r')
+  try {
+    await file.read(header, 0, header.length, 0)
+  } finally {
+    await file.close()
+  }
+  const hasGzipSignature = header[0] === 0x1f && header[1] === 0x8b
+  const hasZipSignature = header[0] === 0x50 && header[1] === 0x4b && header[2] === 0x03 && header[3] === 0x04
+  if ((kind === 'tar.gz' && !hasGzipSignature) || (kind === 'zip' && !hasZipSignature)) {
+    throw new AppError('install', 'SteamCMD download is not a valid installer archive')
+  }
 }
 
 export class SteamCmdInstallManager {
@@ -397,15 +444,16 @@ export class SteamCmdInstallManager {
 
     await this.startInstallLog()
 
+    const archivePath = join(this.installDir, this.platformBehavior.archiveFileName)
     try {
       const downloadUrl = this.platformBehavior.downloadUrl
       await mkdir(this.installDir, { recursive: true })
       await this.logInstallDirectorySnapshot('Install directory before download')
 
-      const archivePath = join(this.installDir, this.platformBehavior.archiveFileName)
       await this.appendInstallLog(`Downloading SteamCMD from ${downloadUrl}`)
       await this.appendInstallLog(`Archive target path=${archivePath}`)
       await download(downloadUrl, archivePath)
+      await validateArchiveSignature(archivePath, this.platformBehavior.archiveKind)
       await this.appendInstallLog('Download completed successfully')
 
       if (this.platformBehavior.archiveKind === 'zip') {
@@ -437,6 +485,7 @@ export class SteamCmdInstallManager {
         source: 'auto'
       }
     } catch (error) {
+      await rm(archivePath, { force: true }).catch(() => undefined)
       await this.appendInstallLog(`Install failed: ${describeUnknownError(error)}`)
       await this.logInstallDirectorySnapshot('Install directory at failure')
       logError('SteamCmdInstallManager::ensureInstalled', normalizeError(error))

@@ -4,8 +4,7 @@
  * tracks selection, and exposes open/refresh actions with status updates.
  */
 import { computed, ref, watch } from 'vue'
-import type { WorkshopItemSummary } from '@shared/contracts'
-import type { WorkshopVisibilityFilter } from '../types/ui'
+import type { WorkshopItemSummary, WorkshopVisibilityFilter } from '@shared/contracts'
 
 interface ApiFailure {
   message: string
@@ -30,42 +29,22 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
   const hasWorkshopItemsError = ref(false)
   const workshopItemsPage = ref(1)
   const isLoadingWorkshopItems = ref(false)
+  const hasNextWorkshopItemsPage = ref(false)
+  const workshopItemsTotalCount = ref(0)
+  let legacyWorkshopItems: WorkshopItemSummary[] | null = null
   let requestVersion = 0
 
   const selectedWorkshopItem = computed(() =>
     workshopItems.value.find((item) => item.publishedFileId === selectedWorkshopItemId.value)
   )
 
-  const filteredWorkshopItems = computed(() => {
-    if (workshopVisibilityFilter.value === 'all') {
-      return workshopItems.value
-    }
-
-    return workshopItems.value.filter((item) => {
-      if (workshopVisibilityFilter.value === 'public') {
-        return item.visibility === 0
-      }
-      if (workshopVisibilityFilter.value === 'friends') {
-        return item.visibility === 1
-      }
-      if (workshopVisibilityFilter.value === 'hidden') {
-        return item.visibility === 2
-      }
-      if (workshopVisibilityFilter.value === 'unlisted') {
-        return item.visibility === 3
-      }
-      return typeof item.visibility === 'undefined'
-    })
-  })
+  const filteredWorkshopItems = computed(() => workshopItems.value)
 
   const workshopItemsTotalPages = computed(() =>
-    Math.max(1, Math.ceil(filteredWorkshopItems.value.length / WORKSHOP_ITEMS_PAGE_SIZE))
+    Math.max(1, Math.ceil(workshopItemsTotalCount.value / WORKSHOP_ITEMS_PAGE_SIZE))
   )
 
-  const paginatedWorkshopItems = computed(() => {
-    const startIndex = (workshopItemsPage.value - 1) * WORKSHOP_ITEMS_PAGE_SIZE
-    return filteredWorkshopItems.value.slice(startIndex, startIndex + WORKSHOP_ITEMS_PAGE_SIZE)
-  })
+  const paginatedWorkshopItems = computed(() => filteredWorkshopItems.value)
 
   const workshopItemsPageStart = computed(() =>
     filteredWorkshopItems.value.length === 0
@@ -74,7 +53,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
   )
 
   const workshopItemsPageEnd = computed(() =>
-    Math.min(workshopItemsPage.value * WORKSHOP_ITEMS_PAGE_SIZE, filteredWorkshopItems.value.length)
+    workshopItemsPageStart.value + Math.max(0, filteredWorkshopItems.value.length - 1)
   )
 
   watch(workshopItemsTotalPages, (totalPages) => {
@@ -91,16 +70,40 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
   function onChangeWorkshopVisibilityFilter(value: WorkshopVisibilityFilter): void {
     workshopVisibilityFilter.value = value
     workshopItemsPage.value = 1
+    if (legacyWorkshopItems) {
+      applyLegacyPage()
+      return
+    }
+    if (options.canAccessMods()) void fetchWorkshopItems(false)
   }
 
   function goToWorkshopItemsPage(page: number): void {
     if (!Number.isFinite(page)) {
       return
     }
-    workshopItemsPage.value = Math.min(
-      workshopItemsTotalPages.value,
-      Math.max(1, Math.trunc(page))
-    )
+    const nextPage = Math.min(workshopItemsTotalPages.value, Math.max(1, Math.trunc(page)))
+    if (nextPage === workshopItemsPage.value) return
+    workshopItemsPage.value = nextPage
+    if (legacyWorkshopItems) {
+      applyLegacyPage()
+      return
+    }
+    void fetchWorkshopItems(false)
+  }
+
+  function applyLegacyPage(): void {
+    if (!legacyWorkshopItems) return
+    const visibility = workshopVisibilityFilter.value
+    const filtered = legacyWorkshopItems.filter((item) => {
+      if (visibility === 'all') return true
+      if (visibility === 'unknown') return item.visibility === undefined
+      const expected = visibility === 'public' ? 0 : visibility === 'friends' ? 1 : visibility === 'hidden' ? 2 : 3
+      return item.visibility === expected
+    })
+    workshopItemsTotalCount.value = filtered.length
+    const start = (workshopItemsPage.value - 1) * WORKSHOP_ITEMS_PAGE_SIZE
+    workshopItems.value = filtered.slice(start, start + WORKSHOP_ITEMS_PAGE_SIZE)
+    hasNextWorkshopItemsPage.value = start + WORKSHOP_ITEMS_PAGE_SIZE < filtered.length
   }
 
   function selectWorkshopItem(item: WorkshopItemSummary): void {
@@ -130,10 +133,27 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     const selectedId = selectedWorkshopItemId.value
     isLoadingWorkshopItems.value = true
     try {
-      const items = await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value.trim() || undefined })
+      const pagedApi = window.workshop.getMyWorkshopItemsPage
+      const result = typeof pagedApi === 'function'
+        ? await pagedApi({
+            appId: workshopFilterAppId.value.trim() || undefined,
+            page: workshopItemsPage.value,
+            pageSize: WORKSHOP_ITEMS_PAGE_SIZE,
+            visibility: workshopVisibilityFilter.value
+          })
+        : null
+      const legacyItems = result ? null : await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value.trim() || undefined })
       if (version !== requestVersion || !options.canAccessMods()) return
-      workshopItems.value = items
-      if (!refreshSelection) workshopItemsPage.value = 1
+      legacyWorkshopItems = legacyItems
+      if (legacyItems) {
+        applyLegacyPage()
+      } else if (result) {
+        workshopItems.value = result.items
+        workshopItemsPage.value = result.page
+        hasNextWorkshopItemsPage.value = result.hasNext
+        workshopItemsTotalCount.value = result.totalItems ?? ((result.page - 1) * result.pageSize + result.items.length + (result.hasNext ? 1 : 0))
+      }
+      const items = workshopItems.value
       reconcileSelection(items)
       hasWorkshopItemsError.value = false
       const refreshedItem = refreshSelection && selectedWorkshopItemId.value === selectedId
@@ -212,6 +232,9 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     workshopFilterAppId.value = ''
     workshopVisibilityFilter.value = 'all'
     workshopItems.value = []
+    hasNextWorkshopItemsPage.value = false
+    workshopItemsTotalCount.value = 0
+    legacyWorkshopItems = null
     workshopItemsPage.value = 1
     selectedWorkshopItemId.value = ''
     workshopListMessage.value = ''
@@ -222,6 +245,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     workshopFilterAppId,
     workshopVisibilityFilter,
     workshopItems,
+    workshopItemsTotalCount,
     selectedWorkshopItemId,
     workshopListMessage,
     hasWorkshopItemsError,

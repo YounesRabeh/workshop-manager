@@ -120,20 +120,7 @@ const {
 
 const isWebApiKeyPeek = ref(false)
 
-async function setWebApiKeyPeek(value: boolean): Promise<void> {
-  if (
-    value &&
-    advancedSettings.hasWebApiKey &&
-    advancedSettings.webApiKey.trim().length === 0
-  ) {
-    try {
-      const payload = await window.workshop.getSavedWebApiKey()
-      setWebApiKey(payload.webApiKey)
-    } catch (error) {
-      const parsed = normalizeError(error)
-      advancedSettings.statusMessage = `Saved Web API key lookup failed (${parsed.code}): ${parsed.message}`
-    }
-  }
+function setWebApiKeyPeek(value: boolean): void {
   isWebApiKeyPeek.value = value
 }
 
@@ -271,6 +258,7 @@ const workshopStore = useWorkshopItems({
 const workshopFilterAppId = workshopStore.workshopFilterAppId
 const workshopVisibilityFilter = workshopStore.workshopVisibilityFilter
 const workshopItems = workshopStore.workshopItems
+const workshopItemsTotalCount = workshopStore.workshopItemsTotalCount
 const selectedWorkshopItemId = workshopStore.selectedWorkshopItemId
 const workshopListMessage = workshopStore.workshopListMessage
 const filteredWorkshopItems = workshopStore.filteredWorkshopItems
@@ -335,7 +323,8 @@ const publishActions = usePublishActions({
   showToast,
   onSelectWorkshopItem: (item) => {
     selectWorkshopItem(item)
-  }
+  },
+  reloadWorkshopPage: loadWorkshopItems
 })
 
 const {
@@ -653,8 +642,8 @@ async function pickUpdatePreviewFile(): Promise<void> {
           :app-id="workshopFilterAppId"
           :is-loading="workshopStore.isLoadingWorkshopItems.value"
           :workshop-items="paginatedWorkshopItems"
-          :all-items-count="workshopItems.length"
-          :filtered-items-count="filteredWorkshopItems.length"
+          :all-items-count="workshopItemsTotalCount"
+          :filtered-items-count="workshopItemsTotalCount"
           :current-page="workshopItemsPage"
           :total-pages="workshopItemsTotalPages"
           :page-start="workshopItemsPageStart"

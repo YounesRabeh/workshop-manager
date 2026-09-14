@@ -37,7 +37,7 @@ describe('SteamCmdInstallManager Windows ZIP extraction', () => {
 
       queueMicrotask(() => {
         callback(response)
-        response.end('archive-bytes')
+        response.end(Buffer.from([0x50, 0x4b, 0x03, 0x04]))
       })
 
       return request
@@ -71,7 +71,7 @@ describe('SteamCmdInstallManager Windows ZIP extraction', () => {
 
       queueMicrotask(() => {
         callback(response)
-        response.end('archive-bytes')
+        response.end(Buffer.from([0x50, 0x4b, 0x03, 0x04]))
       })
 
       return request

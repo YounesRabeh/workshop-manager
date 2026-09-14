@@ -3,7 +3,8 @@
  * Responsibility: Validates drafts, checks update content folders,
  *  writes run-scoped VDF files, and returns executable command arguments.
  */
-import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, rm, statfs, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import type { UploadDraft } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
@@ -68,10 +69,19 @@ async function prepareFilteredContentFolder(
   const stagingPath = join(runtimeDir, 'staged-content', runId)
   await mkdir(stagingPath, { recursive: true })
   try {
-    for (const file of includedFiles) {
-      const destinationPath = join(stagingPath, normalizeExcludedPath(file.relativePath))
-      await mkdir(dirname(destinationPath), { recursive: true })
-      await copyFile(file.absolutePath, destinationPath)
+    const requiredBytes = includedFiles.reduce((total, file) => total + file.sizeBytes, 0)
+    const filesystem = await statfs(stagingPath)
+    const availableBytes = Number(filesystem.bavail) * Number(filesystem.bsize)
+    if (Number.isFinite(availableBytes) && requiredBytes > availableBytes) {
+      throw new AppError('validation', 'Not enough free disk space to stage the selected content files.')
+    }
+    const copyConcurrency = 8
+    for (let start = 0; start < includedFiles.length; start += copyConcurrency) {
+      await Promise.all(includedFiles.slice(start, start + copyConcurrency).map(async (file) => {
+        const destinationPath = join(stagingPath, normalizeExcludedPath(file.relativePath))
+        await mkdir(dirname(destinationPath), { recursive: true })
+        await copyFile(file.absolutePath, destinationPath)
+      }))
     }
   } catch (error) {
     await rm(stagingPath, { recursive: true, force: true })
@@ -85,7 +95,7 @@ async function prepareFilteredContentFolder(
 }
 
 function createRunId(): string {
-  return `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
+  return `${Date.now()}-${randomUUID().replaceAll('-', '')}`
 }
 
 async function ensureUpdateContentFolderHasFiles(draft: UploadDraft): Promise<void> {

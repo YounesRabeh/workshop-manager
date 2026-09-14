@@ -3,7 +3,13 @@
  * Responsibility: Loads profile details, 
  * aggregates workshop listings from Steam Web API and Community pages, and normalizes merged results.
  */
-import type { SteamProfileSummary, WorkshopItemSummary } from '@shared/contracts'
+import type {
+  SteamProfileSummary,
+  WorkshopItemSummary,
+  WorkshopItemsPage,
+  WorkshopItemsPageInput,
+  WorkshopVisibilityFilter
+} from '@shared/contracts'
 import { normalizeError } from '@shared/api-error-utils'
 import { AppError } from '@backend/utils/errors'
 import { resolveWorkshopFetchPolicy, type WorkshopFetchPolicy } from './workshop-fetch-policy'
@@ -21,6 +27,32 @@ interface WorkshopFetchContext {
 }
 
 export type WorkshopWebApiAccessState = 'active' | 'configured_unavailable' | 'disabled'
+
+const WEB_API_PRIVACY_BY_FILTER: Partial<Record<WorkshopVisibilityFilter, string>> = {
+  public: '0',
+  friends: '1',
+  hidden: '2',
+  unlisted: '3'
+}
+
+function matchesVisibility(item: WorkshopItemSummary, filter: WorkshopVisibilityFilter): boolean {
+  if (filter === 'all') return true
+  if (filter === 'unknown') return item.visibility === undefined
+  return item.visibility === Number(WEB_API_PRIVACY_BY_FILTER[filter])
+}
+
+function normalizePageInput(input: WorkshopItemsPageInput): Required<Pick<WorkshopItemsPageInput, 'page' | 'pageSize'>> & Pick<WorkshopItemsPageInput, 'appId' | 'visibility'> {
+  if (!Number.isSafeInteger(input.page) || input.page < 1) throw new AppError('validation', 'Workshop page must be a positive integer.')
+  if (!Number.isSafeInteger(input.pageSize) || input.pageSize < 1 || input.pageSize > 100) {
+    throw new AppError('validation', 'Workshop page size must be between 1 and 100.')
+  }
+  return {
+    appId: input.appId?.trim() || undefined,
+    page: input.page,
+    pageSize: input.pageSize,
+    visibility: input.visibility ?? 'all'
+  }
+}
 
 function errorMessage(error: unknown): string {
   return normalizeError(error).message
@@ -276,6 +308,95 @@ export class WorkshopFetchService {
     }
 
     return []
+  }
+
+  async getMyWorkshopItemsPage(
+    input: WorkshopItemsPageInput,
+    savedWebApiKey?: string,
+    options: { allowWebApi?: boolean; webApiAccess?: WorkshopWebApiAccessState } = {}
+  ): Promise<WorkshopItemsPage> {
+    const request = normalizePageInput(input)
+    const loginState = this.context.getLoginState()
+    if (!loginState) throw new AppError('auth', 'Login is required before loading workshop items')
+    if (!loginState.steamId64) {
+      throw new AppError('auth', unresolvedIdentityMessage('workshop', options.webApiAccess))
+    }
+
+    const apiKey = options.allowWebApi === false ? undefined : savedWebApiKey?.trim()
+    if (apiKey) {
+      try {
+        return await this.getWorkshopItemsPageWithWebApi(apiKey, loginState.steamId64, request)
+      } catch (error) {
+        this.appendDiagnosticLog(`paged web_api failed error=${errorMessage(error)}; falling back to community`)
+      }
+    }
+    return await this.getWorkshopItemsPageWithCommunity(loginState.steamId64, request)
+  }
+
+  private async getWorkshopItemsPageWithWebApi(
+    apiKey: string,
+    steamId64: string,
+    request: ReturnType<typeof normalizePageInput>
+  ): Promise<WorkshopItemsPage> {
+    const params = new URLSearchParams({
+      key: apiKey,
+      steamid: steamId64,
+      appid: request.appId ?? '0',
+      numperpage: String(request.pageSize),
+      page: String(request.page),
+      return_details: 'true'
+    })
+    const privacy = WEB_API_PRIVACY_BY_FILTER[request.visibility ?? 'all']
+    if (privacy !== undefined) params.set('privacy', privacy)
+
+    const response = await this.fetchSteam(
+      `https://api.steampowered.com/IPublishedFileService/GetUserFiles/v1/?${params.toString()}`
+    )
+    if (!response.ok) throw new AppError('command_failed', `Workshop item fetch failed with status ${response.status}`)
+    const payload = (await response.json()) as unknown
+    let items = normalizeWorkshopItems(payload)
+    const rawRows = this.countRawPublishedFileRows(payload)
+    if (items.length === 0) {
+      const ids = extractPublishedFileIds(payload)
+      if (ids.length > 0) items = await this.fetchPublishedFileDetails(ids)
+    }
+    items = items.filter((item) => matchesVisibility(item, request.visibility ?? 'all'))
+    const totalValue = (payload as { response?: { total?: unknown } })?.response?.total
+    const total = typeof totalValue === 'number' || typeof totalValue === 'string' ? Number(totalValue) : NaN
+    return {
+      items,
+      page: request.page,
+      pageSize: request.pageSize,
+      hasNext: Number.isFinite(total) ? request.page * request.pageSize < total : rawRows >= request.pageSize,
+      ...(Number.isFinite(total) ? { totalItems: total } : {})
+    }
+  }
+
+  private async getWorkshopItemsPageWithCommunity(
+    steamId64: string,
+    request: ReturnType<typeof normalizePageInput>
+  ): Promise<WorkshopItemsPage> {
+    const params = new URLSearchParams({
+      browsefilter: 'myfiles',
+      numperpage: String(request.pageSize),
+      p: String(request.page)
+    })
+    if (request.appId) params.set('appid', request.appId)
+    const response = await this.fetchSteam(
+      `https://steamcommunity.com/profiles/${steamId64}/myworkshopfiles/?${params.toString()}`
+    )
+    if (!response.ok) throw new AppError('command_failed', `Community workshop page fetch failed with status ${response.status}`)
+    const html = await response.text()
+    const ids = extractWorkshopFileIdsFromHtml(html)
+    let items = ids.length > 0 ? await this.fetchPublishedFileDetails(ids) : []
+    if (request.appId) items = items.filter((item) => item.appId === request.appId)
+    items = items.filter((item) => matchesVisibility(item, request.visibility ?? 'all'))
+    return {
+      items,
+      page: request.page,
+      pageSize: request.pageSize,
+      hasNext: request.page < extractMaxWorkshopPage(html)
+    }
   }
 
   private async getMyWorkshopItemsWithWebApi(

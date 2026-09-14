@@ -161,6 +161,23 @@ export interface WorkshopItemSummary {
   tags?: string[]
 }
 
+export type WorkshopVisibilityFilter = 'all' | 'public' | 'friends' | 'hidden' | 'unlisted' | 'unknown'
+
+export interface WorkshopItemsPageInput {
+  appId?: string
+  page: number
+  pageSize: number
+  visibility?: WorkshopVisibilityFilter
+}
+
+export interface WorkshopItemsPage {
+  items: WorkshopItemSummary[]
+  page: number
+  pageSize: number
+  hasNext: boolean
+  totalItems?: number
+}
+
 export interface SteamProfileSummary {
   steamId64: string
   personaName?: string

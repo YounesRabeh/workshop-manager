@@ -18,7 +18,9 @@ import type {
   SteamProfileSummary,
   UploadInput,
   VisibilityUpdateInput,
-  WorkshopItemSummary
+  WorkshopItemSummary,
+  WorkshopItemsPage,
+  WorkshopItemsPageInput
 } from '@shared/contracts'
 import { IPC_CHANNELS } from '@shared/ipc'
 
@@ -44,13 +46,13 @@ export interface WorkshopApi {
   getAdvancedSettings: () => Promise<AdvancedSettings>
   getInstallLog: () => Promise<InstallLogSnapshot>
   saveAdvancedSettings: (payload: SaveAdvancedSettingsInput) => Promise<AdvancedSettings>
-  getSavedWebApiKey: () => Promise<{ webApiKey: string }>
   saveProfile: (payload: { profile: ModProfile }) => Promise<ModProfile>
   deleteProfile: (payload: { profileId: string }) => Promise<{ ok: true }>
   getRunLogs: () => Promise<PersistedRunLog[]>
   getRunLog: (runId: string) => Promise<PersistedRunLog | null>
   getCurrentProfile: () => Promise<SteamProfileSummary>
   getMyWorkshopItems: (payload: { appId?: string }) => Promise<WorkshopItemSummary[]>
+  getMyWorkshopItemsPage: (payload: WorkshopItemsPageInput) => Promise<WorkshopItemsPage>
   listContentFolderFiles: (payload: { folderPath: string }) => Promise<ContentFolderFileEntry[]>
   openPath: (payload: { path: string }) => Promise<{ ok: true; error?: string }>
   openExternal: (payload: { url: string }) => Promise<{ ok: true; error?: string }>
@@ -78,13 +80,13 @@ const api: WorkshopApi = {
   getAdvancedSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getAdvancedSettings),
   getInstallLog: () => ipcRenderer.invoke(IPC_CHANNELS.getInstallLog),
   saveAdvancedSettings: (payload) => ipcRenderer.invoke(IPC_CHANNELS.saveAdvancedSettings, payload),
-  getSavedWebApiKey: () => ipcRenderer.invoke(IPC_CHANNELS.getSavedWebApiKey),
   saveProfile: (payload) => ipcRenderer.invoke(IPC_CHANNELS.saveProfile, payload),
   deleteProfile: (payload) => ipcRenderer.invoke(IPC_CHANNELS.deleteProfile, payload),
   getRunLogs: () => ipcRenderer.invoke(IPC_CHANNELS.getRunLogs),
   getRunLog: (runId) => ipcRenderer.invoke(IPC_CHANNELS.getRunLog, { runId }),
   getCurrentProfile: () => ipcRenderer.invoke(IPC_CHANNELS.getCurrentProfile),
   getMyWorkshopItems: (payload) => ipcRenderer.invoke(IPC_CHANNELS.getMyWorkshopItems, payload),
+  getMyWorkshopItemsPage: (payload) => ipcRenderer.invoke(IPC_CHANNELS.getMyWorkshopItemsPage, payload),
   listContentFolderFiles: (payload) => ipcRenderer.invoke(IPC_CHANNELS.listContentFolderFiles, payload),
   openPath: (payload) => ipcRenderer.invoke(IPC_CHANNELS.openPath, payload),
   openExternal: (payload) => ipcRenderer.invoke(IPC_CHANNELS.openExternal, payload),

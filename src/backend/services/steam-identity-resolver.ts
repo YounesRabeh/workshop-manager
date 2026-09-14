@@ -145,7 +145,7 @@ export class SteamIdentityResolver {
     }
 
     try {
-      const response = await fetch(reference.profileXmlUrl!)
+      const response = await fetch(reference.profileXmlUrl!, { signal: AbortSignal.timeout(15_000) })
       if (!response.ok) {
         return undefined
       }

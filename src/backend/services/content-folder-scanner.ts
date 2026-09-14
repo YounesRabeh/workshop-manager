@@ -8,6 +8,9 @@ import { relative, resolve } from 'node:path'
 import type { ContentFolderFileEntry } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
 
+const MAX_SCAN_DEPTH = 64
+const MAX_SCANNED_FILES = 100_000
+
 function normalizeRelativePath(path: string): string {
   return path.replace(/\\/g, '/')
 }
@@ -38,7 +41,10 @@ export async function listContentFolderFiles(folderPath: string): Promise<Conten
 
   const files: ContentFolderFileEntry[] = []
 
-  const walk = async (currentPath: string): Promise<void> => {
+  const walk = async (currentPath: string, depth: number): Promise<void> => {
+    if (depth > MAX_SCAN_DEPTH) {
+      throw new AppError('validation', `Content folder hierarchy exceeds ${MAX_SCAN_DEPTH} levels.`)
+    }
     let entries
     try {
       entries = await readdir(currentPath, { withFileTypes: true })
@@ -53,7 +59,7 @@ export async function listContentFolderFiles(folderPath: string): Promise<Conten
       const absolutePath = resolve(currentPath, entry.name)
 
       if (entry.isDirectory()) {
-        await walk(absolutePath)
+        await walk(absolutePath, depth + 1)
         continue
       }
 
@@ -79,10 +85,13 @@ export async function listContentFolderFiles(folderPath: string): Promise<Conten
         relativePath: normalizeRelativePath(relative(rootPath, absolutePath)),
         sizeBytes: fileStats.size
       })
+      if (files.length > MAX_SCANNED_FILES) {
+        throw new AppError('validation', `Content folder contains more than ${MAX_SCANNED_FILES.toLocaleString()} files.`)
+      }
     }
   }
 
-  await walk(rootPath)
+  await walk(rootPath, 0)
   files.sort((a, b) => a.relativePath.localeCompare(b.relativePath, undefined, { sensitivity: 'base' }))
   return files
 }

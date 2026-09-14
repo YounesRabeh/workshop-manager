@@ -58,7 +58,7 @@ describe('SteamCmdInstallManager download failures', () => {
     })
   })
 
-  it('follows HTTP redirects before writing the archive to disk', async () => {
+  it('rejects redirects to an untrusted download host', async () => {
     const root = await mkdtemp(join(tmpdir(), 'steamcmd-install-'))
 
     createWriteStreamMock.mockImplementation(() => {
@@ -95,7 +95,7 @@ describe('SteamCmdInstallManager download failures', () => {
 
     await expect(manager.ensureInstalled()).rejects.toMatchObject({
       code: 'install',
-      message: expect.stringContaining('Extraction command failed')
+      message: expect.stringContaining('untrusted source')
     })
 
     expect(getMock).toHaveBeenNthCalledWith(
@@ -103,10 +103,6 @@ describe('SteamCmdInstallManager download failures', () => {
       'https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz',
       expect.any(Function)
     )
-    expect(getMock).toHaveBeenNthCalledWith(
-      2,
-      'https://cdn.example.com/steamcmd.tar.gz',
-      expect.any(Function)
-    )
+    expect(getMock).toHaveBeenCalledTimes(1)
   })
 })
