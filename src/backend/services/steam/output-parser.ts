@@ -1,4 +1,5 @@
 /**
+ * Domain: Shared Steam protocol and response parsing.
  * Overview: Provides SteamCMD output parsers and helpers used by runtime/workshop services.
  * Responsibility: Detects login/workshop outcomes, normalizes Steam API/community payloads,
  *  and builds safe argument fragments for SteamCMD commands.

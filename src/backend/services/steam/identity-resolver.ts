@@ -1,4 +1,5 @@
 /**
+ * Domain: Steam account identity resolution.
  * Overview: Resolves the authenticated Steam account identity used by profile and workshop fetches.
  * Responsibility: Validates SteamCMD-derived IDs and applies platform-specific fallback resolution when needed.
  */
@@ -8,12 +9,12 @@ import {
   isValidSteamId64,
   parseSteamId64,
   steamId64FromAccountId
-} from './steam-output-parser'
+} from './output-parser'
 import {
   getSteamCmdPlatformBehavior,
   type SteamCmdPlatformBehavior,
   type SteamCmdPlatformProfile
-} from './steamcmd-platform-profile'
+} from '../steamcmd/platform-profile'
 
 const CONNECTION_LOG_TAIL_BYTES = 128 * 1024
 

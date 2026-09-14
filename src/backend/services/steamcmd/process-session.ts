@@ -1,31 +1,32 @@
 /**
+ * Domain: SteamCMD execution.
  * Overview: Coordinates persistent and one-shot SteamCMD runs for login and workshop phases.
  * Responsibility: Keeps high-level run orchestration while delegating process lifecycle,
  * run setup, output parsing, and logging/event behavior to focused helper modules.
  */
 import { AppError, RunCancelledError } from '@backend/utils/errors'
-import { buildLoginArgs } from './steam-output-parser'
+import { buildLoginArgs } from '../steam/output-parser'
 import {
   getSteamCmdPlatformBehavior,
   type SteamCmdPlatformBehavior,
   type SteamCmdPlatformProfile
-} from './steamcmd-platform-profile'
-import { SteamCmdLogger } from './SteamCmdLogger'
-import { SteamCmdOutputProcessor } from './SteamCmdOutputProcessor'
-import { SteamCmdProcessManager } from './SteamCmdProcessManager'
-import { SteamCmdRunHandler } from './SteamCmdRunHandler'
+} from './platform-profile'
+import { SteamCmdLogger } from './logger'
+import { SteamCmdOutputProcessor } from './output-processor'
+import { SteamCmdProcessManager } from './process-manager'
+import { SteamCmdRunHandler } from './run-handler'
 import type {
   ActiveInteractiveRun,
   RunPhase,
   SessionRunOptions,
   SteamCmdProcessSessionDeps,
   SteamCmdSessionState
-} from './steamcmd-process-session-types'
+} from './process-session-types'
 
 export type {
   RunPhase,
   SessionRunOptions
-} from './steamcmd-process-session-types'
+} from './process-session-types'
 
 export class SteamCmdProcessSession {
   private readonly state: SteamCmdSessionState = {

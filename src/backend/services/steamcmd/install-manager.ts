@@ -1,4 +1,5 @@
 /**
+ * Domain: SteamCMD installation.
  * Overview: Resolves and installs the SteamCMD executable for the backend runtime.
  * Responsibility: Reports install status, supports manual executable overrides,
  *  and performs OS-aware download/extraction when SteamCMD is missing.
@@ -17,7 +18,7 @@ import { AppError } from '@backend/utils/errors'
 import {
   getSteamCmdPlatformBehavior,
   type SteamCmdPlatformProfile
-} from './steamcmd-platform-profile'
+} from './platform-profile'
 
 const DOWNLOAD_TIMEOUT_MS = 30_000
 const MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024

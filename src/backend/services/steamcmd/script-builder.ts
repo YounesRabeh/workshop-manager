@@ -1,10 +1,11 @@
 /**
+ * Domain: SteamCMD script execution.
  * Overview: Produces SteamCMD script-file content for one-shot `+runscript` execution.
  * Responsibility: Generates command scripts with safe defaults and explicit controls
  * for password prompts and failure behavior during secure execution migration.
  */
 import { AppError } from '@backend/utils/errors'
-import { escapeInteractiveArg } from './steam-output-parser'
+import { escapeInteractiveArg } from '../steam/output-parser'
 
 interface ScriptDirectiveOptions {
   shutdownOnFailedCommand?: boolean

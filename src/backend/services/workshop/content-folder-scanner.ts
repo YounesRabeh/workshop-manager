@@ -1,4 +1,5 @@
 /**
+ * Domain: Workshop content preparation.
  * Overview: Recursively scans a selected workshop content folder and returns normalized file metadata.
  * Responsibility: Validates the input directory, 
  * traverses regular files safely, and reports relative paths with byte sizes for upload/update checks.

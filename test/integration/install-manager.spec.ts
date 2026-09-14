@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { SteamCmdInstallManager } from '../../src/backend/services/steamcmd-install-manager'
+import { SteamCmdInstallManager } from '../../src/backend/services/steamcmd/install-manager'
 
 describe('SteamCmdInstallManager', () => {
   it('uses manual executable path when provided and valid', async () => {

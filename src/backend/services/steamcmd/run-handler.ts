@@ -1,12 +1,13 @@
 /**
+ * Domain: SteamCMD execution.
  * Overview: Handles SteamCMD run queuing and lifecycle setup concerns.
  * Responsibility: Prepares run context metadata, creates run timeouts/instances,
  * and dispatches interactive commands with guarded login-progress retry behavior.
  */
 import { mkdir } from 'node:fs/promises'
 import { AppError } from '@backend/utils/errors'
-import { escapeInteractiveArg } from './steam-output-parser'
-import type { SteamCmdPlatformBehavior } from './steamcmd-platform-profile'
+import { escapeInteractiveArg } from '../steam/output-parser'
+import type { SteamCmdPlatformBehavior } from './platform-profile'
 import type {
   ActiveInteractiveRun,
   ActiveRunConfig,
@@ -14,8 +15,8 @@ import type {
   RunPhase,
   SessionRunOptions,
   SteamCmdSessionState
-} from './steamcmd-process-session-types'
-import { SteamCmdLogger } from './SteamCmdLogger'
+} from './process-session-types'
+import { SteamCmdLogger } from './logger'
 
 interface SteamCmdRunHandlerDeps {
   state: SteamCmdSessionState

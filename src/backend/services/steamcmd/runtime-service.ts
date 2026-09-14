@@ -1,4 +1,5 @@
 /**
+ * Domain: SteamCMD orchestration.
  * Overview: Orchestrates authenticated SteamCMD runtime workflows for login and workshop operations.
  * Responsibility: Coordinates process sessions, login state, 
  * run events/logging, and delegates command preparation and workshop/profile fetching to specialized services.
@@ -42,25 +43,25 @@ import {
   steamId64FromAccountId,
   isSteamGuardMobileTimeout,
   stripAnsi
-} from './steam-output-parser'
-import { SteamCmdProcessSession } from './steamcmd-process-session'
+} from '../steam/output-parser'
+import { SteamCmdProcessSession } from './process-session'
 import {
   getSteamCmdPlatformBehavior,
   type SteamCmdPlatformBehavior,
   type SteamCmdPlatformProfile
-} from './steamcmd-platform-profile'
-import { WorkshopFetchService } from './workshop-fetch-service'
+} from './platform-profile'
+import { WorkshopFetchService } from '../workshop/fetch-service'
 import {
   SteamIdentityResolver
-} from './steam-identity-resolver'
-import { WorkshopCommandService } from './workshop-command-service'
-import type { WorkshopWebApiAccessState } from './workshop-fetch-service'
+} from '../steam/identity-resolver'
+import { WorkshopCommandService } from '../workshop/command-service'
+import type { WorkshopWebApiAccessState } from '../workshop/fetch-service'
 import {
   resolveSteamCmdExecutionPolicy,
   type SteamCmdExecutionPolicy
-} from './steamcmd-execution-policy'
-import { SteamCmdScriptRunner } from './steamcmd-script-runner'
-import { buildSteamCmdLoginScript, buildSteamCmdWorkshopScript } from './steamcmd-script-builder'
+} from './execution-policy'
+import { SteamCmdScriptRunner } from './script-runner'
+import { buildSteamCmdLoginScript, buildSteamCmdWorkshopScript } from './script-builder'
 
 interface LoginState {
   username: string

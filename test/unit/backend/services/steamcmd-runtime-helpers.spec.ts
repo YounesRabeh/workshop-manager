@@ -13,8 +13,8 @@ import {
   parseSteamId64,
   resolveLoginTimeoutMs,
   steamId64FromAccountId
-} from '@backend/services/steamcmd-runtime-service'
-import { isLoginSuccessLine } from '@backend/services/steam-output-parser'
+} from '@backend/services/steamcmd/runtime-service'
+import { isLoginSuccessLine } from '@backend/services/steam/output-parser'
 
 describe('steamcmd runtime helpers', () => {
   it('builds workshop upload args in expected order', () => {

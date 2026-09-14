@@ -3,10 +3,10 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '@backend/utils/errors'
-import { WorkshopCommandService } from '@backend/services/workshop-command-service'
-import { listContentFolderFiles } from '@backend/services/content-folder-scanner'
+import { WorkshopCommandService } from '@backend/services/workshop/command-service'
+import { listContentFolderFiles } from '@backend/services/workshop/content-folder-scanner'
 
-vi.mock('@backend/services/content-folder-scanner', () => ({
+vi.mock('@backend/services/workshop/content-folder-scanner', () => ({
   listContentFolderFiles: vi.fn(async () => [])
 }))
 

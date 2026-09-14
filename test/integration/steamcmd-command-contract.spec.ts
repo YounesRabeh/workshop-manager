@@ -4,13 +4,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { buildSteamCmdLoginScript, buildSteamCmdWorkshopScript } from '@backend/services/steamcmd-script-builder'
-import { SteamCmdScriptRunner } from '@backend/services/steamcmd-script-runner'
+import { buildSteamCmdLoginScript, buildSteamCmdWorkshopScript } from '@backend/services/steamcmd/script-builder'
+import { SteamCmdScriptRunner } from '@backend/services/steamcmd/script-runner'
 import {
   getSteamCmdPlatformBehavior,
   resolveSteamCmdPlatformProfile,
   type SteamCmdPlatformProfile
-} from '@backend/services/steamcmd-platform-profile'
+} from '@backend/services/steamcmd/platform-profile'
 
 interface ProbeResult {
   platform: NodeJS.Platform

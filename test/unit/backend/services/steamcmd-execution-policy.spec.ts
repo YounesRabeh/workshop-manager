@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveSteamCmdExecutionPolicy } from '@backend/services/steamcmd-execution-policy'
+import { resolveSteamCmdExecutionPolicy } from '@backend/services/steamcmd/execution-policy'
 
 describe('steamcmd execution policy', () => {
   it('defaults standalone callers to interactive mode', () => {

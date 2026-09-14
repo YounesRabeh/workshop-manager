@@ -1,4 +1,5 @@
 /**
+ * Domain: Workshop publishing.
  * Overview: Generates Steam Workshop VDF payloads from validated upload or update drafts.
  * Responsibility: Escapes and normalizes field values, 
  * enforces mode-specific validation, and emits VDF text compatible with SteamCMD.

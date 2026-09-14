@@ -1,4 +1,5 @@
 /**
+ * Domain: SteamCMD execution.
  * Overview: Resolves feature flags controlling SteamCMD execution strategy.
  * Responsibility: Parses process environment inputs into a normalized policy
  * used by runtime services during migration from interactive to script mode.

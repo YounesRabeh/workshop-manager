@@ -1,4 +1,5 @@
 /**
+ * Domain: SteamCMD execution.
  * Overview: Processes SteamCMD output streams and resolves active run state transitions.
  * Responsibility: Splits buffered chunk output into lines, detects prompts/challenges,
  * updates run result state, and emits output/guard events through shared logger utilities.
@@ -16,14 +17,14 @@ import {
   parseSteamLoginFailure,
   parseWorkshopRunFailure,
   stripAnsi
-} from './steam-output-parser'
+} from '../steam/output-parser'
 import type {
   ActiveInteractiveRun,
   OneShotBuffers,
   RunPhase,
   SteamCmdSessionState
-} from './steamcmd-process-session-types'
-import { SteamCmdLogger } from './SteamCmdLogger'
+} from './process-session-types'
+import { SteamCmdLogger } from './logger'
 
 interface SteamCmdOutputProcessorDeps {
   state: SteamCmdSessionState

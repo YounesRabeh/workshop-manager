@@ -6,7 +6,7 @@ import { PassThrough } from 'node:stream'
 import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RunLogStore } from '../../src/backend/stores/run-log-store'
-import { SteamCmdRuntimeService } from '../../src/backend/services/steamcmd-runtime-service'
+import { SteamCmdRuntimeService } from '../../src/backend/services/steamcmd/runtime-service'
 import { AppError } from '../../src/backend/utils/errors'
 
 vi.mock('node:child_process', () => {

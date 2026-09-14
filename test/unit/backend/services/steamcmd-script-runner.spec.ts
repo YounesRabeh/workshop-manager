@@ -2,7 +2,7 @@ import { access, mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from '
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { SteamCmdScriptRunner } from '@backend/services/steamcmd-script-runner'
+import { SteamCmdScriptRunner } from '@backend/services/steamcmd/script-runner'
 
 describe('SteamCmdScriptRunner', () => {
   it('creates an ephemeral script file and deletes it after execution', async () => {

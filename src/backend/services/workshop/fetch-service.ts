@@ -1,4 +1,5 @@
 /**
+ * Domain: Workshop metadata retrieval.
  * Overview: Fetches Steam profile and workshop item metadata for the authenticated user.
  * Responsibility: Loads profile details, 
  * aggregates workshop listings from Steam Web API and Community pages, and normalizes merged results.
@@ -12,14 +13,14 @@ import type {
 } from '@shared/contracts'
 import { normalizeError } from '@shared/api-error-utils'
 import { AppError } from '@backend/utils/errors'
-import { resolveWorkshopFetchPolicy, type WorkshopFetchPolicy } from './workshop-fetch-policy'
+import { resolveWorkshopFetchPolicy, type WorkshopFetchPolicy } from './fetch-policy'
 import {
   extractMaxWorkshopPage,
   extractWorkshopFileIdsFromHtml,
   extractXmlTagValue,
   mergeWorkshopItems,
   normalizeWorkshopItems
-} from './steam-output-parser'
+} from '../steam/output-parser'
 
 interface WorkshopFetchContext {
   getLoginState: () => { username: string; steamId64?: string } | null

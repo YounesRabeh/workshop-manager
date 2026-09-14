@@ -1,5 +1,5 @@
 /**
- * Overview: Provides canonical filesystem paths for backend persistence and runtime data.
+ * Overview: Provides canonical filesystem paths for backend application data.
  * Responsibility: Derives user-data rooted locations for profiles, run logs, and SteamCMD runtime artifacts.
  */
 import { app } from 'electron'

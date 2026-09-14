@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveWorkshopFetchPolicy } from '@backend/services/workshop-fetch-policy'
+import { resolveWorkshopFetchPolicy } from '@backend/services/workshop/fetch-policy'
 
 describe('Workshop fetch policy', () => {
   it('accepts explicit limits and rejects invalid request budgets', () => {

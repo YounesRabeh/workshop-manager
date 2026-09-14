@@ -3,6 +3,7 @@
  * Responsibility: Centralizes run/session state and callback contracts to keep extracted
  * process/run/output/logger modules aligned without changing external runtime service APIs.
  */
+/** Domain types for SteamCMD process sessions. */
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { RunEvent } from '@shared/contracts'
 import type { AppError } from '@backend/utils/errors'

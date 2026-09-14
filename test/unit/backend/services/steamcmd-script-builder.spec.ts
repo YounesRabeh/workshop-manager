@@ -3,7 +3,7 @@ import {
   buildSteamCmdLoginScript,
   buildSteamCmdScriptDirectives,
   buildSteamCmdWorkshopScript
-} from '@backend/services/steamcmd-script-builder'
+} from '@backend/services/steamcmd/script-builder'
 
 describe('steamcmd script builder', () => {
   it('builds secure default directives', () => {

@@ -1,11 +1,12 @@
 /**
+ * Domain: SteamCMD execution.
  * Overview: Owns SteamCMD child-process lifecycle management for interactive and one-shot runs.
  * Responsibility: Spawns processes with platform-aware options, routes lifecycle callbacks,
  * manages persistent-session invalidation, and writes interactive stdin input.
  */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import type { SteamCmdPlatformBehavior } from './steamcmd-platform-profile'
-import type { SteamCmdSessionState } from './steamcmd-process-session-types'
+import type { SteamCmdPlatformBehavior } from './platform-profile'
+import type { SteamCmdSessionState } from './process-session-types'
 
 interface SteamCmdProcessManagerDeps {
   state: SteamCmdSessionState

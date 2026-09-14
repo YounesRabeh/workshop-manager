@@ -1,4 +1,5 @@
 /**
+ * Domain: Workshop publishing.
  * Overview: Prepares SteamCMD workshop command inputs for upload, update, and visibility operations.
  * Responsibility: Validates drafts, checks update content folders,
  *  writes run-scoped VDF files, and returns executable command arguments.
@@ -10,7 +11,7 @@ import type { UploadDraft } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
 import { validateDraft } from '@backend/utils/validation'
 import { listContentFolderFiles } from './content-folder-scanner'
-import { buildWorkshopArgs } from './steam-output-parser'
+import { buildWorkshopArgs } from '../steam/output-parser'
 import { generateWorkshopVdf } from './vdf-generator'
 
 export interface PreparedWorkshopCommand {

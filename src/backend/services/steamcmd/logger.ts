@@ -1,4 +1,5 @@
 /**
+ * Domain: SteamCMD execution.
  * Overview: Centralizes run-log persistence helpers and run event emission for SteamCMD sessions.
  * Responsibility: Provides consistent metadata formatting, log writes, and event dispatch wrappers
  * used across process management, run handling, and output processing helpers.

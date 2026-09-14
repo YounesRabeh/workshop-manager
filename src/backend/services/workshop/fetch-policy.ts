@@ -1,4 +1,4 @@
-/** Bounds remote work separately from SteamCMD process timeouts and UI page size. */
+/** Domain policy that bounds Workshop remote work separately from SteamCMD and UI timeouts. */
 export interface WorkshopFetchPolicy {
   requestTimeoutMs: number
   maxCommunityPages: number

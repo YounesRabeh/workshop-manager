@@ -1,4 +1,5 @@
 /**
+ * Domain: SteamCMD script execution.
  * Overview: Manages ephemeral SteamCMD script files used with `+runscript`.
  * Responsibility: Creates secure temp scripts, executes caller-provided work
  * against the script path, and guarantees deterministic cleanup.
@@ -82,4 +83,3 @@ class SteamCmdScriptRunner {
 export {
   SteamCmdScriptRunner
 }
-

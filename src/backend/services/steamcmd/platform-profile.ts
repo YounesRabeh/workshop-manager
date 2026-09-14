@@ -1,4 +1,5 @@
 /**
+ * Domain: SteamCMD platform configuration.
  * Overview: Centralizes the supported SteamCMD platform layouts and runtime behaviors.
  * Responsibility: Maps the host runtime to a SteamCMD profile and exposes
  *  the install/runtime rules each profile needs.
