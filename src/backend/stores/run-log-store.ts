@@ -22,6 +22,8 @@ export class RunLogStore {
   private runs = new Map<string, PersistedRunLog>()
   private pendingLines: string[] = []
   private flushTimer: ReturnType<typeof setTimeout> | null = null
+  private backgroundFlush: Promise<void> | null = null
+  private backgroundFlushError: unknown = null
 
   constructor(private readonly logsDir: string) {}
 
@@ -36,6 +38,7 @@ export class RunLogStore {
   }
 
   async create(runId: string): Promise<PersistedRunLog> {
+    await this.waitForBackgroundFlush()
     const log: PersistedRunLog = {
       runId,
       success: false,
@@ -77,7 +80,7 @@ export class RunLogStore {
     this.pendingLines.push(line)
 
     if (this.pendingLines.length >= FLUSH_BATCH_SIZE) {
-      void this.flushPendingLines()
+      this.startBackgroundFlush()
       return
     }
 
@@ -89,6 +92,7 @@ export class RunLogStore {
       clearTimeout(this.flushTimer)
       this.flushTimer = null
     }
+    await this.waitForBackgroundFlush()
     await this.flushPendingLines()
 
     for (const current of this.runs.values()) {
@@ -107,6 +111,7 @@ export class RunLogStore {
       clearTimeout(this.flushTimer)
       this.flushTimer = null
     }
+    await this.waitForBackgroundFlush()
     await this.flushPendingLines()
 
     let merged!: PersistedRunLog
@@ -150,8 +155,30 @@ export class RunLogStore {
     }
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null
-      void this.flushPendingLines()
+      this.startBackgroundFlush()
     }, FLUSH_INTERVAL_MS)
+  }
+
+  private startBackgroundFlush(): void {
+    if (this.backgroundFlush) {
+      return
+    }
+    this.backgroundFlush = this.flushPendingLines()
+      .catch((error: unknown) => {
+        this.backgroundFlushError ??= error
+      })
+      .finally(() => {
+        this.backgroundFlush = null
+      })
+  }
+
+  private async waitForBackgroundFlush(): Promise<void> {
+    await this.backgroundFlush
+    if (this.backgroundFlushError) {
+      const error = this.backgroundFlushError
+      this.backgroundFlushError = null
+      throw error
+    }
   }
 
   private async flushPendingLines(): Promise<void> {
@@ -162,8 +189,13 @@ export class RunLogStore {
     const lines = this.pendingLines
     this.pendingLines = []
     const content = `${lines.join('\n')}\n`
-    await this.withWriteLock(async () => {
-      await appendFile(this.getSessionLogPath(), content, 'utf8')
-    })
+    try {
+      await this.withWriteLock(async () => {
+        await appendFile(this.getSessionLogPath(), content, 'utf8')
+      })
+    } catch (error) {
+      this.pendingLines = [...lines, ...this.pendingLines]
+      throw error
+    }
   }
 }

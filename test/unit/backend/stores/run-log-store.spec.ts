@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -70,5 +70,22 @@ describe('RunLogStore batching', () => {
     expect(persistedLines).toHaveLength(totalLines)
     expect(persistedLines[0]).toBe('burst-0')
     expect(persistedLines[persistedLines.length - 1]).toBe(`burst-${totalLines - 1}`)
+  })
+
+  it('reports background flush failures through finalize without an unhandled rejection', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'run-log-store-failure-'))
+    const logsDir = join(root, 'logs')
+    const store = new RunLogStore(logsDir)
+    await store.create('run-failure')
+    await rm(logsDir, { recursive: true })
+    await writeFile(logsDir, 'not a directory', 'utf8')
+
+    for (let index = 0; index < 24; index += 1) {
+      await store.appendLine('run-failure', `line-${index}`)
+    }
+
+    await expect(
+      store.finalize('run-failure', { success: false, status: 'failed' })
+    ).rejects.toMatchObject({ code: 'ENOTDIR' })
   })
 })

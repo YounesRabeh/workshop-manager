@@ -60,6 +60,43 @@ describe('profile and run-log persistence', () => {
     expect(JSON.parse(await readFile(dbPath, 'utf8'))).toEqual({ profiles: [] })
   })
 
+  it('backs up profile data with invalid nested field types', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'profile-store-invalid-types-'))
+    const dbPath = join(root, 'profiles.json')
+    const store = new ProfileStore(dbPath)
+    const invalidDb = JSON.stringify({
+      profiles: [],
+      rememberedUsername: 123,
+      steamCmdManualPath: { path: '/tools/steamcmd' }
+    })
+
+    await writeFile(dbPath, invalidDb, 'utf8')
+
+    expect(await store.getProfiles()).toEqual([])
+    expect(await store.getRememberedUsername()).toBeUndefined()
+    expect(await store.getSteamCmdManualPath()).toBeUndefined()
+    const entries = await readdir(root)
+    const backupName = entries.find((entry) => /^profiles\.corrupt\.\d+\.json$/.test(entry))
+    expect(backupName).toBeDefined()
+    expect(await readFile(join(root, backupName!), 'utf8')).toBe(invalidDb)
+  })
+
+  it('rejects invalid profiles before writing them', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'profile-store-invalid-write-'))
+    const dbPath = join(root, 'profiles.json')
+    const store = new ProfileStore(dbPath)
+
+    await expect(
+      store.saveProfile({
+        id: 'invalid',
+        appId: 480,
+        contentFolder: '/mods',
+        title: 'Invalid profile'
+      } as unknown as Parameters<ProfileStore['saveProfile']>[0])
+    ).rejects.toMatchObject({ code: 'validation' })
+    await expect(readFile(dbPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('defaults preferred auth mode to otp when not yet stored', async () => {
     const root = await mkdtemp(join(tmpdir(), 'profile-store-default-auth-mode-'))
     const store = new ProfileStore(join(root, 'profiles.json'))

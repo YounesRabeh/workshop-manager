@@ -151,6 +151,29 @@ describe('WorkshopFetchService', () => {
     ).toBe(true)
   })
 
+  it('caps community pagination and attaches a timeout signal to requests', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      if (url.includes('/myworkshopfiles/')) {
+        const page = new URL(url).searchParams.get('p')
+        const pagination = page === '1' ? '<a href="?p=999999">Last</a>' : ''
+        return new Response(`<html>${pagination}</html>`, { status: 200 })
+      }
+      throw new Error(`Unexpected fetch url: ${url}`)
+    })
+
+    const service = new WorkshopFetchService({
+      getLoginState: () => ({
+        username: 'Alice',
+        steamId64: '76561198000000000'
+      })
+    })
+
+    await expect(service.getMyWorkshopItems(undefined, undefined, { allowWebApi: false })).resolves.toEqual([])
+    expect(fetchSpy).toHaveBeenCalledTimes(50)
+    expect(fetchSpy.mock.calls.every(([, init]) => init?.signal instanceof AbortSignal)).toBe(true)
+  })
+
   it('uses appid=0 for web api lookup when app filter is not provided', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url

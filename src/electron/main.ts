@@ -4,8 +4,7 @@
  * configures platform-specific behavior, and handles renderer requests for SteamCMD workflows and filesystem actions.
  */
 import { app, BrowserWindow, dialog, Menu, shell } from 'electron'
-import { extname } from 'node:path'
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { IPC_CHANNELS } from '@shared/ipc'
 import type {
   AdvancedSettings,
@@ -29,6 +28,7 @@ import { listContentFolderFiles } from '@backend/services/content-folder-scanner
 import { createMainWindow } from './main-window'
 import { decryptSecret, encryptSecret, isSecureStorageAvailable } from './secret-store'
 import { handleIpc } from './ipc-helpers'
+import { isSafeExternalUrl, LocalImagePreviewAccess } from './ipc-security'
 import { configureStableUserDataPath, migrateLegacyUserData } from './user-data-migration'
 
 let mainWindow: BrowserWindow | null = null
@@ -49,15 +49,6 @@ if (process.platform === 'linux') {
 }
 
 const stableUserDataPath = configureStableUserDataPath()
-
-function toImageMimeType(path: string): string {
-  const ext = extname(path).toLowerCase()
-  if (ext === '.png') return 'image/png'
-  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
-  if (ext === '.webp') return 'image/webp'
-  if (ext === '.gif') return 'image/gif'
-  return 'application/octet-stream'
-}
 
 async function showOpenDialog(
   dialogOptions: Electron.OpenDialogOptions
@@ -93,6 +84,9 @@ app.whenReady().then(async () => {
   const steamCmdPlatformProfile = resolveSteamCmdPlatformProfile()
 
   const profileStore = new ProfileStore(paths.profilesPath)
+  const localImagePreviewAccess = new LocalImagePreviewAccess()
+  const persistedProfiles = await profileStore.getProfiles()
+  await Promise.all(persistedProfiles.map((profile) => localImagePreviewAccess.approve(profile.previewFile)))
   const runLogStore = new RunLogStore(paths.runLogsDir)
   const installManager = new SteamCmdInstallManager(paths.dataDir, steamCmdPlatformProfile)
   installManager.setManualExecutablePath(await profileStore.getSteamCmdManualPath())
@@ -426,26 +420,15 @@ app.whenReady().then(async () => {
 
   handleIpc(IPC_CHANNELS.openExternal, async (payload: { url: string }) => {
     const targetUrl = payload.url?.trim()
-    if (!targetUrl) {
-      throw new AppError('validation', 'URL is required')
+    if (!targetUrl || !isSafeExternalUrl(targetUrl)) {
+      throw new AppError('validation', 'Only HTTP and HTTPS URLs can be opened')
     }
     await shell.openExternal(targetUrl)
     return { ok: true }
   })
 
   handleIpc(IPC_CHANNELS.getLocalImagePreview, async (payload: { path: string }) => {
-    const targetPath = payload.path?.trim()
-    if (!targetPath) {
-      return undefined
-    }
-
-    try {
-      const bytes = await readFile(targetPath)
-      const mime = toImageMimeType(targetPath)
-      return `data:${mime};base64,${bytes.toString('base64')}`
-    } catch {
-      return undefined
-    }
+    return await localImagePreviewAccess.load(payload.path)
   })
 
   handleIpc(IPC_CHANNELS.pickFolder, async () => {
@@ -458,7 +441,9 @@ app.whenReady().then(async () => {
       properties: ['openFile'],
       filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
     })
-    return result.filePaths[0]
+    const selectedPath = result.filePaths[0]
+    await localImagePreviewAccess.approve(selectedPath)
+    return selectedPath
   })
 
   handleIpc(IPC_CHANNELS.pickSteamCmdExecutable, async () => {

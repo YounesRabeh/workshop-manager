@@ -21,6 +21,16 @@ interface WorkshopFetchContext {
 
 export type WorkshopWebApiAccessState = 'active' | 'configured_unavailable' | 'disabled'
 
+const WORKSHOP_FETCH_TIMEOUT_MS = 15_000
+const MAX_COMMUNITY_PAGES = 50
+
+function fetchSteam(input: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(input, {
+    ...init,
+    signal: AbortSignal.timeout(WORKSHOP_FETCH_TIMEOUT_MS)
+  })
+}
+
 function errorMessage(error: unknown): string {
   return normalizeError(error).message
 }
@@ -106,7 +116,7 @@ export class WorkshopFetchService {
         detailsParams.set(`publishedfileids[${index}]`, id)
       }
 
-      const detailsResponse = await fetch(
+      const detailsResponse = await fetchSteam(
         'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/',
         {
           method: 'POST',
@@ -154,7 +164,7 @@ export class WorkshopFetchService {
     }
 
     try {
-      const response = await fetch(`${profileUrl}/?xml=1`)
+      const response = await fetchSteam(`${profileUrl}/?xml=1`)
       if (!response.ok) {
         return fallback
       }
@@ -297,7 +307,7 @@ export class WorkshopFetchService {
           params.set('privacy', mode.value)
         }
 
-        const response = await fetch(
+        const response = await fetchSteam(
           `https://api.steampowered.com/IPublishedFileService/GetUserFiles/v1/?${params.toString()}`
         )
         this.appendDiagnosticLog(
@@ -363,7 +373,7 @@ export class WorkshopFetchService {
       params.set('appid', appId)
     }
 
-    const firstPage = await fetch(
+    const firstPage = await fetchSteam(
       `https://steamcommunity.com/profiles/${steamId64}/myworkshopfiles/?${params.toString()}`
     )
     if (!firstPage.ok) {
@@ -376,14 +386,14 @@ export class WorkshopFetchService {
     const firstHtml = await firstPage.text()
     const allIds = extractWorkshopFileIdsFromHtml(firstHtml)
     const seenIds = new Set(allIds)
-    const maxPage = extractMaxWorkshopPage(firstHtml)
+    const maxPage = Math.min(extractMaxWorkshopPage(firstHtml), MAX_COMMUNITY_PAGES)
     this.appendDiagnosticLog(
       `community request appId=${appId ?? 'all'} page=1 status=${firstPage.status} ids=${allIds.length} maxPage=${maxPage}`
     )
 
     for (let page = 2; page <= maxPage; page += 1) {
       params.set('p', String(page))
-      const response = await fetch(
+      const response = await fetchSteam(
         `https://steamcommunity.com/profiles/${steamId64}/myworkshopfiles/?${params.toString()}`
       )
       if (!response.ok) {

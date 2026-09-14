@@ -28,6 +28,7 @@ import { dirname, join, parse } from 'node:path'
 import type { ModProfile, PreferredAuthMode } from '@shared/contracts'
 import type { SteamCmdTimeoutSettings } from '@shared/runtime-settings'
 import { normalizeSteamCmdTimeoutSettings } from '@shared/runtime-settings'
+import { AppError } from '@backend/utils/errors'
 
 /**
  * Version-tolerant shape of the on-disk JSON document.
@@ -80,23 +81,54 @@ function normalizeDb(parsed: unknown): ProfileDb {
     throw new CorruptProfileDbError('Profile database root must be an object.')
   }
 
-  const record = parsed as Partial<ProfileDb>
-  if (!Array.isArray(record.profiles)) {
+  const record = parsed as Record<string, unknown>
+  if (!Array.isArray(record.profiles) || !record.profiles.every(isModProfile)) {
     throw new CorruptProfileDbError('Profile database is missing a valid profiles array.')
   }
 
+  assertOptionalType(record, 'rememberedUsername', 'string')
+  assertOptionalType(record, 'rememberAuth', 'boolean')
+  assertOptionalType(record, 'webApiEnabled', 'boolean')
+  assertOptionalType(record, 'webApiKeyEncrypted', 'string')
+  assertOptionalType(record, 'steamCmdManualPath', 'string')
+  assertOptionalType(record, 'loginTimeoutMs', 'number')
+  assertOptionalType(record, 'storedSessionTimeoutMs', 'number')
+  assertOptionalType(record, 'workshopTimeoutMs', 'number')
+
   return {
     profiles: record.profiles,
-    rememberedUsername: record.rememberedUsername,
-    rememberAuth: record.rememberAuth,
+    rememberedUsername: record.rememberedUsername as string | undefined,
+    rememberAuth: record.rememberAuth as boolean | undefined,
     preferredAuthMode: normalizePreferredAuthMode(record.preferredAuthMode),
-    webApiEnabled: record.webApiEnabled,
-    webApiKeyEncrypted: record.webApiKeyEncrypted,
-    steamCmdManualPath: record.steamCmdManualPath,
-    loginTimeoutMs: record.loginTimeoutMs,
-    storedSessionTimeoutMs: record.storedSessionTimeoutMs,
-    workshopTimeoutMs: record.workshopTimeoutMs
+    webApiEnabled: record.webApiEnabled as boolean | undefined,
+    webApiKeyEncrypted: record.webApiKeyEncrypted as string | undefined,
+    steamCmdManualPath: record.steamCmdManualPath as string | undefined,
+    loginTimeoutMs: record.loginTimeoutMs as number | undefined,
+    storedSessionTimeoutMs: record.storedSessionTimeoutMs as number | undefined,
+    workshopTimeoutMs: record.workshopTimeoutMs as number | undefined
   }
+}
+
+function assertOptionalType(record: Record<string, unknown>, field: string, expectedType: 'string' | 'boolean' | 'number'): void {
+  const value = record[field]
+  if (value !== undefined && (typeof value !== expectedType || (expectedType === 'number' && !Number.isFinite(value)))) {
+    throw new CorruptProfileDbError(`Profile database field "${field}" must be a ${expectedType}.`)
+  }
+}
+
+function isModProfile(value: unknown): value is ModProfile {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+  const profile = value as Record<string, unknown>
+  return (
+    typeof profile.id === 'string' &&
+    typeof profile.appId === 'string' &&
+    typeof profile.contentFolder === 'string' &&
+    typeof profile.title === 'string' &&
+    (profile.publishedFileId === undefined || typeof profile.publishedFileId === 'string') &&
+    (profile.previewFile === undefined || typeof profile.previewFile === 'string')
+  )
 }
 
 function normalizePreferredAuthMode(value: unknown): PreferredAuthMode | undefined {
@@ -190,10 +222,13 @@ export class ProfileStore {
   /**
    * Inserts a new profile or replaces the existing profile with the same ID.
    *
-   * The provided object is persisted as-is; validation is expected to happen at
-   * the IPC or form boundary before the store is called.
+   * The provided object is schema-checked here as a final defense before it is
+   * persisted, even when an upstream form or IPC boundary already validated it.
    */
   async saveProfile(profile: ModProfile): Promise<ModProfile> {
+    if (!isModProfile(profile)) {
+      throw new AppError('validation', 'Profile contains invalid or missing fields.')
+    }
     return await this.updateDb(async (db) => {
       const existingIndex = db.profiles.findIndex((item) => item.id === profile.id)
 
