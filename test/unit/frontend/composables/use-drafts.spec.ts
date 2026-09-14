@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContentTree, mergeContentFiles } from '@frontend/composables/useDrafts'
+import { buildContentTree, mergeContentFiles, useDrafts } from '@frontend/composables/useDrafts'
 
 describe('useDrafts composable', () => {
   it('deduplicates merged content files by absolute path', () => {
@@ -43,5 +43,23 @@ describe('useDrafts composable', () => {
 
     expect(merged).toHaveLength(2)
     expect(merged.map((file) => file.relativePath).sort()).toEqual(['Foo.txt', 'foo.txt'])
+  })
+
+  it('toggles files between included and ignored without removing them', () => {
+    const drafts = useDrafts()
+    drafts.setStagedFilesForMode('create', [
+      { absolutePath: '/mods/a.txt', relativePath: 'a.txt', sizeBytes: 5 },
+      { absolutePath: '/mods/b.txt', relativePath: 'b.txt', sizeBytes: 8 }
+    ])
+
+    drafts.toggleStagedFileForMode('create', 'a.txt')
+    expect(drafts.createStagedContentFiles.value).toHaveLength(2)
+    expect(drafts.createStagedContentFiles.value[0]?.excluded).toBe(true)
+    expect(drafts.createTotalStagedContentSizeBytes.value).toBe(8)
+    expect(drafts.createStagedContentTree.value.find((node) => node.name === 'a.txt')?.excluded).toBe(true)
+
+    drafts.toggleStagedFileForMode('create', 'a.txt')
+    expect(drafts.createStagedContentFiles.value[0]?.excluded).toBe(false)
+    expect(drafts.createTotalStagedContentSizeBytes.value).toBe(13)
   })
 })

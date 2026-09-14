@@ -11,6 +11,14 @@ import {
 import { AppError } from './errors'
 
 export function validateDraft(draft: UploadDraft, mode: 'upload' | 'update' | 'visibility'): void {
+  const excludedContentPaths = draft.excludedContentPaths as unknown
+  if (
+    excludedContentPaths !== undefined &&
+    (!Array.isArray(excludedContentPaths) || excludedContentPaths.some((path) => typeof path !== 'string'))
+  ) {
+    throw new AppError('validation', 'excludedContentPaths must be an array of relative file paths')
+  }
+
   if (draft.visibility !== undefined && ![0, 1, 2, 3].includes(draft.visibility)) {
     throw new AppError('validation', 'visibility must be one of: 0, 1, 2, 3')
   }

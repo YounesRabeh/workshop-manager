@@ -4,11 +4,12 @@
   (collapse/expand/reset/select-folder) for publish flows.
 -->
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { FlattenedContentNode } from '../composables/useContentExplorer'
 import type { StagedContentFile } from '../../../types/ui'
 import { formatSizeLabel } from '../../../utils/size-format'
 
-defineProps<{
+const props = defineProps<{
   stagedContentFiles: StagedContentFile[]
   flattenedContentNodes: FlattenedContentNode[]
   hasContentFolder: boolean
@@ -19,12 +20,15 @@ defineProps<{
   isFolderCollapsed: (folderId: string) => boolean
 }>()
 
+const includedFileCount = computed(() => props.stagedContentFiles.filter((file) => !file.excluded).length)
+
 const emit = defineEmits<{
   (e: 'pick-workspace-root'): void
   (e: 'clear-workspace'): void
   (e: 'toggle-all-folders'): void
   (e: 'toggle-content-explorer'): void
   (e: 'toggle-folder', folderId: string): void
+  (e: 'toggle-file', relativePath: string): void
 }>()
 </script>
 
@@ -66,7 +70,7 @@ const emit = defineEmits<{
       >
         <span class="text-base font-semibold text-slate-100">Content Explorer</span>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-slate-300">{{ stagedContentFiles.length }} item(s) • {{ totalContentSizeLabel }}</span>
+          <span class="text-sm text-slate-300">{{ includedFileCount }} of {{ stagedContentFiles.length }} included • {{ totalContentSizeLabel }}</span>
           <button
             type="button"
             class="inline-flex w-[92px] items-center justify-center gap-1 rounded border border-[#4d7ca0] bg-[#2c4d67] px-2 py-0.5 text-xs font-semibold text-slate-100"
@@ -106,6 +110,7 @@ const emit = defineEmits<{
             v-for="{ node, depth } in flattenedContentNodes"
             :key="node.id"
             class="group min-w-0 flex items-center justify-between gap-3 rounded-lg border border-[#355874] bg-[linear-gradient(120deg,#122638,#152d41)] px-3 py-2 transition-colors hover:border-[#5d88ab] hover:bg-[linear-gradient(120deg,#16314a,#1a3850)]"
+            :class="node.type === 'file' && node.excluded ? 'opacity-55' : ''"
             :style="{ paddingLeft: `${0.75 + depth * 0.85}rem` }"
           >
             <button
@@ -138,12 +143,37 @@ const emit = defineEmits<{
                 <path d="M8 3h6l5 5v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
                 <path d="M14 3v6h6" />
               </svg>
-              <p class="min-w-0 truncate text-[14px] font-semibold text-slate-100" :title="node.name">{{ node.name }}</p>
+              <p
+                class="min-w-0 truncate text-[14px] font-semibold text-slate-100"
+                :class="node.excluded ? 'line-through' : ''"
+                :title="node.name"
+              >
+                {{ node.name }}
+              </p>
             </div>
             <div class="flex items-center gap-2">
+              <span v-if="node.type === 'file' && node.excluded" class="text-[11px] font-semibold text-amber-300">Ignored</span>
               <span class="shrink-0 rounded-md border border-[#466887] bg-[#102335] px-2.5 py-0.5 text-xs font-medium text-slate-100">
                 {{ formatSizeLabel(node.sizeBytes) }}
               </span>
+              <button
+                v-if="node.type === 'file'"
+                type="button"
+                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border transition-colors"
+                :class="node.excluded
+                  ? 'border-emerald-500/70 bg-emerald-950/60 text-emerald-200 hover:bg-emerald-900/70'
+                  : 'border-rose-500/70 bg-rose-950/60 text-rose-200 hover:bg-rose-900/70'"
+                :aria-label="node.excluded ? `Include ${node.name}` : `Ignore ${node.name}`"
+                :title="node.excluded ? 'Include in upload' : 'Ignore for this upload'"
+                @click="emit('toggle-file', node.relativePath)"
+              >
+                <svg v-if="node.excluded" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                <svg v-else class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="m6 6 12 12M18 6 6 18" />
+                </svg>
+              </button>
             </div>
           </li>
         </ul>

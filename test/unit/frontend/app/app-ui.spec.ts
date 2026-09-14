@@ -1911,6 +1911,17 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).toContain('24 B')
     expect(wrapper.text()).not.toContain('Drag and drop files to add mod content')
     expect(wrapper.text()).not.toContain('data/config.json')
+
+    const ignoreReadmeButton = wrapper.find('button[aria-label="Ignore readme.txt"]')
+    expect(ignoreReadmeButton.exists()).toBe(true)
+    await ignoreReadmeButton.trigger('click')
+    expect(wrapper.text()).toContain('1 of 2 included • 18 B')
+    expect(wrapper.text()).toContain('Ignored')
+
+    const includeReadmeButton = wrapper.find('button[aria-label="Include readme.txt"]')
+    expect(includeReadmeButton.exists()).toBe(true)
+    await includeReadmeButton.trigger('click')
+    expect(wrapper.text()).toContain('2 of 2 included • 24 B')
   })
 
   it('clears content folder and staged files from mod content panel', async () => {

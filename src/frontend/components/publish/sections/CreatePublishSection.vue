@@ -36,6 +36,7 @@ const emit = defineEmits<{
   (e: 'update-title', value: string): void
   (e: 'update-release-notes', value: string): void
   (e: 'change-visibility-selection', value: 0 | 1 | 2 | 3): void
+  (e: 'toggle-content-file', relativePath: string): void
 }>()
 
 function onVisibilitySelectChange(event: Event): void {
@@ -197,6 +198,7 @@ function submitPrimaryAction(): void {
       @toggle-all-folders="toggleAllFolders"
       @toggle-content-explorer="toggleContentExplorerCollapsed"
       @toggle-folder="toggleFolder"
+      @toggle-file="emit('toggle-content-file', $event)"
     />
   </section>
 </template>

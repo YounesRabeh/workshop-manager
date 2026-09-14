@@ -10,7 +10,7 @@ import {
   visibilityLabel,
   type PublishVisibility
 } from '../components/publish/model/visibility'
-import type { UploadDraftState } from '../types/ui'
+import type { StagedContentFile, UploadDraftState } from '../types/ui'
 
 interface ToastInput {
   tone: 'success' | 'error' | 'warning' | 'info'
@@ -34,6 +34,8 @@ interface UsePublishActionsOptions {
   workshopFilterAppId: Ref<string>
   createDraft: UploadDraftState
   updateDraft: UploadDraftState
+  createStagedContentFiles: Ref<StagedContentFile[]>
+  updateStagedContentFiles: Ref<StagedContentFile[]>
   createRequirements: ComputedRef<RequirementsResult>
   updateRequirements: ComputedRef<RequirementsResult>
   hasPendingUpdateChanges: () => boolean
@@ -66,9 +68,13 @@ function actionFailureStatus(operation: 'upload' | 'update' | 'visibility'): str
 function buildUploadDraft(
   source: UploadDraftState,
   mode: 'update' | 'create',
-  visibility?: 0 | 1 | 2 | 3
+  visibility?: 0 | 1 | 2 | 3,
+  stagedContentFiles: StagedContentFile[] = []
 ): UploadDraft {
   const normalizedReleaseNote = source.releaseNotes.replace(/\r\n/g, '\n').trim()
+  const excludedContentPaths = stagedContentFiles
+    .filter((file) => file.excluded)
+    .map((file) => file.relativePath)
 
   return {
     appId: source.appId,
@@ -77,7 +83,8 @@ function buildUploadDraft(
     previewFile: source.previewFile,
     title: source.title,
     changenote: normalizedReleaseNote.length > 0 ? normalizedReleaseNote : undefined,
-    visibility
+    visibility,
+    ...(excludedContentPaths.length > 0 ? { excludedContentPaths } : {})
   }
 }
 
@@ -128,7 +135,10 @@ export function usePublishActions(options: UsePublishActionsOptions) {
   }
 
   function canCreate(): boolean {
-    return options.loginState.value === 'signed_in' && options.createRequirements.value.valid
+    const hasIncludedContent =
+      options.createStagedContentFiles.value.length === 0 ||
+      options.createStagedContentFiles.value.some((file) => !file.excluded)
+    return options.loginState.value === 'signed_in' && options.createRequirements.value.valid && hasIncludedContent
   }
 
   function resolveCreateBlockedMessage(): string {
@@ -141,6 +151,12 @@ export function usePublishActions(options: UsePublishActionsOptions) {
       !options.createRequirements.value.title
     ) {
       return 'Create blocked: app ID, content folder, and title are required.'
+    }
+    if (
+      options.createStagedContentFiles.value.length > 0 &&
+      !options.createStagedContentFiles.value.some((file) => !file.excluded)
+    ) {
+      return 'Create blocked: include at least one content file.'
     }
     return 'Create blocked: requirements not met.'
   }
@@ -195,7 +211,12 @@ export function usePublishActions(options: UsePublishActionsOptions) {
 
     try {
       const result = await window.workshop.uploadMod({
-        draft: buildUploadDraft(options.createDraft, 'create', createVisibility.value)
+        draft: buildUploadDraft(
+          options.createDraft,
+          'create',
+          createVisibility.value,
+          options.createStagedContentFiles.value
+        )
       })
 
       options.setStatusMessage('Upload completed successfully.')
@@ -248,7 +269,12 @@ export function usePublishActions(options: UsePublishActionsOptions) {
 
     try {
       const result = await window.workshop.updateMod({
-        draft: buildUploadDraft(options.updateDraft, 'update', pendingVisibility.value)
+        draft: buildUploadDraft(
+          options.updateDraft,
+          'update',
+          pendingVisibility.value,
+          options.updateStagedContentFiles.value
+        )
       })
 
       committedVisibility.value = pendingVisibility.value

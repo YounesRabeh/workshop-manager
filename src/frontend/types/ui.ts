@@ -58,6 +58,7 @@ export interface StagedContentFile {
   absolutePath: string
   relativePath: string
   sizeBytes: number
+  excluded?: boolean
 }
 
 export interface ContentTreeNode {
@@ -68,6 +69,7 @@ export interface ContentTreeNode {
   sizeBytes: number
   fileCount: number
   absolutePath?: string
+  excluded?: boolean
   children?: ContentTreeNode[]
 }
 

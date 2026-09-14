@@ -105,4 +105,18 @@ describe('validateDraft', () => {
       )
     ).toThrowError(/appId is required for visibility updates/i)
   })
+
+  it('rejects malformed excluded content paths from IPC payloads', () => {
+    expect(() =>
+      validateDraft(
+        {
+          appId: '480',
+          contentFolder: '/mods/content',
+          title: 'Created Title',
+          excludedContentPaths: 'secret.txt' as unknown as string[]
+        },
+        'upload'
+      )
+    ).toThrowError(/excludedContentPaths must be an array/i)
+  })
 })

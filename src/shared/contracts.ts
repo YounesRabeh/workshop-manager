@@ -31,6 +31,7 @@ export interface UploadDraft {
   title: string
   changenote?: string
   visibility?: 0 | 1 | 2 | 3
+  excludedContentPaths?: string[]
   validationErrors?: string[]
 }
 

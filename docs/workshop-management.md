@@ -43,6 +43,8 @@ The renderer requests directory selection through Electron’s native dialog, th
 
 On Windows, a native folder picker may not display files while navigating. The in-app Content Explorer displays them after the folder is selected.
 
+Files in the Content Explorer can be toggled off for an individual upload or update. Ignored files stay visible and can be restored with the same control. The backend copies only included files into a run-scoped temporary staging folder, so the original content directory is never modified.
+
 ## Loading published items
 
 After Steam ID resolution, item discovery can use two sources in parallel:

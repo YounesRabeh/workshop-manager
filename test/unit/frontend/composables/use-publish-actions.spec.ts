@@ -3,6 +3,7 @@
 import { computed, reactive, ref } from 'vue'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { usePublishActions } from '@frontend/composables/usePublishActions'
+import type { StagedContentFile } from '@frontend/types/ui'
 
 describe('usePublishActions composable', () => {
   const workshop = {
@@ -43,6 +44,12 @@ describe('usePublishActions composable', () => {
       title: 'Update Item',
       releaseNotes: ''
     })
+    const createStagedContentFiles = ref<StagedContentFile[]>([
+      { absolutePath: '/mods/file.txt', relativePath: 'file.txt', sizeBytes: 10 }
+    ])
+    const updateStagedContentFiles = ref<StagedContentFile[]>([
+      { absolutePath: '/mods/file.txt', relativePath: 'file.txt', sizeBytes: 10 }
+    ])
     const createRequirements = computed(() => ({ valid: true, appId: true, contentFolder: true, title: true }))
     const updateRequirements = computed(() => ({ valid: true, appId: true, publishedFileId: true, title: true }))
     const updateDraftCache = ref<Record<string, typeof updateDraft>>({})
@@ -57,6 +64,8 @@ describe('usePublishActions composable', () => {
       workshopFilterAppId,
       createDraft,
       updateDraft,
+      createStagedContentFiles,
+      updateStagedContentFiles,
       createRequirements,
       updateRequirements,
       hasPendingUpdateChanges: () => options?.hasPendingUpdateChanges ?? true,
@@ -72,7 +81,16 @@ describe('usePublishActions composable', () => {
       }
     })
 
-    return { loginState, selectedWorkshopItemId, statuses, toasts, publish, workshopItems }
+    return {
+      loginState,
+      selectedWorkshopItemId,
+      statuses,
+      toasts,
+      publish,
+      workshopItems,
+      createStagedContentFiles,
+      updateStagedContentFiles
+    }
   }
 
   it('blocks create confirm when signed out', () => {
@@ -132,6 +150,33 @@ describe('usePublishActions composable', () => {
     })
     expect(harness.publish.isCreateConfirmOpen.value).toBe(false)
     expect(harness.toasts.at(-1)?.title).toBe('Upload Completed')
+  })
+
+  it('sends ignored relative paths and allows them to be restored', async () => {
+    const harness = createHarness()
+    harness.createStagedContentFiles.value[0]!.excluded = true
+
+    harness.publish.openCreateConfirmation()
+    expect(harness.publish.isCreateConfirmOpen.value).toBe(false)
+    expect(harness.statuses.at(-1)).toContain('include at least one content file')
+
+    harness.createStagedContentFiles.value.push({
+      absolutePath: '/mods/keep.txt',
+      relativePath: 'keep.txt',
+      sizeBytes: 4
+    })
+    harness.publish.openCreateConfirmation()
+    await harness.publish.confirmCreateItem()
+
+    expect(workshop.uploadMod).toHaveBeenCalledWith({
+      draft: expect.objectContaining({ excludedContentPaths: ['file.txt'] })
+    })
+
+    harness.createStagedContentFiles.value[0]!.excluded = false
+    harness.publish.openCreateConfirmation()
+    await harness.publish.confirmCreateItem()
+    const lastCall = workshop.uploadMod.mock.calls.at(-1) as unknown as [{ draft: Record<string, unknown> }]
+    expect(lastCall[0].draft).not.toHaveProperty('excludedContentPaths')
   })
 
   it('shows success popup after confirming an update', async () => {

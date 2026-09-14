@@ -64,7 +64,8 @@ export function toStagedContentFile(entry: ContentFolderFileEntry): StagedConten
   return {
     absolutePath: entry.absolutePath,
     relativePath: normalizeRelativePath(entry.relativePath),
-    sizeBytes: entry.sizeBytes
+    sizeBytes: entry.sizeBytes,
+    excluded: false
   }
 }
 
@@ -82,6 +83,7 @@ export function buildContentTree(files: StagedContentFile[]): ContentTreeNode[] 
     absolutePath: string
     sizeBytes: number
     fileCount: number
+    excluded: boolean
   }
 
   interface MutableFolderNode {
@@ -123,7 +125,8 @@ export function buildContentTree(files: StagedContentFile[]): ContentTreeNode[] 
           relativePath: currentRelativePath,
           absolutePath: file.absolutePath,
           sizeBytes: file.sizeBytes,
-          fileCount: 1
+          fileCount: 1,
+          excluded: file.excluded === true
         })
         continue
       }
@@ -184,10 +187,10 @@ export function useDrafts() {
   const updateStagedContentFiles = ref<StagedContentFile[]>([])
 
   const createTotalStagedContentSizeBytes = computed(() =>
-    createStagedContentFiles.value.reduce((sum, file) => sum + file.sizeBytes, 0)
+    createStagedContentFiles.value.reduce((sum, file) => sum + (file.excluded ? 0 : file.sizeBytes), 0)
   )
   const updateTotalStagedContentSizeBytes = computed(() =>
-    updateStagedContentFiles.value.reduce((sum, file) => sum + file.sizeBytes, 0)
+    updateStagedContentFiles.value.reduce((sum, file) => sum + (file.excluded ? 0 : file.sizeBytes), 0)
   )
   const createStagedContentTree = computed<ContentTreeNode[]>(() =>
     buildContentTree(createStagedContentFiles.value)
@@ -225,6 +228,13 @@ export function useDrafts() {
     updateStagedContentFiles.value = files
   }
 
+  function toggleStagedFileForMode(mode: 'create' | 'update', relativePath: string): void {
+    const files = mode === 'create' ? createStagedContentFiles : updateStagedContentFiles
+    files.value = files.value.map((file) =>
+      file.relativePath === relativePath ? { ...file, excluded: !file.excluded } : file
+    )
+  }
+
   function clearWorkspaceForMode(mode: 'create' | 'update'): void {
     const draft = getDraftForMode(mode)
     draft.contentFolder = ''
@@ -255,6 +265,7 @@ export function useDrafts() {
     getDraftForMode,
     setDraftField,
     setStagedFilesForMode,
+    toggleStagedFileForMode,
     clearWorkspaceForMode,
     resetDraftsState
   }

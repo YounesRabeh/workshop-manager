@@ -636,88 +636,91 @@ export class SteamCmdRuntimeService extends EventEmitter {
     const loginState = await this.resolveWorkshopLoginState()
     const prepared = await this.workshopCommandService.prepare(loginState.username, draft, mode)
 
-    this.emitRunEvent({ runId: prepared.runId, ts: Date.now(), type: 'phase_changed', phase: mode })
-
-    let commandResult: { lines: string[]; exitCode: number }
     try {
-      if (this.shouldUseSteamCmdScripts()) {
-        const scriptContent = buildSteamCmdWorkshopScript({
-          username: loginState.username,
-          vdfPath: prepared.vdfPath
-        })
-        commandResult = await this.scriptRunner.runWithEphemeralScript({
+      this.emitRunEvent({ runId: prepared.runId, ts: Date.now(), type: 'phase_changed', phase: mode })
+      let commandResult: { lines: string[]; exitCode: number }
+      try {
+        if (this.shouldUseSteamCmdScripts()) {
+          const scriptContent = buildSteamCmdWorkshopScript({
+            username: loginState.username,
+            vdfPath: prepared.vdfPath
+          })
+          commandResult = await this.scriptRunner.runWithEphemeralScript({
+            runId: prepared.runId,
+            scriptContent,
+            execute: async (scriptPath) =>
+              await this.processSession.runOneShot(prepared.runId, ['+runscript', scriptPath], {
+                phase: mode,
+                timeoutMs: this.timeoutSettings.workshopTimeoutMs,
+                emitOutputEvents: true
+              })
+          })
+        } else {
+          commandResult = await this.runCompatibilityInteractiveWorkshopCommand(prepared.runId, prepared.args, mode)
+        }
+      } catch (error) {
+        const runError =
+          error instanceof AppError ? error : new AppError('command_failed', errorMessage(error))
+        if (isRunCancelledError(runError)) {
+          await this.runLogStore.finalize(prepared.runId, {
+            success: false,
+            status: 'cancelled'
+          })
+          throw runError
+        }
+
+        this.emitRunEvent({
           runId: prepared.runId,
-          scriptContent,
-          execute: async (scriptPath) =>
-            await this.processSession.runOneShot(prepared.runId, ['+runscript', scriptPath], {
-              phase: mode,
-              timeoutMs: this.timeoutSettings.workshopTimeoutMs,
-              emitOutputEvents: true
-            })
+          ts: Date.now(),
+          type: 'run_failed',
+          phase: mode,
+          errorCode: runError.code
         })
-      } else {
-        commandResult = await this.runCompatibilityInteractiveWorkshopCommand(prepared.runId, prepared.args, mode)
-      }
-    } catch (error) {
-      const runError =
-        error instanceof AppError ? error : new AppError('command_failed', errorMessage(error))
-      if (isRunCancelledError(runError)) {
         await this.runLogStore.finalize(prepared.runId, {
           success: false,
-          status: 'cancelled'
+          status: 'failed'
         })
+
+        if (runError.code === 'timeout' && mode === 'upload') {
+          throw new AppError(
+            'timeout',
+            `Steam upload timed out after ${Math.round(this.timeoutSettings.workshopTimeoutMs / 1000)}s. Steam may still finish creating the item in the background. Refresh My Workshop Items to confirm.`
+          )
+        }
+
         throw runError
       }
 
-      this.emitRunEvent({
-        runId: prepared.runId,
-        ts: Date.now(),
-        type: 'run_failed',
-        phase: mode,
-        errorCode: runError.code
-      })
-      await this.runLogStore.finalize(prepared.runId, {
-        success: false,
-        status: 'failed'
-      })
-
-      if (runError.code === 'timeout' && mode === 'upload') {
-        throw new AppError(
-          'timeout',
-          `Steam upload timed out after ${Math.round(this.timeoutSettings.workshopTimeoutMs / 1000)}s. Steam may still finish creating the item in the background. Refresh My Workshop Items to confirm.`
-        )
+      if (commandResult.exitCode !== 0) {
+        const parsedFailure = parseWorkshopRunFailure(commandResult.lines, mode)
+        this.emitRunEvent({ runId: prepared.runId, ts: Date.now(), type: 'run_failed', phase: mode, errorCode: 'command_failed' })
+        await this.runLogStore.finalize(prepared.runId, {
+          success: false,
+          status: 'failed'
+        })
+        throw new AppError('command_failed', parsedFailure ?? `Workshop ${mode} failed. See run logs for details.`)
       }
 
-      throw runError
-    }
-
-    if (commandResult.exitCode !== 0) {
-      const parsedFailure = parseWorkshopRunFailure(commandResult.lines, mode)
-      this.emitRunEvent({ runId: prepared.runId, ts: Date.now(), type: 'run_failed', phase: mode, errorCode: 'command_failed' })
-      await this.runLogStore.finalize(prepared.runId, {
-        success: false,
-        status: 'failed'
+      const publishedFileId = parsePublishedFileId(commandResult.lines) ?? prepared.publishedFileId
+      const persisted = await this.runLogStore.finalize(prepared.runId, {
+        success: true,
+        status: 'success',
+        publishedFileId
       })
-      throw new AppError('command_failed', parsedFailure ?? `Workshop ${mode} failed. See run logs for details.`)
+
+      const result: RunResult = {
+        runId: prepared.runId,
+        success: true,
+        publishedFileId,
+        steamOutputSummary: persisted.steamOutputSummary,
+        logPath: persisted.logPath
+      }
+
+      this.emitRunEvent({ runId: prepared.runId, ts: Date.now(), type: 'run_finished', phase: mode })
+      return result
+    } finally {
+      await prepared.cleanup()
     }
-
-    const publishedFileId = parsePublishedFileId(commandResult.lines) ?? prepared.publishedFileId
-    const persisted = await this.runLogStore.finalize(prepared.runId, {
-      success: true,
-      status: 'success',
-      publishedFileId
-    })
-
-    const result: RunResult = {
-      runId: prepared.runId,
-      success: true,
-      publishedFileId,
-      steamOutputSummary: persisted.steamOutputSummary,
-      logPath: persisted.logPath
-    }
-
-    this.emitRunEvent({ runId: prepared.runId, ts: Date.now(), type: 'run_finished', phase: mode })
-    return result
   }
 
   private async runCompatibilityInteractiveWorkshopCommand(

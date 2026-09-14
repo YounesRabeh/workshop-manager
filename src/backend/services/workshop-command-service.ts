@@ -3,8 +3,8 @@
  * Responsibility: Validates drafts, checks update content folders,
  *  writes run-scoped VDF files, and returns executable command arguments.
  */
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import type { UploadDraft } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
 import { validateDraft } from '@backend/utils/validation'
@@ -17,6 +17,71 @@ export interface PreparedWorkshopCommand {
   args: string[]
   vdfPath: string
   publishedFileId?: string
+  cleanup: () => Promise<void>
+}
+
+function normalizeExcludedPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/').replace(/^\.\//, '')
+  const segments = normalized.split('/')
+  if (!normalized || normalized.startsWith('/') || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
+    throw new AppError('validation', `Invalid excluded content path: ${path}`)
+  }
+  return normalized
+}
+
+async function prepareFilteredContentFolder(
+  draft: UploadDraft,
+  runtimeDir: string,
+  runId: string,
+  mode: 'upload' | 'update' | 'visibility'
+): Promise<{ draft: UploadDraft; stagingPath?: string }> {
+  const excludedPaths = draft.excludedContentPaths ?? []
+  if (mode === 'visibility' || excludedPaths.length === 0) {
+    return { draft }
+  }
+
+  const contentFolder = draft.contentFolder?.trim()
+  if (!contentFolder) {
+    throw new AppError('validation', 'A content folder is required when excluding staged files.')
+  }
+
+  const excluded = new Set(excludedPaths.map(normalizeExcludedPath))
+  const sourceFiles = await listContentFolderFiles(contentFolder)
+  const availablePaths = new Set(sourceFiles.map((file) => normalizeExcludedPath(file.relativePath)))
+  for (const excludedPath of excluded) {
+    if (!availablePaths.has(excludedPath)) {
+      throw new AppError('validation', `Excluded content file no longer exists: ${excludedPath}`)
+    }
+  }
+
+  const includedFiles = sourceFiles.filter((file) => !excluded.has(normalizeExcludedPath(file.relativePath)))
+  if (mode === 'upload' && includedFiles.length === 0) {
+    throw new AppError('validation', 'At least one content file must be included for upload.')
+  }
+
+  if (includedFiles.length === 0) {
+    return {
+      draft: { ...draft, contentFolder: '' }
+    }
+  }
+
+  const stagingPath = join(runtimeDir, 'staged-content', runId)
+  await mkdir(stagingPath, { recursive: true })
+  try {
+    for (const file of includedFiles) {
+      const destinationPath = join(stagingPath, normalizeExcludedPath(file.relativePath))
+      await mkdir(dirname(destinationPath), { recursive: true })
+      await copyFile(file.absolutePath, destinationPath)
+    }
+  } catch (error) {
+    await rm(stagingPath, { recursive: true, force: true })
+    throw error
+  }
+
+  return {
+    draft: { ...draft, contentFolder: stagingPath },
+    stagingPath
+  }
 }
 
 function createRunId(): string {
@@ -54,20 +119,35 @@ export class WorkshopCommandService {
     mode: 'upload' | 'update' | 'visibility'
   ): Promise<PreparedWorkshopCommand> {
     validateDraft(draft, mode)
+    const runId = createRunId()
+    const filteredContent = await prepareFilteredContentFolder(draft, this.runtimeDir, runId, mode)
+    const effectiveDraft = filteredContent.draft
     if (mode === 'update') {
-      await ensureUpdateContentFolderHasFiles(draft)
+      await ensureUpdateContentFolderHasFiles(effectiveDraft)
     }
 
-    const runId = createRunId()
     const vdfPath = join(this.runtimeDir, `${runId}.vdf`)
     await mkdir(this.runtimeDir, { recursive: true })
-    await writeFile(vdfPath, generateWorkshopVdf(draft, mode), 'utf8')
+    try {
+      await writeFile(vdfPath, generateWorkshopVdf(effectiveDraft, mode), 'utf8')
+    } catch (error) {
+      if (filteredContent.stagingPath) {
+        await rm(filteredContent.stagingPath, { recursive: true, force: true })
+      }
+      throw error
+    }
 
     return {
       runId,
       args: buildWorkshopArgs(username, undefined, vdfPath),
       vdfPath,
-      publishedFileId: draft.publishedFileId
+      publishedFileId: draft.publishedFileId,
+      cleanup: async () => {
+        await rm(vdfPath, { force: true })
+        if (filteredContent.stagingPath) {
+          await rm(filteredContent.stagingPath, { recursive: true, force: true })
+        }
+      }
     }
   }
 }

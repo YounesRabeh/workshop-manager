@@ -59,6 +59,7 @@ const {
   resetDraftsState,
   setDraftField,
   setStagedFilesForMode,
+  toggleStagedFileForMode,
   clearWorkspaceForMode
 } = useDrafts()
 
@@ -326,6 +327,8 @@ const publishActions = usePublishActions({
   updateRequirements,
   hasPendingUpdateChanges: () => hasPendingUpdateChangesHandler(),
   updateDraftCache,
+  createStagedContentFiles,
+  updateStagedContentFiles,
   setStatusMessage: (message) => {
     statusMessage.value = message
   },
@@ -684,6 +687,7 @@ async function pickUpdatePreviewFile(): Promise<void> {
           @open-workshop-item="openSelectedWorkshopItem"
           @pick-workspace-root="pickUpdateContentFolder"
           @clear-workspace="clearUpdateWorkspace"
+          @toggle-content-file="toggleStagedFileForMode('update', $event)"
           @pick-preview-file="pickUpdatePreviewFile"
           @clear-preview-file="clearUpdatePreviewFile"
           @update-title="setDraftField('update', 'title', $event)"
@@ -704,6 +708,7 @@ async function pickUpdatePreviewFile(): Promise<void> {
           :can-upload="canCreate()"
           @pick-workspace-root="pickCreateContentFolder"
           @clear-workspace="clearCreateWorkspace"
+          @toggle-content-file="toggleStagedFileForMode('create', $event)"
           @pick-preview-file="pickCreatePreviewFile"
           @clear-preview-file="clearCreatePreviewFile"
           @update-app-id="setDraftField('create', 'appId', $event)"

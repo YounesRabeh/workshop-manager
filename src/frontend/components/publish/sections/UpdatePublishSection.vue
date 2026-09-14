@@ -42,6 +42,7 @@ const emit = defineEmits<{
   (e: 'update-release-notes', value: string): void
   (e: 'change-visibility-selection', value: 0 | 1 | 2 | 3): void
   (e: 'update-visibility-only'): void
+  (e: 'toggle-content-file', relativePath: string): void
 }>()
 
 const sectionTitle = 'Update Workshop Item'
@@ -161,6 +162,7 @@ function submitPrimaryAction(): void {
       @toggle-all-folders="toggleAllFolders"
       @toggle-content-explorer="toggleContentExplorerCollapsed"
       @toggle-folder="toggleFolder"
+      @toggle-file="emit('toggle-content-file', $event)"
     />
   </section>
 </template>
