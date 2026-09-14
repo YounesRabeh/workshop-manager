@@ -126,11 +126,12 @@ export class SteamCmdRuntimeService extends EventEmitter {
     private readonly steamCmdExecutablePath: () => Promise<string>,
     private readonly runLogStore: RunLogStore,
     private readonly runtimeDir: string,
-    platformProfile: SteamCmdPlatformProfile
+    platformProfile: SteamCmdPlatformProfile,
+    executionPolicy: SteamCmdExecutionPolicy = resolveSteamCmdExecutionPolicy()
   ) {
     super()
     this.platformBehavior = getSteamCmdPlatformBehavior(platformProfile)
-    this.executionPolicy = resolveSteamCmdExecutionPolicy()
+    this.executionPolicy = { ...executionPolicy }
     this.scriptRunner = new SteamCmdScriptRunner(this.runtimeDir)
     this.processSession = new SteamCmdProcessSession({
       steamCmdExecutablePath: this.steamCmdExecutablePath,

@@ -33,6 +33,31 @@ describe('useWorkshopItems composable', () => {
     expect(statuses.at(-1)).toBe('Login first to load workshop items.')
   })
 
+  it('ignores older responses and responses arriving after sign-out', async () => {
+    type Items = Awaited<ReturnType<typeof workshop.getMyWorkshopItems>>
+    let resolveFirst!: (items: Items) => void
+    workshop.getMyWorkshopItems.mockImplementationOnce(() => new Promise<Items>((resolve) => { resolveFirst = resolve }))
+    const store = useWorkshopItems({
+      canAccessMods: () => true,
+      normalizeError: () => ({ code: 'command_failed', message: 'failed' }),
+      setStatusMessage: () => undefined,
+      onSelectWorkshopItem: () => undefined
+    })
+    const first = store.loadWorkshopItems()
+    await store.loadWorkshopItems()
+    resolveFirst([{ publishedFileId: 'old', title: 'Old', appId: '480', visibility: 0 }])
+    await first
+    expect(store.workshopItems.value[0]?.publishedFileId).toBe('1')
+
+    workshop.getMyWorkshopItems.mockImplementationOnce(() => new Promise<Items>((resolve) => { resolveFirst = resolve }))
+    const pending = store.loadWorkshopItems()
+    store.resetWorkshopState()
+    resolveFirst([{ publishedFileId: 'old', title: 'Old', appId: '480', visibility: 0 }])
+    await pending
+    expect(store.workshopItems.value).toEqual([])
+    expect(store.isLoadingWorkshopItems.value).toBe(false)
+  })
+
   it('loads items and reports status message', async () => {
     const statuses: string[] = []
     const store = useWorkshopItems({

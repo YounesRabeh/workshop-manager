@@ -2,11 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { resolveSteamCmdExecutionPolicy } from '@backend/services/steamcmd-execution-policy'
 
 describe('steamcmd execution policy', () => {
-  it('defaults to interactive mode with credential scripts disabled', () => {
+  it('defaults standalone callers to interactive mode', () => {
     const policy = resolveSteamCmdExecutionPolicy({})
     expect(policy).toEqual({
-      mode: 'interactive',
-      allowCredentialScripts: false
+      mode: 'interactive'
     })
   })
 
@@ -24,11 +23,4 @@ describe('steamcmd execution policy', () => {
     expect(policy.mode).toBe('interactive')
   })
 
-  it('parses truthy credential script flags', () => {
-    const policy = resolveSteamCmdExecutionPolicy({
-      STEAMCMD_ALLOW_CREDENTIAL_SCRIPTS: 'true'
-    })
-    expect(policy.allowCredentialScripts).toBe(true)
-  })
 })
-

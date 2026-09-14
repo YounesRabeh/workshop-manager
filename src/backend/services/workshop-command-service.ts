@@ -122,18 +122,26 @@ export class WorkshopCommandService {
     const runId = createRunId()
     const filteredContent = await prepareFilteredContentFolder(draft, this.runtimeDir, runId, mode)
     const effectiveDraft = filteredContent.draft
-    if (mode === 'update') {
-      await ensureUpdateContentFolderHasFiles(effectiveDraft)
-    }
-
     const vdfPath = join(this.runtimeDir, `${runId}.vdf`)
-    await mkdir(this.runtimeDir, { recursive: true })
+    const cleanup = async (): Promise<void> => {
+      const results = await Promise.allSettled([
+        rm(vdfPath, { force: true }),
+        ...(filteredContent.stagingPath
+          ? [rm(filteredContent.stagingPath, { recursive: true, force: true })]
+          : [])
+      ])
+      const failure = results.find((result) => result.status === 'rejected')
+      if (failure?.status === 'rejected') throw failure.reason
+    }
     try {
+      // A filtered folder has already been scanned and checked before copying.
+      if (mode === 'update' && !filteredContent.stagingPath) {
+        await ensureUpdateContentFolderHasFiles(effectiveDraft)
+      }
+      await mkdir(this.runtimeDir, { recursive: true })
       await writeFile(vdfPath, generateWorkshopVdf(effectiveDraft, mode), 'utf8')
     } catch (error) {
-      if (filteredContent.stagingPath) {
-        await rm(filteredContent.stagingPath, { recursive: true, force: true })
-      }
+      await cleanup()
       throw error
     }
 
@@ -142,12 +150,7 @@ export class WorkshopCommandService {
       args: buildWorkshopArgs(username, undefined, vdfPath),
       vdfPath,
       publishedFileId: draft.publishedFileId,
-      cleanup: async () => {
-        await rm(vdfPath, { force: true })
-        if (filteredContent.stagingPath) {
-          await rm(filteredContent.stagingPath, { recursive: true, force: true })
-        }
-      }
+      cleanup
     }
   }
 }

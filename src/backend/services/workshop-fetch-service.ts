@@ -6,6 +6,7 @@
 import type { SteamProfileSummary, WorkshopItemSummary } from '@shared/contracts'
 import { normalizeError } from '@shared/api-error-utils'
 import { AppError } from '@backend/utils/errors'
+import { resolveWorkshopFetchPolicy, type WorkshopFetchPolicy } from './workshop-fetch-policy'
 import {
   extractMaxWorkshopPage,
   extractWorkshopFileIdsFromHtml,
@@ -20,16 +21,6 @@ interface WorkshopFetchContext {
 }
 
 export type WorkshopWebApiAccessState = 'active' | 'configured_unavailable' | 'disabled'
-
-const WORKSHOP_FETCH_TIMEOUT_MS = 15_000
-const MAX_COMMUNITY_PAGES = 50
-
-function fetchSteam(input: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(input, {
-    ...init,
-    signal: AbortSignal.timeout(WORKSHOP_FETCH_TIMEOUT_MS)
-  })
-}
 
 function errorMessage(error: unknown): string {
   return normalizeError(error).message
@@ -80,7 +71,15 @@ function extractPublishedFileIds(payload: unknown): string[] {
 }
 
 export class WorkshopFetchService {
-  constructor(private readonly context: WorkshopFetchContext) {}
+  private readonly policy: WorkshopFetchPolicy
+
+  constructor(private readonly context: WorkshopFetchContext, policy: Partial<WorkshopFetchPolicy> = {}) {
+    this.policy = resolveWorkshopFetchPolicy(policy)
+  }
+
+  private fetchSteam(input: string, init: RequestInit = {}): Promise<Response> {
+    return fetch(input, { ...init, signal: AbortSignal.timeout(this.policy.requestTimeoutMs) })
+  }
 
   private appendDiagnosticLog(line: string): void {
     const result = this.context.appendDiagnosticLog?.(`[API_META] ${line}`)
@@ -106,7 +105,7 @@ export class WorkshopFetchService {
 
   private async fetchPublishedFileDetails(ids: string[]): Promise<WorkshopItemSummary[]> {
     const items: WorkshopItemSummary[] = []
-    const batchSize = 100
+    const batchSize = this.policy.detailsBatchSize
 
     for (let start = 0; start < ids.length; start += batchSize) {
       const batch = ids.slice(start, start + batchSize)
@@ -116,7 +115,7 @@ export class WorkshopFetchService {
         detailsParams.set(`publishedfileids[${index}]`, id)
       }
 
-      const detailsResponse = await fetchSteam(
+      const detailsResponse = await this.fetchSteam(
         'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/',
         {
           method: 'POST',
@@ -164,7 +163,7 @@ export class WorkshopFetchService {
     }
 
     try {
-      const response = await fetchSteam(`${profileUrl}/?xml=1`)
+      const response = await this.fetchSteam(`${profileUrl}/?xml=1`)
       if (!response.ok) {
         return fallback
       }
@@ -208,7 +207,7 @@ export class WorkshopFetchService {
 
     const normalizedAppId = appId?.trim() || undefined
     const allowWebApi = options.allowWebApi ?? true
-    const apiKey = allowWebApi ? savedWebApiKey?.trim() || process.env['STEAM_WEB_API_KEY']?.trim() : undefined
+    const apiKey = allowWebApi ? savedWebApiKey?.trim() : undefined
     const failures: string[] = []
     let webApiItems: WorkshopItemSummary[] = []
     let communityItems: WorkshopItemSummary[] = []
@@ -285,7 +284,7 @@ export class WorkshopFetchService {
     appId?: string
   ): Promise<WorkshopItemSummary[]> {
     const perPage = 100
-    const maxPages = 20
+    const maxPages = this.policy.maxWebApiPages
     const privacyModes: Array<{ value?: string }> = [{}, { value: '0' }, { value: '1' }, { value: '2' }, { value: '3' }, { value: '4' }]
     const failures: string[] = []
     const collected: WorkshopItemSummary[] = []
@@ -307,7 +306,7 @@ export class WorkshopFetchService {
           params.set('privacy', mode.value)
         }
 
-        const response = await fetchSteam(
+        const response = await this.fetchSteam(
           `https://api.steampowered.com/IPublishedFileService/GetUserFiles/v1/?${params.toString()}`
         )
         this.appendDiagnosticLog(
@@ -373,7 +372,7 @@ export class WorkshopFetchService {
       params.set('appid', appId)
     }
 
-    const firstPage = await fetchSteam(
+    const firstPage = await this.fetchSteam(
       `https://steamcommunity.com/profiles/${steamId64}/myworkshopfiles/?${params.toString()}`
     )
     if (!firstPage.ok) {
@@ -386,14 +385,18 @@ export class WorkshopFetchService {
     const firstHtml = await firstPage.text()
     const allIds = extractWorkshopFileIdsFromHtml(firstHtml)
     const seenIds = new Set(allIds)
-    const maxPage = Math.min(extractMaxWorkshopPage(firstHtml), MAX_COMMUNITY_PAGES)
+    const discoveredPages = extractMaxWorkshopPage(firstHtml)
+    if (discoveredPages > this.policy.maxCommunityPages) {
+      throw new AppError('command_failed', 'Workshop listing exceeds the fetch limit. Narrow the App ID filter and retry.')
+    }
+    const maxPage = discoveredPages
     this.appendDiagnosticLog(
       `community request appId=${appId ?? 'all'} page=1 status=${firstPage.status} ids=${allIds.length} maxPage=${maxPage}`
     )
 
     for (let page = 2; page <= maxPage; page += 1) {
       params.set('p', String(page))
-      const response = await fetchSteam(
+      const response = await this.fetchSteam(
         `https://steamcommunity.com/profiles/${steamId64}/myworkshopfiles/?${params.toString()}`
       )
       if (!response.ok) {

@@ -651,6 +651,7 @@ async function pickUpdatePreviewFile(): Promise<void> {
         <WorkshopItemsSection
           v-if="flowStep === 'mods'"
           :app-id="workshopFilterAppId"
+          :is-loading="workshopStore.isLoadingWorkshopItems.value"
           :workshop-items="paginatedWorkshopItems"
           :all-items-count="workshopItems.length"
           :filtered-items-count="filteredWorkshopItems.length"

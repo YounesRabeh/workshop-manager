@@ -6,6 +6,7 @@ import { app, BrowserWindow, nativeImage, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { isSafeExternalUrl } from './ipc-security'
 
 function resolvePreloadPath(): string {
   const jsPath = join(__dirname, '../preload/index.js')
@@ -44,15 +45,6 @@ function resolveWindowIconPath(): string | undefined {
   }
 
   return undefined
-}
-
-function isSafeExternalUrl(targetUrl: string): boolean {
-  try {
-    const parsed = new URL(targetUrl)
-    return parsed.protocol === 'https:' || parsed.protocol === 'http:'
-  } catch {
-    return false
-  }
 }
 
 function resolveAllowedNavigationTarget(): URL {

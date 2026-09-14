@@ -57,3 +57,11 @@ Keep a change within the narrowest layer possible:
 6. Add unit tests for each layer and an integration test when process or filesystem behavior crosses layers.
 
 Related pages: [Authentication](authentication.md), [SteamCMD runtime](steamcmd-runtime.md), and [Workshop management](workshop-management.md).
+
+## Configuration and request ownership
+
+The Electron startup layer passes its script execution policy directly into the runtime; it does not rewrite the process environment. Standalone runtime consumers may still resolve their policy from the environment for compatibility testing.
+
+`workshop-fetch-policy.ts` owns remote request timeouts, page limits, and details batch size. Callers may inject validated overrides into `WorkshopFetchService`. These limits are separate from SteamCMD process timeouts and the renderer's card page size. Oversized community listings report an error asking for an App ID filter instead of silently truncating results. Web API keys are supplied explicitly by the caller.
+
+The Workshop browser uses one request flow for loading and refreshing. A request version prevents older responses or responses after sign-out from replacing current state. Prepared upload commands own their temporary artifacts and expose a cleanup operation used on both preparation errors and completed runs.

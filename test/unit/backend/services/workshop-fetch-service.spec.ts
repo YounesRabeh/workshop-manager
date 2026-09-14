@@ -151,7 +151,7 @@ describe('WorkshopFetchService', () => {
     ).toBe(true)
   })
 
-  it('caps community pagination and attaches a timeout signal to requests', async () => {
+  it('reports oversized listings instead of silently returning a truncated list', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
       if (url.includes('/myworkshopfiles/')) {
@@ -169,8 +169,8 @@ describe('WorkshopFetchService', () => {
       })
     })
 
-    await expect(service.getMyWorkshopItems(undefined, undefined, { allowWebApi: false })).resolves.toEqual([])
-    expect(fetchSpy).toHaveBeenCalledTimes(50)
+    await expect(service.getMyWorkshopItems(undefined, undefined, { allowWebApi: false })).rejects.toThrow('Narrow the App ID filter')
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
     expect(fetchSpy.mock.calls.every(([, init]) => init?.signal instanceof AbortSignal)).toBe(true)
   })
 

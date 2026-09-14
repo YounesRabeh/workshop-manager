@@ -29,6 +29,8 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
   const workshopListMessage = ref('')
   const hasWorkshopItemsError = ref(false)
   const workshopItemsPage = ref(1)
+  const isLoadingWorkshopItems = ref(false)
+  let requestVersion = 0
 
   const selectedWorkshopItem = computed(() =>
     workshopItems.value.find((item) => item.publishedFileId === selectedWorkshopItemId.value)
@@ -118,18 +120,31 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     }
   }
 
-  async function loadWorkshopItems(): Promise<void> {
+  async function fetchWorkshopItems(refreshSelection: boolean): Promise<void> {
     if (!options.canAccessMods()) {
       options.setStatusMessage('Login first to load workshop items.')
       return
     }
 
+    const version = ++requestVersion
+    const selectedId = selectedWorkshopItemId.value
+    isLoadingWorkshopItems.value = true
     try {
-      const items = await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value || undefined })
+      const items = await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value.trim() || undefined })
+      if (version !== requestVersion || !options.canAccessMods()) return
       workshopItems.value = items
-      workshopItemsPage.value = 1
+      if (!refreshSelection) workshopItemsPage.value = 1
       reconcileSelection(items)
       hasWorkshopItemsError.value = false
+      const refreshedItem = refreshSelection && selectedWorkshopItemId.value === selectedId
+        ? items.find((item) => item.publishedFileId === selectedId)
+        : undefined
+      if (refreshedItem) {
+        selectWorkshopItem(refreshedItem)
+        workshopListMessage.value = ''
+        options.setStatusMessage('Workshop item refreshed.')
+        return
+      }
       if (items.length === 0) {
         workshopListMessage.value = 'No workshop items found for this account/filter.'
         options.setStatusMessage(workshopListMessage.value)
@@ -138,11 +153,18 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
       workshopListMessage.value = ''
       options.setStatusMessage(`Loaded ${items.length} workshop item(s).`)
     } catch (error) {
+      if (version !== requestVersion || !options.canAccessMods()) return
       const parsed = options.normalizeError(error)
       hasWorkshopItemsError.value = true
-      workshopListMessage.value = `Workshop list failed (${parsed.code}): ${parsed.message}`
+      workshopListMessage.value = `Workshop ${refreshSelection ? 'refresh' : 'list'} failed (${parsed.code}): ${parsed.message}`
       options.setStatusMessage(workshopListMessage.value)
+    } finally {
+      if (version === requestVersion) isLoadingWorkshopItems.value = false
     }
+  }
+
+  async function loadWorkshopItems(): Promise<void> {
+    await fetchWorkshopItems(false)
   }
 
   async function resetAppIdFilter(): Promise<void> {
@@ -181,45 +203,12 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
   }
 
   async function refreshSelectedWorkshopItem(): Promise<void> {
-    if (!options.canAccessMods()) {
-      options.setStatusMessage('Login first to load workshop items.')
-      return
-    }
-
-    const currentSelectedId = selectedWorkshopItemId.value.trim()
-
-    try {
-      const items = await window.workshop.getMyWorkshopItems({ appId: workshopFilterAppId.value || undefined })
-      workshopItems.value = items
-      reconcileSelection(items)
-      hasWorkshopItemsError.value = false
-
-      if (currentSelectedId) {
-        const refreshedItem = items.find((item) => item.publishedFileId === currentSelectedId)
-        if (refreshedItem) {
-          selectWorkshopItem(refreshedItem)
-          workshopListMessage.value = ''
-          options.setStatusMessage('Workshop item refreshed.')
-          return
-        }
-      }
-
-      if (items.length === 0) {
-        workshopListMessage.value = 'No workshop items found for this account/filter.'
-        options.setStatusMessage(workshopListMessage.value)
-        return
-      }
-      workshopListMessage.value = ''
-      options.setStatusMessage(`Loaded ${items.length} workshop item(s).`)
-    } catch (error) {
-      const parsed = options.normalizeError(error)
-      hasWorkshopItemsError.value = true
-      workshopListMessage.value = `Workshop refresh failed (${parsed.code}): ${parsed.message}`
-      options.setStatusMessage(workshopListMessage.value)
-    }
+    await fetchWorkshopItems(true)
   }
 
   function resetWorkshopState(): void {
+    requestVersion += 1
+    isLoadingWorkshopItems.value = false
     workshopFilterAppId.value = ''
     workshopVisibilityFilter.value = 'all'
     workshopItems.value = []
@@ -236,6 +225,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     selectedWorkshopItemId,
     workshopListMessage,
     hasWorkshopItemsError,
+    isLoadingWorkshopItems,
     selectedWorkshopItem,
     filteredWorkshopItems,
     paginatedWorkshopItems,

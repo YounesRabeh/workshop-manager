@@ -10,6 +10,7 @@ import type { WorkshopVisibilityFilter } from '../types/ui'
 
 const props = defineProps<{
   appId: string
+  isLoading: boolean
   workshopItems: WorkshopItemSummary[]
   allItemsCount: number
   filteredItemsCount: number
@@ -110,8 +111,8 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
           >
             Reset
           </button>
-          <button class="rounded bg-slate-900 px-3 py-2 text-xs font-semibold text-white" @click="emit('refresh')">
-            Refresh
+          <button class="rounded bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" :disabled="isLoading" @click="emit('refresh')">
+            {{ isLoading ? 'Loading…' : 'Refresh' }}
           </button>
         </div>
       </div>
