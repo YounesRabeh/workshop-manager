@@ -167,8 +167,18 @@ export function parseWorkshopRunFailure(
     return 'Steam could not save the Workshop update. This is usually temporary; wait briefly and retry.'
   }
 
+  if (/legal agreement|workshop terms|accept.*agreement/i.test(joined)) {
+    return 'Steam requires the Workshop Legal Agreement to be accepted before publishing. Open the item’s Workshop page, accept the agreement, then retry.'
+  }
+
+  if (/steam cloud.*(quota|space)|quota.*steam cloud|not enough.*space.*cloud/i.test(joined)) {
+    return 'Steam Cloud storage for Workshop previews is full. Reduce or remove stored preview files, or ask the app owner to increase the per-user Steam Cloud quota.'
+  }
+
   if (/failed to create new workshop item\s*\(access denied\)|access denied/i.test(joined)) {
-    return 'Steam denied creating this Workshop item (Access Denied). Verify app ownership/permissions and ensure your Steam account can publish for this game.'
+    return mode === 'upload'
+      ? 'Steam denied creating this Workshop item (Access Denied). Verify game ownership, Workshop permissions, and the account’s publishing access.'
+      : 'Steam denied updating this Workshop item (Access Denied). Verify game ownership, item ownership, Workshop permissions, and the account’s publishing access.'
   }
 
   if (/build for workshop item has no content|has no content/i.test(joined)) {
@@ -189,6 +199,9 @@ export function parseWorkshopRunFailure(
   if (steamResult === 'failure' || /failed to update workshop item\s*\(failure\)/i.test(joined)) {
     if (mode === 'visibility') {
       return 'Steam failed to change item visibility. Retry shortly.'
+    }
+    if (mode === 'upload') {
+      return 'Steam failed to create the Workshop item. Check the app ID, title, content folder, preview image, and Workshop permissions.'
     }
     return 'Steam failed to update the Workshop item. Retry shortly; if it persists, verify content folder and Steam service status.'
   }

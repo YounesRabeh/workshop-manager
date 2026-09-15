@@ -37,6 +37,10 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
   const selectedWorkshopItem = computed(() =>
     workshopItems.value.find((item) => item.publishedFileId === selectedWorkshopItemId.value)
   )
+  const workshopFilterAppIdHasInvalidFormat = computed(() => {
+    const value = workshopFilterAppId.value.trim()
+    return value.length > 0 && !/^\d+$/.test(value)
+  })
 
   const filteredWorkshopItems = computed(() => workshopItems.value)
 
@@ -126,6 +130,12 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
   async function fetchWorkshopItems(refreshSelection: boolean): Promise<void> {
     if (!options.canAccessMods()) {
       options.setStatusMessage('Login first to load workshop items.')
+      return
+    }
+    if (workshopFilterAppIdHasInvalidFormat.value) {
+      hasWorkshopItemsError.value = true
+      workshopListMessage.value = 'Workshop App ID filter must contain digits only.'
+      options.setStatusMessage(workshopListMessage.value)
       return
     }
 
@@ -246,6 +256,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     workshopVisibilityFilter,
     workshopItems,
     workshopItemsTotalCount,
+    workshopFilterAppIdHasInvalidFormat,
     selectedWorkshopItemId,
     workshopListMessage,
     hasWorkshopItemsError,

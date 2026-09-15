@@ -407,8 +407,22 @@ Steam>`)
     )
 
     expect(failure).toBe(
-      'Steam denied creating this Workshop item (Access Denied). Verify app ownership/permissions and ensure your Steam account can publish for this game.'
+      'Steam denied creating this Workshop item (Access Denied). Verify game ownership, Workshop permissions, and the account’s publishing access.'
     )
+  })
+
+  it('uses create-specific guidance for generic upload failures', () => {
+    expect(parseWorkshopRunFailure(
+      ['ERROR! Failed to create new workshop item (Failure).'],
+      'upload'
+    )).toContain('failed to create the Workshop item')
+  })
+
+  it('explains legal agreement and Steam Cloud quota blockers', () => {
+    expect(parseWorkshopRunFailure(['Workshop Legal Agreement must be accepted'], 'upload'))
+      .toContain('Legal Agreement')
+    expect(parseWorkshopRunFailure(['ERROR: Steam Cloud quota exceeded'], 'upload'))
+      .toContain('Steam Cloud storage')
   })
 
   it('classifies Steam limit-exceeded failures with preview and quota guidance', () => {

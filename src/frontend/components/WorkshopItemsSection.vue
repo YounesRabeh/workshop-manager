@@ -13,7 +13,6 @@ const props = defineProps<{
   isLoading: boolean
   workshopItems: WorkshopItemSummary[]
   allItemsCount: number
-  filteredItemsCount: number
   currentPage: number
   totalPages: number
   pageStart: number
@@ -44,6 +43,11 @@ const resolvedEmptyStateMessage = computed(() => {
     return explicitMessage
   }
   return 'No workshop items found for the current filters.'
+})
+
+const appIdHasInvalidFormat = computed(() => {
+  const value = props.appId.trim()
+  return value.length > 0 && !/^\d+$/.test(value)
 })
 
 function onAppIdInput(event: Event): void {
@@ -100,8 +104,13 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
           </select>
           <input
             :value="appId"
+            inputmode="numeric"
+            pattern="[0-9]*"
             placeholder="Filter by App ID (optional)"
-            class="w-full min-w-[240px] flex-1 rounded border border-slate-300 px-2 py-2 text-xs"
+            class="w-full min-w-[240px] flex-1 rounded border px-2 py-2 text-xs"
+            :class="appIdHasInvalidFormat ? 'border-rose-500 bg-rose-50' : 'border-slate-300'"
+            :aria-invalid="appIdHasInvalidFormat"
+            aria-describedby="workshop-app-id-error"
             @input="onAppIdInput"
           />
           <button
@@ -111,10 +120,13 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
           >
             Reset
           </button>
-          <button class="rounded bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" :disabled="isLoading" @click="emit('refresh')">
+          <button class="rounded bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" :disabled="isLoading || appIdHasInvalidFormat" @click="emit('refresh')">
             {{ isLoading ? 'Loading…' : 'Refresh' }}
           </button>
         </div>
+        <p v-if="appIdHasInvalidFormat" id="workshop-app-id-error" class="text-xs font-medium text-rose-700">
+          App ID must contain digits only.
+        </p>
       </div>
 
       <p v-if="allItemsCount > 0" class="mt-2 text-xs text-slate-500">
@@ -164,7 +176,7 @@ function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): Visi
       </div>
 
       <nav
-        v-if="filteredItemsCount > 0 && totalPages > 1"
+        v-if="allItemsCount > 0 && totalPages > 1"
         class="mt-4 flex items-center justify-center gap-3"
         aria-label="Workshop item pages"
       >

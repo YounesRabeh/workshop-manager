@@ -10,6 +10,16 @@ import {
 } from '@shared/workshop-requirements'
 import { AppError } from './errors'
 
+function validateNumericId(value: string | undefined, label: string, context: string): void {
+  const normalized = value?.trim()
+  if (!normalized) {
+    throw new AppError('validation', `${label} is required for ${context}.`)
+  }
+  if (!/^\d+$/.test(normalized)) {
+    throw new AppError('validation', `${label} must contain digits only.`)
+  }
+}
+
 export function validateDraft(draft: UploadDraft, mode: 'upload' | 'update' | 'visibility'): void {
   const excludedContentPaths = draft.excludedContentPaths as unknown
   if (
@@ -24,13 +34,9 @@ export function validateDraft(draft: UploadDraft, mode: 'upload' | 'update' | 'v
   }
 
   if (mode === 'visibility') {
+    validateNumericId(draft.appId, 'App ID', 'visibility updates')
+    validateNumericId(draft.publishedFileId, 'Published file ID', 'visibility updates')
     const requirements = evaluateVisibilityRequirements(draft)
-    if (!requirements.appId) {
-      throw new AppError('validation', 'appId is required for visibility updates')
-    }
-    if (!requirements.publishedFileId) {
-      throw new AppError('validation', 'publishedFileId is required for visibility updates')
-    }
     if (!requirements.visibility) {
       throw new AppError('validation', 'visibility is required for visibility updates')
     }
@@ -38,18 +44,15 @@ export function validateDraft(draft: UploadDraft, mode: 'upload' | 'update' | 'v
   }
 
   if (mode === 'upload') {
+    validateNumericId(draft.appId, 'App ID', 'uploads')
     const requirements = evaluateCreateRequirements(draft)
     if (requirements.missing.length > 0) {
       throw new AppError('validation', `Missing required fields: ${requirements.missing.join(', ')}`)
     }
   } else {
+    validateNumericId(draft.appId, 'App ID', 'updates')
+    validateNumericId(draft.publishedFileId, 'Published file ID', 'updates')
     const requirements = evaluateUpdateRequirements(draft)
-    if (!requirements.appId) {
-      throw new AppError('validation', 'appId is required for updates')
-    }
-    if (!requirements.publishedFileId) {
-      throw new AppError('validation', 'publishedFileId is required for updates')
-    }
     if (!requirements.title) {
       throw new AppError('validation', 'title is required for updates')
     }

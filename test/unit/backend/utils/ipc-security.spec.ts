@@ -25,7 +25,7 @@ describe('IPC security helpers', () => {
     expect(await access.load(imagePath)).toBeUndefined()
     expect(await access.approve(imagePath)).toBe(true)
     expect(await access.load(imagePath)).toBe(`data:image/png;base64,${pngBytes.toString('base64')}`)
-    expect(await access.approve(disguisedTextPath)).toBe(true)
+    expect(await access.approve(disguisedTextPath)).toBe(false)
     expect(await access.load(disguisedTextPath)).toBeUndefined()
   })
 })

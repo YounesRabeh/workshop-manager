@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from '@frontend/App.vue'
 import type { PersistedRunLog } from '@shared/contracts'
+import { TEST_ACCOUNT, TEST_APP_VERSION, TEST_WORKSHOP, createWorkshopItem } from '../../../fixtures/workshop-seed'
 
 const workshop = {
   ensureSteamCmdInstalled: vi.fn(async () => ({
@@ -11,7 +12,7 @@ const workshop = {
     executablePath: '/managed/steamcmd.sh',
     source: 'auto'
   })),
-  getAppVersion: vi.fn(async () => ({ version: '0.1.0' })),
+  getAppVersion: vi.fn(async () => ({ version: TEST_APP_VERSION })),
   login: vi.fn(async () => ({ sessionId: 's1' })),
   quitApp: vi.fn(async () => ({ ok: true })),
   logout: vi.fn(async () => ({ ok: true })),
@@ -23,7 +24,7 @@ const workshop = {
   updateVisibility: vi.fn(async () => ({ runId: 'r3', success: true })),
   getProfiles: vi.fn(async () => ({
     profiles: [],
-    rememberedUsername: 'alice',
+    rememberedUsername: TEST_ACCOUNT.username,
     rememberAuth: false,
     hasStoredAuth: false,
     preferredAuthMode: 'otp'
@@ -46,7 +47,7 @@ const workshop = {
     content: '[install] example log',
     exists: true
   })),
-  getSavedWebApiKey: vi.fn(async () => ({ webApiKey: 'saved-dev-key' })),
+  getSavedWebApiKey: vi.fn(async () => ({ webApiKey: TEST_ACCOUNT.apiKey })),
   saveAdvancedSettings: vi.fn(async (payload: {
     webApiEnabled: boolean
     webApiKey?: string
@@ -71,18 +72,13 @@ const workshop = {
     }
   })),
   getCurrentProfile: vi.fn(async () => ({
-    steamId64: '76561197960265729',
-    personaName: 'Alice Persona',
+    steamId64: TEST_ACCOUNT.steamId64,
+    personaName: TEST_ACCOUNT.personaName,
     avatarUrl: 'https://example.invalid/avatar.png',
-    profileUrl: 'https://steamcommunity.com/profiles/76561197960265729'
+    profileUrl: `https://steamcommunity.com/profiles/${TEST_ACCOUNT.steamId64}`
   })),
   getMyWorkshopItems: vi.fn(async () => [
-    {
-      publishedFileId: '123',
-      title: 'Test Item',
-      appId: '480',
-      previewUrl: 'https://example.invalid/preview.jpg'
-    }
+    createWorkshopItem({ previewUrl: 'https://example.invalid/preview.jpg' })
   ]),
   listContentFolderFiles: vi.fn(
     async () => [] as Array<{ absolutePath: string; relativePath: string; sizeBytes: number }>
@@ -92,8 +88,8 @@ const workshop = {
   deleteProfile: vi.fn(async () => ({ ok: true })),
   getRunLogs: vi.fn<() => Promise<PersistedRunLog[]>>(async () => []),
   getRunLog: vi.fn<(runId: string) => Promise<PersistedRunLog | null>>(async () => null),
-  pickFolder: vi.fn(async () => '/mods'),
-  pickFile: vi.fn(async () => '/mods/preview.png'),
+  pickFolder: vi.fn(async () => TEST_WORKSHOP.contentFolder),
+  pickFile: vi.fn(async () => `${TEST_WORKSHOP.contentFolder}/preview.png`),
   pickSteamCmdExecutable: vi.fn(async () => '/tools/steamcmd.sh'),
   onRunEvent: vi.fn((_: (event: unknown) => void) => () => undefined)
 }
@@ -128,6 +124,13 @@ describe('App UI validation gates', () => {
     await flushPromises()
   }
 
+  const signIn = async (wrapper: ReturnType<typeof mount>) => {
+    await wrapper.find('input').setValue(TEST_ACCOUNT.username)
+    await wrapper.find('input[type="password"]').setValue(TEST_ACCOUNT.password)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     ;(window as unknown as { workshop: typeof workshop }).workshop = workshop
@@ -137,12 +140,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -168,53 +166,64 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     expect(wrapper.text()).toContain('Workshop list failed (auth): Signed in to Steam, but account identity could not be resolved on this platform.')
     expect(wrapper.text()).not.toContain('No workshop items found for the current filters.')
+  })
+
+  it('keeps signed-in status visible and makes the current SteamCMD log accessible', async () => {
+    const run = {
+      runId: '1700000000000-upload',
+      success: false,
+      steamOutputSummary: 'Upload failed',
+      logPath: '/tmp/steamcmd-output.log',
+      lines: ['ERROR! Failed to update workshop item'],
+      status: 'failed' as const
+    }
+    workshop.getRunLogs.mockResolvedValueOnce([run])
+    workshop.getRunLog.mockResolvedValueOnce(run)
+
+    const wrapper = mount(App)
+    await flushPromises()
+    await signIn(wrapper)
+
+    expect(wrapper.text()).toContain('Loaded workshop item: Test Item')
+    const logButton = wrapper.findAll('button').find((button) => button.text().trim() === 'View SteamCMD Log')
+    expect(logButton).toBeDefined()
+    await logButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('SteamCMD Session Log')
+    expect(wrapper.text()).toContain('ERROR! Failed to update workshop item')
   })
 
   it('renders loaded workshop items in the Workshop Items section after login', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     expect(wrapper.text()).toContain('My Workshop Items')
     expect(wrapper.text()).toContain('Showing 1 of 1 item(s).')
     expect(wrapper.text()).toContain('Test Item')
-    expect(wrapper.text()).toContain('ID: 123')
+    expect(wrapper.text()).toContain(`ID: ${TEST_WORKSHOP.publishedFileId}`)
     expect(wrapper.text()).not.toContain('Steam login successful. Loading workshop items...')
     expect(wrapper.text()).not.toContain('Loaded 1 workshop item(s).')
   })
 
   it('pages through fetched workshop items twelve at a time', async () => {
     workshop.getMyWorkshopItems.mockResolvedValueOnce(
-      Array.from({ length: 13 }, (_, index) => ({
+      Array.from({ length: 13 }, (_, index) => createWorkshopItem({
         publishedFileId: String(index + 1),
         title: `Paged Item ${index + 1}`,
-        appId: '480',
-        previewUrl: `https://example.invalid/preview-${index + 1}.jpg`,
-        visibility: 0 as const
+        previewUrl: `https://example.invalid/preview-${index + 1}.jpg`
       }))
     )
     const wrapper = mount(App)
     await flushPromises()
 
-    await wrapper.find('input').setValue('alice')
-    await wrapper.find('input[type="password"]').setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     expect(wrapper.text()).toContain('Showing 1–12 of 13 item(s).')
     expect(wrapper.text()).toContain('Page 1 of 2')
@@ -236,12 +245,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -301,7 +305,7 @@ describe('App UI validation gates', () => {
     const usernameInput = wrapper.find('input')
     const passwordInput = wrapper.find('input[type="password"]')
 
-    expect((usernameInput.element as HTMLInputElement).value).toBe('alice')
+    expect((usernameInput.element as HTMLInputElement).value).toBe(TEST_ACCOUNT.username)
     expect((passwordInput.element as HTMLInputElement).value).toBe('')
   })
 
@@ -341,12 +345,7 @@ describe('App UI validation gates', () => {
     await mobileModeRadio.setValue(true)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     expect(workshop.login).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -415,7 +414,7 @@ describe('App UI validation gates', () => {
   it('clears saved session from login panel', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
-      rememberedUsername: 'alice',
+      rememberedUsername: TEST_ACCOUNT.username,
       rememberAuth: true,
       hasStoredAuth: true,
       preferredAuthMode: 'otp'
@@ -451,7 +450,7 @@ describe('App UI validation gates', () => {
   it('clears saved session before quitting after keep-signed-in is unticked', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
-      rememberedUsername: 'alice',
+      rememberedUsername: TEST_ACCOUNT.username,
       rememberAuth: true,
       hasStoredAuth: true,
       preferredAuthMode: 'otp'
@@ -519,7 +518,7 @@ describe('App UI validation gates', () => {
     await flushPromises()
 
     const usernameInput = wrapper.find('input')
-    await usernameInput.setValue('alice')
+    await usernameInput.setValue(TEST_ACCOUNT.username)
 
     const checkboxes = wrapper.findAll('input[type="checkbox"]')
     expect(checkboxes.length).toBeGreaterThanOrEqual(2)
@@ -584,7 +583,7 @@ describe('App UI validation gates', () => {
   it('uses saved-session mode only when stored auth exists', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
-      rememberedUsername: 'alice',
+      rememberedUsername: TEST_ACCOUNT.username,
       rememberAuth: true,
       hasStoredAuth: true,
       preferredAuthMode: 'otp'
@@ -608,7 +607,7 @@ describe('App UI validation gates', () => {
 
     expect(workshop.login).toHaveBeenCalledWith(
       expect.objectContaining({
-        username: 'alice',
+        username: TEST_ACCOUNT.username,
         password: '',
         rememberAuth: true,
         useStoredAuth: true
@@ -619,7 +618,7 @@ describe('App UI validation gates', () => {
   it('requires password after unticking keep-signed-in even when saved-session data exists', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
-      rememberedUsername: 'alice',
+      rememberedUsername: TEST_ACCOUNT.username,
       rememberAuth: true,
       hasStoredAuth: true,
       preferredAuthMode: 'otp'
@@ -651,7 +650,7 @@ describe('App UI validation gates', () => {
   it('keeps saved-session login messaging generic before any steam guard challenge is requested', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
-      rememberedUsername: 'alice',
+      rememberedUsername: TEST_ACCOUNT.username,
       rememberAuth: true,
       hasStoredAuth: true,
       preferredAuthMode: 'steam_guard_mobile'
@@ -669,7 +668,7 @@ describe('App UI validation gates', () => {
     expect(wrapper.text()).not.toContain('Save OTP / Email code')
   })
 
-  it('shows dedicated logs section when login times out', async () => {
+  it('shows the SteamCMD session log when login times out', async () => {
     const timeoutRun = {
       runId: '1700000000000-timeout',
       success: false,
@@ -686,15 +685,10 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     expect(workshop.getRunLogs).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('Dedicated Logs')
+    expect(wrapper.text()).toContain('SteamCMD Session Log')
     expect(wrapper.text()).toContain('SteamCMD run exceeded timeout (10000ms)')
   })
 
@@ -704,8 +698,8 @@ describe('App UI validation gates', () => {
 
     const username = wrapper.find('input')
     const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
+    await username.setValue(TEST_ACCOUNT.username)
+    await password.setValue(TEST_ACCOUNT.password)
 
     const checkboxes = wrapper.findAll('input[type="checkbox"]')
     expect(checkboxes.length).toBeGreaterThanOrEqual(2)
@@ -718,7 +712,7 @@ describe('App UI validation gates', () => {
 
     expect(workshop.login).toHaveBeenCalledWith(
       expect.objectContaining({
-        username: 'alice',
+        username: TEST_ACCOUNT.username,
         rememberAuth: true,
         rememberUsername: true
       })
@@ -729,15 +723,10 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     expect(workshop.getCurrentProfile).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('Alice Persona')
+    expect(wrapper.text()).toContain(TEST_ACCOUNT.personaName)
     expect(wrapper.text()).not.toContain('DEV')
 
     const avatar = wrapper.find('.session-avatar')
@@ -763,12 +752,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     expect(wrapper.text()).toContain('DEV')
     expect(wrapper.find('[aria-label="Dev mode enabled"]').exists()).toBe(true)
@@ -778,14 +762,9 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
-    expect(wrapper.text()).not.toContain('v0.1.0')
+    expect(wrapper.text()).not.toContain(`v${TEST_APP_VERSION}`)
 
     const aboutButton = wrapper
       .findAll('button')
@@ -794,19 +773,15 @@ describe('App UI validation gates', () => {
     await aboutButton?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toMatch(/Version:\s*v0\.1\.0/)
+    expect(wrapper.text()).toContain('Version:')
+    expect(wrapper.text()).toContain(`v${TEST_APP_VERSION}`)
   })
 
   it('opens the signed-in settings stage and saves timeout settings', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     const settingsButton = wrapper
       .findAll('button')
@@ -852,12 +827,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     const settingsButton = wrapper
       .findAll('button')
@@ -928,12 +898,7 @@ describe('App UI validation gates', () => {
     await otpModeRadio.setValue(true)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     expect(wrapper.text()).toContain('Save OTP / Email code')
     expect(wrapper.text()).toContain('Sign-in request sent. You can enter OTP / Email code now')
@@ -950,12 +915,7 @@ describe('App UI validation gates', () => {
     await mobileModeRadio.setValue(true)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     expect(wrapper.text()).toContain('Waiting for Steam verification')
     expect(wrapper.text()).toContain('Steam auth request sent.')
@@ -1304,12 +1264,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1331,12 +1286,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1368,12 +1318,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
     expect(createTab).toBeDefined()
@@ -1393,7 +1338,7 @@ describe('App UI validation gates', () => {
     expect(publishArticle).toBeTruthy()
     const publishInputs = publishArticle!.querySelectorAll('input')
     expect(publishInputs.length).toBeGreaterThanOrEqual(2)
-    ;(publishInputs[0] as HTMLInputElement).value = '480'
+    ;(publishInputs[0] as HTMLInputElement).value = TEST_WORKSHOP.appId
     publishInputs[0].dispatchEvent(new Event('input', { bubbles: true }))
     ;(publishInputs[1] as HTMLInputElement).value = 'Created Mod'
     publishInputs[1].dispatchEvent(new Event('input', { bubbles: true }))
@@ -1424,12 +1369,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
     expect(createTab).toBeDefined()
@@ -1449,7 +1389,7 @@ describe('App UI validation gates', () => {
     expect(publishArticle).toBeTruthy()
     const publishInputs = publishArticle!.querySelectorAll('input')
     expect(publishInputs.length).toBeGreaterThanOrEqual(2)
-    ;(publishInputs[0] as HTMLInputElement).value = '480'
+    ;(publishInputs[0] as HTMLInputElement).value = TEST_WORKSHOP.appId
     publishInputs[0].dispatchEvent(new Event('input', { bubbles: true }))
     ;(publishInputs[1] as HTMLInputElement).value = 'Created Mod'
     publishInputs[1].dispatchEvent(new Event('input', { bubbles: true }))
@@ -1472,19 +1412,14 @@ describe('App UI validation gates', () => {
     expect(workshop.uploadMod).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Upload Failed')
     expect(wrapper.text()).toContain('ERROR (No Connection)')
-    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Upload failed. See popup.')
+    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Upload failed: ERROR (No Connection)')
   })
 
   it('keeps create release notes disabled until content folder is selected', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
     expect(createTab).toBeDefined()
@@ -1509,12 +1444,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
     expect(createTab).toBeDefined()
@@ -1534,7 +1464,7 @@ describe('App UI validation gates', () => {
     expect(publishArticle).toBeTruthy()
     const publishInputs = publishArticle!.querySelectorAll('input')
     expect(publishInputs.length).toBeGreaterThanOrEqual(2)
-    ;(publishInputs[0] as HTMLInputElement).value = '480'
+    ;(publishInputs[0] as HTMLInputElement).value = TEST_WORKSHOP.appId
     publishInputs[0].dispatchEvent(new Event('input', { bubbles: true }))
     ;(publishInputs[1] as HTMLInputElement).value = 'Created With Hidden Visibility'
     publishInputs[1].dispatchEvent(new Event('input', { bubbles: true }))
@@ -1558,7 +1488,7 @@ describe('App UI validation gates', () => {
     expect(workshop.uploadMod).toHaveBeenCalledTimes(1)
     expect(workshop.uploadMod).toHaveBeenCalledWith({
       draft: expect.objectContaining({
-        appId: '480',
+        appId: TEST_WORKSHOP.appId,
         title: 'Created With Hidden Visibility',
         visibility: 2
       })
@@ -1569,12 +1499,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     const createTab = wrapper.findAll('button').find((button) => button.text().trim() === 'Create')
     expect(createTab).toBeDefined()
@@ -1594,7 +1519,7 @@ describe('App UI validation gates', () => {
     expect(publishArticle).toBeTruthy()
     const publishInputs = publishArticle!.querySelectorAll('input')
     expect(publishInputs.length).toBeGreaterThanOrEqual(2)
-    ;(publishInputs[0] as HTMLInputElement).value = '480'
+    ;(publishInputs[0] as HTMLInputElement).value = TEST_WORKSHOP.appId
     publishInputs[0].dispatchEvent(new Event('input', { bubbles: true }))
     ;(publishInputs[1] as HTMLInputElement).value = 'Created But Cancelled'
     publishInputs[1].dispatchEvent(new Event('input', { bubbles: true }))
@@ -1623,12 +1548,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1652,19 +1572,14 @@ describe('App UI validation gates', () => {
     expect(workshop.updateMod).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Update Failed')
     expect(wrapper.text()).toContain('Steam connection failed after 4 retries')
-    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Update failed. See popup.')
+    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Update failed: Steam connection failed after 4 retries. Check internet/Steam status and retry.')
   })
 
   it('allows update when only preview image is set (no content folder)', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1691,10 +1606,10 @@ describe('App UI validation gates', () => {
     expect(workshop.updateMod).toHaveBeenCalledTimes(1)
     expect(workshop.updateMod).toHaveBeenCalledWith({
       draft: expect.objectContaining({
-        appId: '480',
-        publishedFileId: '123',
+        appId: TEST_WORKSHOP.appId,
+        publishedFileId: TEST_WORKSHOP.publishedFileId,
         contentFolder: '',
-        previewFile: '/mods/preview.png',
+        previewFile: `${TEST_WORKSHOP.contentFolder}/preview.png`,
         title: 'Test Item'
       })
     })
@@ -1706,12 +1621,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1733,12 +1643,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1758,12 +1663,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1793,12 +1693,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1823,8 +1718,8 @@ describe('App UI validation gates', () => {
     expect(workshop.updateMod).toHaveBeenCalledTimes(1)
     expect(workshop.updateMod).toHaveBeenCalledWith({
       draft: expect.objectContaining({
-        appId: '480',
-        publishedFileId: '123',
+        appId: TEST_WORKSHOP.appId,
+        publishedFileId: TEST_WORKSHOP.publishedFileId,
         contentFolder: '',
         previewFile: '',
         title: 'Renamed Test Item'
@@ -1840,12 +1735,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1868,7 +1758,7 @@ describe('App UI validation gates', () => {
 
     expect(wrapper.text()).toContain('Update Failed')
     expect(wrapper.text()).toContain('Selected content folder is empty')
-    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Update failed. See popup.')
+    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Update failed: Selected content folder is empty. Add files or use preview-only update.')
   })
 
   it('auto-loads mod content files after selecting a content folder', async () => {
@@ -1888,12 +1778,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1904,7 +1789,7 @@ describe('App UI validation gates', () => {
     await pickContentFolderButton?.trigger('click')
     await flushPromises()
 
-    expect(workshop.listContentFolderFiles).toHaveBeenCalledWith({ folderPath: '/mods' })
+    expect(workshop.listContentFolderFiles).toHaveBeenCalledWith({ folderPath: TEST_WORKSHOP.contentFolder })
     expect(wrapper.text()).toContain('Content Explorer')
     expect(wrapper.text()).toContain('readme.txt')
     expect(wrapper.text()).toContain('config.json')
@@ -1936,12 +1821,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1968,12 +1848,7 @@ describe('App UI validation gates', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    const username = wrapper.find('input')
-    const password = wrapper.find('input[type="password"]')
-    await username.setValue('alice')
-    await password.setValue('secret')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await signIn(wrapper)
 
     await openUpdateTab(wrapper)
 
@@ -1992,6 +1867,6 @@ describe('App UI validation gates', () => {
     expect(workshop.updateVisibility).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Visibility Update Failed')
     expect(wrapper.text()).toContain('upstream failed')
-    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Visibility update failed. See popup.')
+    expect((wrapper.vm as unknown as { statusMessage: string }).statusMessage).toBe('Visibility update failed: upstream failed')
   })
 })

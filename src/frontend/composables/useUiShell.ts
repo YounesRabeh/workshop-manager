@@ -29,10 +29,10 @@ export function useUiShell(options: UseUiShellOptions) {
   const isFullscreen = ref(false)
   const isAboutOpen = ref(false)
   const activeToast = ref<UiToast | null>(null)
-  const recentRuns = ref<PersistedRunLog[]>([])
+  const runLogs = ref<PersistedRunLog[]>([])
   const selectedRunId = ref('')
   const selectedRun = ref<PersistedRunLog | null>(null)
-  const showLoginLogs = ref(false)
+  const showRunLogs = ref(false)
   let toastTimer: ReturnType<typeof setTimeout> | null = null
 
   function statusBadgeClass(status: PersistedRunLog['status']): string {
@@ -69,14 +69,14 @@ export function useUiShell(options: UseUiShellOptions) {
       // Fall through to local list fallback.
     }
 
-    selectedRun.value = recentRuns.value.find((run) => run.runId === runId) ?? null
+    selectedRun.value = runLogs.value.find((run) => run.runId === runId) ?? null
   }
 
   async function refreshRunLogs(): Promise<void> {
     try {
       const payload = await window.workshop.getRunLogs()
       const runs = Array.isArray(payload) ? payload : []
-      recentRuns.value = runs
+      runLogs.value = runs
 
       const nextRunId = selectedRunId.value || runs[0]?.runId || ''
       if (!nextRunId) {
@@ -88,15 +88,19 @@ export function useUiShell(options: UseUiShellOptions) {
       await selectRun(nextRunId)
     } catch (error) {
       logError('useUiShell::refreshRunLogs', normalizeError(error))
-      recentRuns.value = []
+      runLogs.value = []
       selectedRunId.value = ''
       selectedRun.value = null
     }
   }
 
-  async function showTimeoutLogs(): Promise<void> {
-    showLoginLogs.value = true
+  async function openRunLogs(): Promise<void> {
+    showRunLogs.value = true
     await refreshRunLogs()
+  }
+
+  function closeRunLogs(): void {
+    showRunLogs.value = false
   }
 
   function syncFullscreenState(): void {
@@ -216,15 +220,16 @@ export function useUiShell(options: UseUiShellOptions) {
     isFullscreen,
     isAboutOpen,
     activeToast,
-    recentRuns,
+    runLogs,
     selectedRunId,
     selectedRun,
-    showLoginLogs,
+    showRunLogs,
     statusBadgeClass,
     formatRunTimestamp,
     selectRun,
     refreshRunLogs,
-    showTimeoutLogs,
+    openRunLogs,
+    closeRunLogs,
     toggleFullscreen,
     openAboutModal,
     closeAboutModal,

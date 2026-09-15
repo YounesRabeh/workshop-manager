@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { useAuthFlow } from '@frontend/composables/useAuthFlow'
+import { TEST_ACCOUNT, TEST_APP_VERSION } from '../../../fixtures/workshop-seed'
 
 describe('useAuthFlow composable', () => {
   type ProfilesPayload = {
@@ -30,7 +31,7 @@ describe('useAuthFlow composable', () => {
     })),
     getProfiles: vi.fn<() => Promise<ProfilesPayload>>(async () => ({
       profiles: [],
-      rememberedUsername: 'alice',
+      rememberedUsername: TEST_ACCOUNT.username,
       rememberAuth: false,
       hasStoredAuth: false,
       preferredAuthMode: 'otp'
@@ -62,11 +63,11 @@ describe('useAuthFlow composable', () => {
       }
     })),
     getCurrentProfile: vi.fn(async () => ({
-      steamId64: '7656119',
-      personaName: 'Alice',
+      steamId64: TEST_ACCOUNT.steamId64,
+      personaName: TEST_ACCOUNT.personaName,
       avatarUrl: ''
     })),
-    getAppVersion: vi.fn(async () => ({ version: '0.1.0' })),
+    getAppVersion: vi.fn(async () => ({ version: TEST_APP_VERSION })),
     openPath: vi.fn(async () => ({ ok: true })),
     quitApp: vi.fn(async () => ({ ok: true })),
     pickSteamCmdExecutable: vi.fn(async () => '/tools/steamcmd.sh')
@@ -88,8 +89,8 @@ describe('useAuthFlow composable', () => {
       onSignedOut: vi.fn()
     })
 
-    flow.loginForm.username = 'alice'
-    flow.loginForm.password = 'secret'
+    flow.loginForm.username = TEST_ACCOUNT.username
+    flow.loginForm.password = TEST_ACCOUNT.password
     await flow.login()
 
     expect(onShowTimeoutLogs).toHaveBeenCalledTimes(1)
@@ -106,8 +107,8 @@ describe('useAuthFlow composable', () => {
       onSignedOut: vi.fn()
     })
 
-    flow.loginForm.username = 'alice'
-    flow.loginForm.password = 'secret'
+    flow.loginForm.username = TEST_ACCOUNT.username
+    flow.loginForm.password = TEST_ACCOUNT.password
     await flow.login()
 
     expect(flow.loginState.value).toBe('signed_in')
@@ -182,7 +183,7 @@ describe('useAuthFlow composable', () => {
       onSignedOut: vi.fn()
     })
 
-    flow.loginForm.password = 'secret'
+    flow.loginForm.password = TEST_ACCOUNT.password
     flow.loginForm.rememberAuth = true
     flow.hasPersistedStoredSession.value = true
 
@@ -281,8 +282,8 @@ describe('useAuthFlow composable', () => {
       onSteamCmdPathRequired
     })
 
-    flow.loginForm.username = 'alice'
-    flow.loginForm.password = 'secret'
+    flow.loginForm.username = TEST_ACCOUNT.username
+    flow.loginForm.password = TEST_ACCOUNT.password
     await flow.login()
 
     expect(onSteamCmdPathRequired).toHaveBeenCalledTimes(1)
@@ -310,7 +311,7 @@ describe('useAuthFlow composable', () => {
   it('hydrates keep-signed-in preference even when cached auth is not available', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
-      rememberedUsername: 'alice',
+      rememberedUsername: TEST_ACCOUNT.username,
       rememberAuth: true,
       hasStoredAuth: false,
       preferredAuthMode: 'otp'
@@ -333,7 +334,7 @@ describe('useAuthFlow composable', () => {
   it('hydrates preferred auth mode from profiles payload and defaults to otp', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
-      rememberedUsername: 'alice',
+      rememberedUsername: TEST_ACCOUNT.username,
       rememberAuth: false,
       hasStoredAuth: false,
       preferredAuthMode: 'steam_guard_mobile'
@@ -351,7 +352,7 @@ describe('useAuthFlow composable', () => {
 
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
-      rememberedUsername: 'alice',
+      rememberedUsername: TEST_ACCOUNT.username,
       rememberAuth: false,
       hasStoredAuth: false,
       preferredAuthMode: undefined
@@ -368,8 +369,8 @@ describe('useAuthFlow composable', () => {
       onSignedOut: vi.fn()
     })
 
-    flow.loginForm.username = 'alice'
-    flow.loginForm.password = 'secret'
+    flow.loginForm.username = TEST_ACCOUNT.username
+    flow.loginForm.password = TEST_ACCOUNT.password
     flow.setPreferredAuthMode('steam_guard_mobile')
     await flow.login()
 
@@ -740,7 +741,7 @@ describe('useAuthFlow composable', () => {
   it('requires password when keep-signed-in is turned off, even if a saved session exists', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
-      rememberedUsername: 'alice',
+      rememberedUsername: TEST_ACCOUNT.username,
       rememberAuth: true,
       hasStoredAuth: true,
       preferredAuthMode: 'otp'
@@ -765,7 +766,7 @@ describe('useAuthFlow composable', () => {
   it('requires password again after signing out from a saved-session login with keep-signed-in disabled', async () => {
     workshop.getProfiles.mockResolvedValueOnce({
       profiles: [],
-      rememberedUsername: 'alice',
+      rememberedUsername: TEST_ACCOUNT.username,
       rememberAuth: true,
       hasStoredAuth: true,
       preferredAuthMode: 'otp'

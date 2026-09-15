@@ -210,14 +210,16 @@ const {
   isFullscreen,
   isAboutOpen,
   activeToast,
-  recentRuns,
+  runLogs,
   selectedRunId,
   selectedRun,
-  showLoginLogs,
+  showRunLogs,
   statusBadgeClass,
   formatRunTimestamp,
   selectRun,
   refreshRunLogs,
+  openRunLogs,
+  closeRunLogs,
   toggleFullscreen,
   openAboutModal,
   closeAboutModal,
@@ -391,10 +393,10 @@ const createChecklist = computed<PublishChecklistItem[]>(() => {
 })
 
 showTimeoutLogsHandler = async () => {
-  await uiShell.showTimeoutLogs()
+  await openRunLogs()
 }
 hideTimeoutLogsHandler = () => {
-  uiShell.showLoginLogs.value = false
+  closeRunLogs()
 }
 signedInRefreshHandler = async () => {
   await Promise.all([loadWorkshopItems(), refreshCurrentProfile()])
@@ -477,11 +479,19 @@ async function refreshSelectedWorkshopItem(): Promise<void> {
   reconcileWorkshopSelection()
 }
 
-async function pickCreatePreviewFile(): Promise<void> {
-  const path = await window.workshop.pickFile()
-  if (path) {
-    createDraft.previewFile = path
+async function pickPreviewFileForMode(mode: 'create' | 'update'): Promise<void> {
+  try {
+    const path = await window.workshop.pickFile()
+    if (path) getDraftForMode(mode).previewFile = path
+  } catch (error) {
+    const parsed = normalizeError(error)
+    statusMessage.value = `Preview selection failed: ${parsed.message}`
+    showToast({ tone: 'error', title: 'Invalid Preview Image', detail: parsed.message })
   }
+}
+
+async function pickCreatePreviewFile(): Promise<void> {
+  await pickPreviewFileForMode('create')
 }
 
 async function pickCreateContentFolder(): Promise<void> {
@@ -508,10 +518,7 @@ async function openSettingsStage(): Promise<void> {
 }
 
 async function pickUpdatePreviewFile(): Promise<void> {
-  const path = await window.workshop.pickFile()
-  if (path) {
-    updateDraft.previewFile = path
-  }
+  await pickPreviewFileForMode('update')
 }
 </script>
 
@@ -576,9 +583,9 @@ async function pickUpdatePreviewFile(): Promise<void> {
         @clear-stored-session="clearStoredSession"
         @quit-app="quitApp"
       />
-      <div v-if="showLoginLogs" class="app-shell pb-6">
+      <div v-if="showRunLogs" class="app-shell pb-6">
         <LogsSection
-          :recent-runs="recentRuns"
+          :run-logs="runLogs"
           :selected-run-id="selectedRunId"
           :selected-run="selectedRun"
           :format-run-timestamp="formatRunTimestamp"
@@ -617,6 +624,32 @@ async function pickUpdatePreviewFile(): Promise<void> {
         />
 
         <section
+          v-if="statusMessage"
+          class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#2c4b63] bg-[#132536] px-4 py-3 text-sm text-slate-200"
+          role="status"
+          aria-live="polite"
+        >
+          <p>{{ statusMessage }}</p>
+          <button
+            class="steam-btn-muted rounded px-3 py-2 text-xs font-semibold"
+            @click="showRunLogs ? closeRunLogs() : openRunLogs()"
+          >
+            {{ showRunLogs ? 'Hide SteamCMD Log' : 'View SteamCMD Log' }}
+          </button>
+        </section>
+
+        <LogsSection
+          v-if="showRunLogs"
+          :run-logs="runLogs"
+          :selected-run-id="selectedRunId"
+          :selected-run="selectedRun"
+          :format-run-timestamp="formatRunTimestamp"
+          :status-badge-class="statusBadgeClass"
+          @refresh="refreshRunLogs"
+          @select-run="selectRun"
+        />
+
+        <section
           v-if="publishProgressVisible"
           class="my-5 rounded-xl border border-[#2c4b63] bg-[linear-gradient(180deg,rgba(27,45,63,0.94)_0%,rgba(16,30,43,0.94)_100%)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(102,192,244,0.22)]"
           role="status"
@@ -643,7 +676,6 @@ async function pickUpdatePreviewFile(): Promise<void> {
           :is-loading="workshopStore.isLoadingWorkshopItems.value"
           :workshop-items="paginatedWorkshopItems"
           :all-items-count="workshopItemsTotalCount"
-          :filtered-items-count="workshopItemsTotalCount"
           :current-page="workshopItemsPage"
           :total-pages="workshopItemsTotalPages"
           :page-start="workshopItemsPageStart"

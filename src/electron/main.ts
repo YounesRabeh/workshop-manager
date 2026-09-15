@@ -26,6 +26,7 @@ import { resolveSteamCmdPlatformProfile } from '@backend/services/steamcmd/platf
 import { SteamCmdRuntimeService } from '@backend/services/steamcmd/runtime-service'
 import { getAppPaths } from '@backend/services/app/path-provider'
 import { listContentFolderFiles } from '@backend/services/workshop/content-folder-scanner'
+import { validateWorkshopPreviewFile } from '@backend/services/workshop/preview-validator'
 import { createMainWindow } from './main-window'
 import { decryptSecret, encryptSecret, isSecureStorageAvailable } from './secret-store'
 import { handleIpc } from './ipc-helpers'
@@ -442,7 +443,12 @@ app.whenReady().then(async () => {
       filters: [{ name: 'Steam Workshop images', extensions: ['png', 'jpg', 'jpeg', 'gif'] }]
     })
     const selectedPath = result.filePaths[0]
-    await localImagePreviewAccess.approve(selectedPath)
+    if (!selectedPath) return undefined
+    await validateWorkshopPreviewFile(selectedPath)
+    const approved = await localImagePreviewAccess.approve(selectedPath)
+    if (!approved) {
+      throw new AppError('validation', 'The selected Workshop preview could not be loaded as an image.')
+    }
     return selectedPath
   })
 

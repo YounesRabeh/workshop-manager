@@ -84,8 +84,8 @@ export function evaluateUpdateRequirements(fields: RequirementFields): {
   valid: boolean
   missing: UpdateMissingField[]
 } {
-  const appId = hasText(fields.appId)
-  const publishedFileId = hasText(fields.publishedFileId)
+  const appId = isNumericText(fields.appId)
+  const publishedFileId = isNumericText(fields.publishedFileId)
   const title = hasText(fields.title)
   const updatePath = getUpdateDraftPath(fields)
   const contentOrPreview = updatePath !== 'none'
@@ -119,8 +119,8 @@ export function evaluateVisibilityRequirements(fields: RequirementFields): {
   valid: boolean
   missing: VisibilityMissingField[]
 } {
-  const appId = hasText(fields.appId)
-  const publishedFileId = hasText(fields.publishedFileId)
+  const appId = isNumericText(fields.appId)
+  const publishedFileId = isNumericText(fields.publishedFileId)
   const visibility = fields.visibility !== undefined && [0, 1, 2, 3].includes(fields.visibility)
   const missing: VisibilityMissingField[] = []
 

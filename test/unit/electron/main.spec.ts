@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { TEST_ACCOUNT, TEST_APP_VERSION, TEST_WORKSHOP, createUploadDraft } from '../../fixtures/workshop-seed'
 
 const mocks = vi.hoisted(() => {
   const handlers = new Map<string, (...args: unknown[]) => unknown>()
@@ -7,7 +8,7 @@ const mocks = vi.hoisted(() => {
     getSteamCmdManualPath: vi.fn(async () => undefined),
     getTimeoutSettings: vi.fn(async () => ({ loginTimeoutMs: 60_000, storedSessionTimeoutMs: 10_000, workshopTimeoutMs: 60_000 })),
     getRememberAuth: vi.fn(async () => true),
-    getRememberedUsername: vi.fn(async () => 'alice'),
+    getRememberedUsername: vi.fn(async () => TEST_ACCOUNT.username),
     getPreferredAuthMode: vi.fn(async () => 'otp'),
     getWebApiKeyEncrypted: vi.fn(async () => 'encrypted-key'),
     getWebApiEnabled: vi.fn(async () => true),
@@ -50,7 +51,7 @@ vi.mock('electron', () => ({
     on: vi.fn(),
     setName: vi.fn(),
     setDesktopName: vi.fn(),
-    getVersion: vi.fn(() => '1.6.7'),
+    getVersion: vi.fn(() => TEST_APP_VERSION),
     quit: vi.fn(),
     exit: vi.fn()
   },
@@ -71,11 +72,12 @@ vi.mock('@backend/services/app/path-provider', () => ({
   getAppPaths: vi.fn(() => ({ dataDir: '/data', profilesPath: '/data/profiles.json', runLogsDir: '/data/logs', runtimeDir: '/data/runtime' }))
 }))
 vi.mock('@backend/services/workshop/content-folder-scanner', () => ({ listContentFolderFiles: vi.fn(async () => []) }))
+vi.mock('@backend/services/workshop/preview-validator', () => ({ validateWorkshopPreviewFile: vi.fn(async () => undefined) }))
 vi.mock('../../../src/electron/main-window', () => ({
   createMainWindow: vi.fn(async () => ({ webContents: { send: vi.fn() } }))
 }))
 vi.mock('../../../src/electron/secret-store', () => ({
-  decryptSecret: vi.fn(() => 'decrypted-api-key'),
+  decryptSecret: vi.fn(() => TEST_ACCOUNT.apiKey),
   encryptSecret: vi.fn(() => 'encrypted-new-key'),
   isSecureStorageAvailable: vi.fn(() => true)
 }))
@@ -108,12 +110,12 @@ describe('Electron main-process wiring', () => {
   })
 
   it('passes paged workshop requests through with the main-process secret', async () => {
-    const payload = { appId: '480', page: 2, pageSize: 12, visibility: 'public' }
+    const payload = { appId: TEST_WORKSHOP.appId, page: 2, pageSize: 12, visibility: 'public' }
     const handler = mocks.handlers.get('workshop:getMyWorkshopItemsPage')!
 
     await handler(payload)
 
-    expect(mocks.runtime.getMyWorkshopItemsPage).toHaveBeenCalledWith(payload, 'decrypted-api-key', {
+    expect(mocks.runtime.getMyWorkshopItemsPage).toHaveBeenCalledWith(payload, TEST_ACCOUNT.apiKey, {
       allowWebApi: true,
       webApiAccess: 'active'
     })
@@ -122,13 +124,13 @@ describe('Electron main-process wiring', () => {
   it('normalizes login persistence and delegates uploads', async () => {
     const login = mocks.handlers.get('workshop:login')!
     await expect(login({
-      username: 'alice', password: 'secret', rememberUsername: false,
+      username: TEST_ACCOUNT.username, password: TEST_ACCOUNT.password, rememberUsername: false,
       rememberAuth: true, useStoredAuth: true, preferredAuthMode: 'steam_guard_mobile'
-    })).resolves.toMatchObject({ sessionId: 'session-1', rememberedUsername: 'alice' })
-    expect(mocks.runtime.login).toHaveBeenCalledWith('alice', 'secret', true, 'steam_guard_mobile')
+    })).resolves.toMatchObject({ sessionId: 'session-1', rememberedUsername: TEST_ACCOUNT.username })
+    expect(mocks.runtime.login).toHaveBeenCalledWith(TEST_ACCOUNT.username, TEST_ACCOUNT.password, true, 'steam_guard_mobile')
 
     const upload = mocks.handlers.get('workshop:uploadMod')!
-    const draft = { appId: '480', contentFolder: '/mods', title: 'Test' }
+    const draft = createUploadDraft({ title: 'Test' })
     await upload({ draft })
     expect(mocks.runtime.upload).toHaveBeenCalledWith(draft, 'upload')
   })

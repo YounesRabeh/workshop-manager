@@ -6,7 +6,8 @@
     "src/frontend/**/*.vue",
     "src/frontend/**/*.d.ts",
     "src/shared/**/*.ts",
-    "test/unit/frontend/**/*.ts"
+    "test/unit/frontend/**/*.ts",
+    "test/fixtures/**/*.ts"
   ],
   "compilerOptions": {
     "composite": true,

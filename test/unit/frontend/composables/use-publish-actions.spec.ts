@@ -4,14 +4,15 @@ import { computed, reactive, ref } from 'vue'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { usePublishActions } from '@frontend/composables/usePublishActions'
 import type { StagedContentFile } from '@frontend/types/ui'
+import { TEST_WORKSHOP, createWorkshopItem } from '../../../fixtures/workshop-seed'
 
 describe('usePublishActions composable', () => {
   const workshop = {
     uploadMod: vi.fn(async () => ({ publishedFileId: '200' })),
-    updateMod: vi.fn(async () => ({ publishedFileId: '100' })),
+    updateMod: vi.fn(async () => ({ publishedFileId: TEST_WORKSHOP.publishedFileId })),
     updateVisibility: vi.fn(async () => ({ ok: true })),
     getMyWorkshopItems: vi.fn(async () => [
-      { publishedFileId: '100', title: 'Updated', appId: '480', visibility: 2 }
+      createWorkshopItem({ title: 'Updated', visibility: 2 })
     ])
   }
 
@@ -22,24 +23,24 @@ describe('usePublishActions composable', () => {
 
   function createHarness(options?: { hasPendingUpdateChanges?: boolean }) {
     const loginState = ref<'signed_out' | 'signed_in'>('signed_in')
-    const selectedWorkshopItemId = ref('100')
-    const workshopItems = ref([{ publishedFileId: '100', title: 'Item', appId: '480', visibility: 0 as 0 | 1 | 2 | 3 }])
+    const selectedWorkshopItemId = ref<string>(TEST_WORKSHOP.publishedFileId)
+    const workshopItems = ref([createWorkshopItem({ title: 'Item' })])
     const selectedWorkshopItem = computed(() =>
       workshopItems.value.find((item) => item.publishedFileId === selectedWorkshopItemId.value)
     )
     const workshopFilterAppId = ref('')
     const createDraft = reactive({
-      appId: '480',
+      appId: TEST_WORKSHOP.appId,
       publishedFileId: '',
-      contentFolder: '/mods',
+      contentFolder: TEST_WORKSHOP.contentFolder,
       previewFile: '',
       title: 'Create Item',
       releaseNotes: ''
     })
     const updateDraft = reactive({
-      appId: '480',
-      publishedFileId: '100',
-      contentFolder: '/mods',
+      appId: TEST_WORKSHOP.appId,
+      publishedFileId: TEST_WORKSHOP.publishedFileId,
+      contentFolder: TEST_WORKSHOP.contentFolder,
       previewFile: '',
       title: 'Update Item',
       releaseNotes: ''
@@ -144,7 +145,7 @@ describe('usePublishActions composable', () => {
     expect(workshop.uploadMod).toHaveBeenCalledTimes(1)
     expect(workshop.uploadMod).toHaveBeenCalledWith({
       draft: expect.objectContaining({
-        appId: '480',
+        appId: TEST_WORKSHOP.appId,
         title: 'Create Item'
       })
     })
@@ -203,7 +204,7 @@ describe('usePublishActions composable', () => {
       title: 'Update Failed',
       tone: 'error'
     })
-    expect(harness.statuses.at(-1)).toBe('Update failed. See popup.')
+    expect(harness.statuses.at(-1)).toBe('Update failed: upstream failed')
   })
 
   it('blocks update confirmation when no pending changes exist', () => {

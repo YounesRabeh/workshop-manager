@@ -47,8 +47,12 @@ function normalizePageInput(input: WorkshopItemsPageInput): Required<Pick<Worksh
   if (!Number.isSafeInteger(input.pageSize) || input.pageSize < 1 || input.pageSize > 100) {
     throw new AppError('validation', 'Workshop page size must be between 1 and 100.')
   }
+  const appId = input.appId?.trim() || undefined
+  if (appId && !/^\d+$/.test(appId)) {
+    throw new AppError('validation', 'Workshop App ID filter must contain digits only.')
+  }
   return {
-    appId: input.appId?.trim() || undefined,
+    appId,
     page: input.page,
     pageSize: input.pageSize,
     visibility: input.visibility ?? 'all'
@@ -377,26 +381,16 @@ export class WorkshopFetchService {
     steamId64: string,
     request: ReturnType<typeof normalizePageInput>
   ): Promise<WorkshopItemsPage> {
-    const params = new URLSearchParams({
-      browsefilter: 'myfiles',
-      numperpage: String(request.pageSize),
-      p: String(request.page)
-    })
-    if (request.appId) params.set('appid', request.appId)
-    const response = await this.fetchSteam(
-      `https://steamcommunity.com/profiles/${steamId64}/myworkshopfiles/?${params.toString()}`
-    )
-    if (!response.ok) throw new AppError('command_failed', `Community workshop page fetch failed with status ${response.status}`)
-    const html = await response.text()
-    const ids = extractWorkshopFileIdsFromHtml(html)
-    let items = ids.length > 0 ? await this.fetchPublishedFileDetails(ids) : []
-    if (request.appId) items = items.filter((item) => item.appId === request.appId)
-    items = items.filter((item) => matchesVisibility(item, request.visibility ?? 'all'))
+    const allItems = await this.getMyWorkshopItemsWithCommunity(steamId64, request.appId)
+    const filteredItems = allItems.filter((item) => matchesVisibility(item, request.visibility ?? 'all'))
+    const start = (request.page - 1) * request.pageSize
+    const items = filteredItems.slice(start, start + request.pageSize)
     return {
       items,
       page: request.page,
       pageSize: request.pageSize,
-      hasNext: request.page < extractMaxWorkshopPage(html)
+      hasNext: start + request.pageSize < filteredItems.length,
+      totalItems: filteredItems.length
     }
   }
 
@@ -523,7 +517,7 @@ export class WorkshopFetchService {
       )
       if (!response.ok) {
         this.appendDiagnosticLog(`community request appId=${appId ?? 'all'} page=${page} status=${response.status}`)
-        continue
+        throw new AppError('command_failed', `Community workshop page ${page} fetch failed with status ${response.status}`)
       }
       const html = await response.text()
       const ids = extractWorkshopFileIdsFromHtml(html)

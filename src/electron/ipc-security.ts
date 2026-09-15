@@ -51,6 +51,11 @@ export class LocalImagePreviewAccess {
       if (!fileStats.isFile() || fileStats.size > MAX_IMAGE_PREVIEW_BYTES) {
         return false
       }
+      const extension = extname(canonicalPath).toLowerCase()
+      const bytes = await readFile(canonicalPath)
+      if (!hasExpectedImageSignature(extension, bytes)) {
+        return false
+      }
       this.approvedRealPaths.add(canonicalPath)
       return true
     } catch {

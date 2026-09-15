@@ -46,23 +46,30 @@ describe('WorkshopFetchService', () => {
 
     await expect(service.getMyWorkshopItemsPage({ page: 0, pageSize: 12 })).rejects.toMatchObject({ code: 'validation' })
     await expect(service.getMyWorkshopItemsPage({ page: 1, pageSize: 101 })).rejects.toMatchObject({ code: 'validation' })
+    await expect(service.getMyWorkshopItemsPage({ appId: 'not-a-number', page: 1, pageSize: 12 })).rejects.toMatchObject({
+      code: 'validation',
+      message: 'Workshop App ID filter must contain digits only.'
+    })
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('falls back to the requested Community page when the Web API fails', async () => {
+  it('filters the complete Community result before paginating and reports an exact total', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input)
       if (url.includes('IPublishedFileService/GetUserFiles')) return new Response('failure', { status: 503 })
       if (url.includes('/myworkshopfiles/')) {
-        return new Response(
-          '<a href="?p=3">3</a><a href="https://steamcommunity.com/sharedfiles/filedetails/?id=222">Item</a>',
-          { status: 200 }
-        )
+        const page = new URL(url).searchParams.get('p')
+        const html = page === '1'
+          ? '<a href="?p=2">2</a><a href="https://steamcommunity.com/sharedfiles/filedetails/?id=111">Hidden one</a><a href="https://steamcommunity.com/sharedfiles/filedetails/?id=333">Public</a>'
+          : '<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=222">Hidden two</a>'
+        return new Response(html, { status: 200 })
       }
       if (url.includes('GetPublishedFileDetails')) {
-        return new Response(JSON.stringify({ response: { publishedfiledetails: [{
-          publishedfileid: '222', title: 'Community item', consumer_appid: '480', visibility: 2
-        }] } }), { status: 200, headers: { 'content-type': 'application/json' } })
+        return new Response(JSON.stringify({ response: { publishedfiledetails: [
+          { publishedfileid: '111', title: 'Hidden one', consumer_appid: '480', visibility: 2 },
+          { publishedfileid: '333', title: 'Public', consumer_appid: '480', visibility: 0 },
+          { publishedfileid: '222', title: 'Hidden two', consumer_appid: '480', visibility: 2 }
+        ] } }), { status: 200, headers: { 'content-type': 'application/json' } })
       }
       throw new Error(`Unexpected URL: ${url}`)
     })
@@ -71,16 +78,18 @@ describe('WorkshopFetchService', () => {
     })
 
     const result = await service.getMyWorkshopItemsPage(
-      { appId: '480', page: 2, pageSize: 12, visibility: 'hidden' },
+      { appId: '480', page: 2, pageSize: 1, visibility: 'hidden' },
       'api-key',
       { allowWebApi: true }
     )
 
-    expect(result).toMatchObject({ page: 2, pageSize: 12, hasNext: true })
+    expect(result).toMatchObject({ page: 2, pageSize: 1, totalItems: 2, hasNext: false })
     expect(result.items.map((item) => item.publishedFileId)).toEqual(['222'])
-    const communityUrl = fetchSpy.mock.calls.map(([input]) => String(input)).find((url) => url.includes('/myworkshopfiles/'))
-    expect(communityUrl).toContain('p=2')
-    expect(communityUrl).toContain('numperpage=12')
+    const communityUrls = fetchSpy.mock.calls.map(([input]) => String(input)).filter((url) => url.includes('/myworkshopfiles/'))
+    expect(communityUrls).toHaveLength(2)
+    expect(communityUrls[0]).toContain('p=1')
+    expect(communityUrls[1]).toContain('p=2')
+    expect(communityUrls[0]).toContain('numperpage=30')
   })
 
   it('throws auth error when not logged in', async () => {

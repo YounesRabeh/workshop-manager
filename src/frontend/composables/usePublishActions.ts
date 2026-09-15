@@ -56,14 +56,14 @@ function actionFailureTitle(operation: 'upload' | 'update' | 'visibility'): stri
   return 'Visibility Update Failed'
 }
 
-function actionFailureStatus(operation: 'upload' | 'update' | 'visibility'): string {
+function actionFailureStatus(operation: 'upload' | 'update' | 'visibility', message: string): string {
   if (operation === 'upload') {
-    return 'Upload failed. See popup.'
+    return `Upload failed: ${message}`
   }
   if (operation === 'update') {
-    return 'Update failed. See popup.'
+    return `Update failed: ${message}`
   }
-  return 'Visibility update failed. See popup.'
+  return `Visibility update failed: ${message}`
 }
 
 function buildUploadDraft(
@@ -188,7 +188,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
   function handleActionFailure(operation: 'upload' | 'update' | 'visibility', error: unknown): void {
     const parsed = normalizeError(error)
     logError(`usePublishActions::${operation}`, parsed)
-    options.setStatusMessage(actionFailureStatus(operation))
+    options.setStatusMessage(actionFailureStatus(operation, parsed.message))
     options.showToast({
       tone: 'error',
       title: actionFailureTitle(operation),
