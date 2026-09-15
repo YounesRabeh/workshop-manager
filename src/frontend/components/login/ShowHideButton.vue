@@ -1,3 +1,7 @@
+<!--
+  Overview: Reusable password/API visibility toggle button.
+  Responsibility: Displays the current visibility action and emits a toggle event to its parent control.
+-->
 <script setup lang="ts">
 const props = withDefaults(
   defineProps<{

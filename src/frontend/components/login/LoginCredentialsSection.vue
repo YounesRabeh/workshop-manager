@@ -1,3 +1,7 @@
+<!--
+  Overview: Credential and advanced Web API fields for the login form.
+  Responsibility: Renders username/password and API-key controls while emitting field and persistence events to the login coordinator.
+-->
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { AdvancedSettingsState, LoginFormState } from '../../types/ui'

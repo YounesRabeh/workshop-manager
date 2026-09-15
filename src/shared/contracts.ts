@@ -1,9 +1,9 @@
-import type { SteamCmdTimeoutSettings } from './runtime-settings'
-
 /**
  * Overview: Declares shared TypeScript contracts used across Electron main, preload, and renderer layers.
  * Responsibility: Defines canonical data models, IPC payload/result shapes, and error/run/install typing for end-to-end consistency.
  */
+import type { SteamCmdTimeoutSettings } from './runtime-settings'
+
 export type ErrorCode =
   | 'validation'
   | 'install'

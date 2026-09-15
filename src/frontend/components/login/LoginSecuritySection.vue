@@ -1,3 +1,7 @@
+<!--
+  Overview: Steam Guard authentication-mode and verification-code controls.
+  Responsibility: Presents OTP/mobile approval state and emits the selected mode or submitted code to the login flow.
+-->
 <script setup lang="ts">
 import { toggleCheckboxOrRadioOnEnter } from '../../events/keyboard-events'
 import type { PreferredAuthMode } from '../../types/ui'

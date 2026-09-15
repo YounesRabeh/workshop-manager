@@ -1,3 +1,8 @@
+/**
+ * Overview: Secures external URLs and local image-preview access at the Electron boundary.
+ * Responsibility: Restricts protocols, approves canonical image files, validates signatures,
+ * and serves data only for explicitly approved local paths.
+ */
 import { realpath, stat, readFile } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
 

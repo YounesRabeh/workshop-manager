@@ -1,3 +1,7 @@
+<!--
+  Overview: Stored-session and remembered-account controls for the login form.
+  Responsibility: Renders persistence choices and exposes the clear-session action without owning authentication state.
+-->
 <script setup lang="ts">
 import type { LoginFormState } from '../../types/ui'
 

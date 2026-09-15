@@ -1,4 +1,8 @@
-/** Domain policy that bounds Workshop remote work separately from SteamCMD and UI timeouts. */
+/**
+ * Overview: Defines limits for remote Workshop metadata requests.
+ * Responsibility: Keeps network timeouts, pagination bounds, and details-request batch sizes
+ * in one validated policy shared by Workshop fetch services.
+ */
 export interface WorkshopFetchPolicy {
   requestTimeoutMs: number
   maxCommunityPages: number

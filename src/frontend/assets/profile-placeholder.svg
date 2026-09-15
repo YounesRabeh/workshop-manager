@@ -1,6 +1,6 @@
 <!--
-  Overview: profile-placeholder.svg file in frontend/assets.
-  Responsibility: Defines the main structure/content for this part of the app.
+  Overview: Fallback avatar artwork for profiles without a usable Steam image.
+  Responsibility: Provides a self-contained, theme-aligned SVG placeholder for account surfaces.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Profile placeholder">
   <defs>

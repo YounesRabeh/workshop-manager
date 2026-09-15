@@ -1,4 +1,8 @@
-/** Validates Steam Workshop preview images before they enter the publish flow. */
+/**
+ * Overview: Validates local Steam Workshop preview images before selection or publishing.
+ * Responsibility: Enforces supported formats, file-size limits, readable files, and image signatures
+ * so invalid previews fail with actionable validation errors at the file boundary.
+ */
 import { readFile, stat } from 'node:fs/promises'
 import { extname } from 'node:path'
 import { AppError } from '@backend/utils/errors'

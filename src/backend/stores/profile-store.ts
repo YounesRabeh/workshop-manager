@@ -1,5 +1,6 @@
 /**
- * Store Overview
+ * Overview: Owns the local JSON database for Workshop profiles and user preferences.
+ * Responsibility: Provides serialized, atomic persistence with schema recovery and normalized settings.
  *
  * `ProfileStore` owns the local JSON database for Workshop profiles and
  * user preferences that need to survive app restarts. The file is intentionally

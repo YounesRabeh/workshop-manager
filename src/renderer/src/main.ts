@@ -1,5 +1,5 @@
 /**
- * Overview: main.ts module in renderer/src.
- * Responsibility: Holds the primary logic/exports for this area of the app.
+ * Overview: Renderer bundle entrypoint used by the Electron build.
+ * Responsibility: Delegates startup to the shared frontend bootstrap so the packaged renderer and development entry use one initialization path.
  */
 import '../../frontend/main'
