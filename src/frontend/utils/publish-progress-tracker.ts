@@ -146,7 +146,7 @@ export class PublishProgressTracker {
       if (Number.isFinite(rawValue)) {
         return {
           percent: clampPercent(rawValue),
-          label: 'Uploading files to Steam...'
+          label: this.progressLabel()
         }
       }
     }
@@ -199,6 +199,13 @@ export class PublishProgressTracker {
     }
 
     return null
+  }
+
+  private progressLabel(): string {
+    if (this.phase.value === 'visibility') {
+      return 'Updating item visibility with Steam...'
+    }
+    return 'Uploading files to Steam...'
   }
 
   private scheduleDismiss(): void {

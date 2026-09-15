@@ -53,6 +53,26 @@ describe('PublishProgressTracker', () => {
     expect(tracker.label.value).toBe('Steam reported an issue. Waiting for final status...')
   })
 
+  it('uses visibility-specific copy for Steam percentage output', () => {
+    const tracker = new PublishProgressTracker()
+
+    tracker.handleRunEvent({
+      runId: 'visibility-run',
+      ts: Date.now(),
+      type: 'run_started',
+      phase: 'visibility'
+    })
+    tracker.handleRunEvent({
+      runId: 'visibility-run',
+      ts: Date.now(),
+      type: 'stdout',
+      phase: 'visibility',
+      line: 'Update progress: 12%'
+    })
+
+    expect(tracker.label.value).toBe('Updating item visibility with Steam...')
+  })
+
   it('dismisses after completion', () => {
     vi.useFakeTimers()
     const tracker = new PublishProgressTracker(100)
