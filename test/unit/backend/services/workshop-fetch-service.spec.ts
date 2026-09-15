@@ -38,6 +38,51 @@ describe('WorkshopFetchService', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
+  it('validates paged requests before making network calls', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const service = new WorkshopFetchService({
+      getLoginState: () => ({ username: 'Alice', steamId64: '76561198000000000' })
+    })
+
+    await expect(service.getMyWorkshopItemsPage({ page: 0, pageSize: 12 })).rejects.toMatchObject({ code: 'validation' })
+    await expect(service.getMyWorkshopItemsPage({ page: 1, pageSize: 101 })).rejects.toMatchObject({ code: 'validation' })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the requested Community page when the Web API fails', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input)
+      if (url.includes('IPublishedFileService/GetUserFiles')) return new Response('failure', { status: 503 })
+      if (url.includes('/myworkshopfiles/')) {
+        return new Response(
+          '<a href="?p=3">3</a><a href="https://steamcommunity.com/sharedfiles/filedetails/?id=222">Item</a>',
+          { status: 200 }
+        )
+      }
+      if (url.includes('GetPublishedFileDetails')) {
+        return new Response(JSON.stringify({ response: { publishedfiledetails: [{
+          publishedfileid: '222', title: 'Community item', consumer_appid: '480', visibility: 2
+        }] } }), { status: 200, headers: { 'content-type': 'application/json' } })
+      }
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    const service = new WorkshopFetchService({
+      getLoginState: () => ({ username: 'Alice', steamId64: '76561198000000000' })
+    })
+
+    const result = await service.getMyWorkshopItemsPage(
+      { appId: '480', page: 2, pageSize: 12, visibility: 'hidden' },
+      'api-key',
+      { allowWebApi: true }
+    )
+
+    expect(result).toMatchObject({ page: 2, pageSize: 12, hasNext: true })
+    expect(result.items.map((item) => item.publishedFileId)).toEqual(['222'])
+    const communityUrl = fetchSpy.mock.calls.map(([input]) => String(input)).find((url) => url.includes('/myworkshopfiles/'))
+    expect(communityUrl).toContain('p=2')
+    expect(communityUrl).toContain('numperpage=12')
+  })
+
   it('throws auth error when not logged in', async () => {
     const service = new WorkshopFetchService({
       getLoginState: () => null

@@ -47,4 +47,23 @@ describe('content folder scanner', () => {
     const files = await listContentFolderFiles(root)
     expect(files.map((file) => file.relativePath)).toEqual(['target.txt'])
   })
+
+  it('rejects hierarchies deeper than the configured safety limit', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'content-scan-depth-'))
+    await mkdir(join(root, 'one', 'two'), { recursive: true })
+    await writeFile(join(root, 'one', 'two', 'file.txt'), 'x')
+
+    await expect(listContentFolderFiles(root, { maxDepth: 1 })).rejects.toThrow('exceeds 1 levels')
+  })
+
+  it('rejects folders exceeding the configured file-count limit', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'content-scan-count-'))
+    await Promise.all(['one', 'two', 'three'].map((name) => writeFile(join(root, `${name}.txt`), name)))
+
+    await expect(listContentFolderFiles(root, { maxFiles: 2 })).rejects.toThrow('more than 2 files')
+  })
+
+  it('rejects invalid safety-limit configuration', async () => {
+    await expect(listContentFolderFiles('/tmp', { maxDepth: -1 })).rejects.toThrow('limits are invalid')
+  })
 })

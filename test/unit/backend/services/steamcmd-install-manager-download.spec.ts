@@ -105,4 +105,41 @@ describe('SteamCmdInstallManager download failures', () => {
     )
     expect(getMock).toHaveBeenCalledTimes(1)
   })
+
+  it('rejects archives whose declared size exceeds the download limit', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'steamcmd-install-'))
+    getMock.mockImplementation((_url: string, callback: (response: PassThrough & { statusCode?: number; headers?: Record<string, string> }) => void) => {
+      const request = Object.assign(new EventEmitter(), { setTimeout: vi.fn(), destroy: vi.fn() })
+      const response = Object.assign(new PassThrough(), {
+        statusCode: 200,
+        headers: { 'content-length': String(129 * 1024 * 1024) }
+      })
+      queueMicrotask(() => callback(response))
+      return request
+    })
+
+    await expect(new SteamCmdInstallManager(root, 'linux').ensureInstalled()).rejects.toMatchObject({
+      code: 'install',
+      message: expect.stringContaining('exceeds the allowed archive size')
+    })
+    expect(createWriteStreamMock).not.toHaveBeenCalled()
+  })
+
+  it('aborts a stalled download after the configured timeout', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'steamcmd-install-'))
+    const destroy = vi.fn()
+    getMock.mockImplementation(() => {
+      const request = Object.assign(new EventEmitter(), {
+        destroy,
+        setTimeout: vi.fn((_ms: number, callback: () => void) => queueMicrotask(callback))
+      })
+      return request
+    })
+
+    await expect(new SteamCmdInstallManager(root, 'linux').ensureInstalled()).rejects.toMatchObject({
+      code: 'timeout',
+      message: 'SteamCMD download timed out'
+    })
+    expect(destroy).toHaveBeenCalled()
+  })
 })

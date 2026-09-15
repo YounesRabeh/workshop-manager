@@ -136,4 +136,32 @@ describe('WorkshopCommandService', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('rejects filtered staging when available disk space is insufficient', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'wm-command-space-'))
+    const contentDir = join(root, 'content')
+    const includedPath = join(contentDir, 'keep.txt')
+    const excludedPath = join(contentDir, 'ignore.txt')
+    await mkdir(contentDir, { recursive: true })
+    await writeFile(includedPath, 'keep')
+    await writeFile(excludedPath, 'ignore')
+    vi.mocked(listContentFolderFiles).mockResolvedValueOnce([
+      { absolutePath: includedPath, relativePath: 'keep.txt', sizeBytes: 4 },
+      { absolutePath: excludedPath, relativePath: 'ignore.txt', sizeBytes: 6 }
+    ])
+
+    try {
+      const service = new WorkshopCommandService(join(root, 'runtime'), {
+        getAvailableDiskBytes: async () => 3
+      })
+      await expect(service.prepare('alice', {
+        appId: '480', contentFolder: contentDir, title: 'No space', excludedContentPaths: ['ignore.txt']
+      }, 'upload')).rejects.toMatchObject({
+        code: 'validation',
+        message: expect.stringContaining('Not enough free disk space')
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

@@ -22,6 +22,15 @@ export interface PreparedWorkshopCommand {
   cleanup: () => Promise<void>
 }
 
+interface WorkshopCommandServiceDependencies {
+  getAvailableDiskBytes?: (path: string) => Promise<number>
+}
+
+async function getAvailableDiskBytes(path: string): Promise<number> {
+  const filesystem = await statfs(path)
+  return Number(filesystem.bavail) * Number(filesystem.bsize)
+}
+
 function normalizeExcludedPath(path: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/^\.\//, '')
   const segments = normalized.split('/')
@@ -35,7 +44,8 @@ async function prepareFilteredContentFolder(
   draft: UploadDraft,
   runtimeDir: string,
   runId: string,
-  mode: 'upload' | 'update' | 'visibility'
+  mode: 'upload' | 'update' | 'visibility',
+  resolveAvailableDiskBytes: (path: string) => Promise<number>
 ): Promise<{ draft: UploadDraft; stagingPath?: string }> {
   const excludedPaths = draft.excludedContentPaths ?? []
   if (mode === 'visibility' || excludedPaths.length === 0) {
@@ -71,8 +81,7 @@ async function prepareFilteredContentFolder(
   await mkdir(stagingPath, { recursive: true })
   try {
     const requiredBytes = includedFiles.reduce((total, file) => total + file.sizeBytes, 0)
-    const filesystem = await statfs(stagingPath)
-    const availableBytes = Number(filesystem.bavail) * Number(filesystem.bsize)
+    const availableBytes = await resolveAvailableDiskBytes(stagingPath)
     if (Number.isFinite(availableBytes) && requiredBytes > availableBytes) {
       throw new AppError('validation', 'Not enough free disk space to stage the selected content files.')
     }
@@ -122,7 +131,14 @@ async function ensureUpdateContentFolderHasFiles(draft: UploadDraft): Promise<vo
 }
 
 export class WorkshopCommandService {
-  constructor(private readonly runtimeDir: string) {}
+  private readonly resolveAvailableDiskBytes: (path: string) => Promise<number>
+
+  constructor(
+    private readonly runtimeDir: string,
+    dependencies: WorkshopCommandServiceDependencies = {}
+  ) {
+    this.resolveAvailableDiskBytes = dependencies.getAvailableDiskBytes ?? getAvailableDiskBytes
+  }
 
   async prepare(
     username: string,
@@ -131,7 +147,13 @@ export class WorkshopCommandService {
   ): Promise<PreparedWorkshopCommand> {
     validateDraft(draft, mode)
     const runId = createRunId()
-    const filteredContent = await prepareFilteredContentFolder(draft, this.runtimeDir, runId, mode)
+    const filteredContent = await prepareFilteredContentFolder(
+      draft,
+      this.runtimeDir,
+      runId,
+      mode,
+      this.resolveAvailableDiskBytes
+    )
     const effectiveDraft = filteredContent.draft
     const vdfPath = join(this.runtimeDir, `${runId}.vdf`)
     const cleanup = async (): Promise<void> => {

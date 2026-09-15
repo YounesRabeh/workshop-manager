@@ -13,7 +13,56 @@ describe('useWorkshopItems composable', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    delete (workshop as typeof workshop & { getMyWorkshopItemsPage?: unknown }).getMyWorkshopItemsPage
     ;(window as unknown as { workshop: typeof workshop }).workshop = workshop
+  })
+
+  it('uses the production paged API and sends page, size, app, and visibility filters', async () => {
+    const getMyWorkshopItemsPage = vi.fn()
+      .mockResolvedValueOnce({
+        items: Array.from({ length: 12 }, (_, index) => ({
+          publishedFileId: String(index + 1), title: `Item ${index + 1}`, appId: '480', visibility: 0
+        })),
+        page: 1,
+        pageSize: 12,
+        totalItems: 13,
+        hasNext: true
+      })
+      .mockResolvedValueOnce({
+        items: [{ publishedFileId: '13', title: 'Item 13', appId: '480', visibility: 0 }],
+        page: 2,
+        pageSize: 12,
+        totalItems: 13,
+        hasNext: false
+      })
+      .mockResolvedValueOnce({ items: [], page: 1, pageSize: 12, totalItems: 0, hasNext: false })
+    ;(workshop as typeof workshop & { getMyWorkshopItemsPage: typeof getMyWorkshopItemsPage }).getMyWorkshopItemsPage = getMyWorkshopItemsPage
+    const store = useWorkshopItems({
+      canAccessMods: () => true,
+      normalizeError: () => ({ code: 'command_failed', message: 'failed' }),
+      setStatusMessage: () => undefined,
+      onSelectWorkshopItem: () => undefined
+    })
+    store.onChangeAppId('480')
+
+    await store.loadWorkshopItems()
+    expect(getMyWorkshopItemsPage).toHaveBeenNthCalledWith(1, {
+      appId: '480', page: 1, pageSize: 12, visibility: 'all'
+    })
+    expect(workshop.getMyWorkshopItems).not.toHaveBeenCalled()
+    expect(store.workshopItemsTotalPages.value).toBe(2)
+
+    store.goToWorkshopItemsPage(2)
+    await vi.waitFor(() => expect(store.workshopItems.value[0]?.publishedFileId).toBe('13'))
+    expect(getMyWorkshopItemsPage).toHaveBeenNthCalledWith(2, {
+      appId: '480', page: 2, pageSize: 12, visibility: 'all'
+    })
+
+    store.onChangeWorkshopVisibilityFilter('hidden')
+    await vi.waitFor(() => expect(getMyWorkshopItemsPage).toHaveBeenCalledTimes(3))
+    expect(getMyWorkshopItemsPage).toHaveBeenNthCalledWith(3, {
+      appId: '480', page: 1, pageSize: 12, visibility: 'hidden'
+    })
   })
 
   it('blocks loading when not authenticated', async () => {

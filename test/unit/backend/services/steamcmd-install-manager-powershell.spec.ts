@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -88,5 +88,26 @@ describe('SteamCmdInstallManager Windows ZIP extraction', () => {
     expect(status.installed).toBe(true)
     expect(status.source).toBe('auto')
     expect(status.executablePath).toBe(join(root, 'steamcmd', 'portable', 'steamcmd.exe'))
+  })
+
+  it('rejects an invalid archive signature and removes the downloaded file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'steamcmd-install-'))
+    getMock.mockImplementation((_url: string, callback: (response: PassThrough & { statusCode?: number }) => void) => {
+      const request = new EventEmitter()
+      const response = new PassThrough() as PassThrough & { statusCode?: number }
+      response.statusCode = 200
+      queueMicrotask(() => {
+        callback(response)
+        response.end('not-a-zip')
+      })
+      return request
+    })
+
+    await expect(new SteamCmdInstallManager(root, 'windows').ensureInstalled()).rejects.toMatchObject({
+      code: 'install',
+      message: expect.stringContaining('not a valid installer archive')
+    })
+    expect(extractZipMock).not.toHaveBeenCalled()
+    await expect(access(join(root, 'steamcmd', 'steamcmd.zip'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })

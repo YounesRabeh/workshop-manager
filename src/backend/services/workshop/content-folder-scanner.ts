@@ -12,6 +12,11 @@ import { AppError } from '@backend/utils/errors'
 const MAX_SCAN_DEPTH = 64
 const MAX_SCANNED_FILES = 100_000
 
+export interface ContentScanLimits {
+  maxDepth?: number
+  maxFiles?: number
+}
+
 function normalizeRelativePath(path: string): string {
   return path.replace(/\\/g, '/')
 }
@@ -20,13 +25,21 @@ function compareByNameAsc(a: { name: string }, b: { name: string }): number {
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
 }
 
-export async function listContentFolderFiles(folderPath: string): Promise<ContentFolderFileEntry[]> {
+export async function listContentFolderFiles(
+  folderPath: string,
+  limits: ContentScanLimits = {}
+): Promise<ContentFolderFileEntry[]> {
   const normalizedInput = folderPath.trim()
   if (normalizedInput.length === 0) {
     throw new AppError('validation', 'Content folder path is required.')
   }
 
   const rootPath = resolve(normalizedInput)
+  const maxDepth = limits.maxDepth ?? MAX_SCAN_DEPTH
+  const maxFiles = limits.maxFiles ?? MAX_SCANNED_FILES
+  if (!Number.isSafeInteger(maxDepth) || maxDepth < 0 || !Number.isSafeInteger(maxFiles) || maxFiles < 1) {
+    throw new AppError('validation', 'Content scan limits are invalid.')
+  }
 
   let rootStats
   try {
@@ -43,8 +56,8 @@ export async function listContentFolderFiles(folderPath: string): Promise<Conten
   const files: ContentFolderFileEntry[] = []
 
   const walk = async (currentPath: string, depth: number): Promise<void> => {
-    if (depth > MAX_SCAN_DEPTH) {
-      throw new AppError('validation', `Content folder hierarchy exceeds ${MAX_SCAN_DEPTH} levels.`)
+    if (depth > maxDepth) {
+      throw new AppError('validation', `Content folder hierarchy exceeds ${maxDepth} levels.`)
     }
     let entries
     try {
@@ -86,8 +99,8 @@ export async function listContentFolderFiles(folderPath: string): Promise<Conten
         relativePath: normalizeRelativePath(relative(rootPath, absolutePath)),
         sizeBytes: fileStats.size
       })
-      if (files.length > MAX_SCANNED_FILES) {
-        throw new AppError('validation', `Content folder contains more than ${MAX_SCANNED_FILES.toLocaleString()} files.`)
+      if (files.length > maxFiles) {
+        throw new AppError('validation', `Content folder contains more than ${maxFiles.toLocaleString()} files.`)
       }
     }
   }
