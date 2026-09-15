@@ -164,4 +164,41 @@ describe('WorkshopCommandService', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('rejects a preview at or above the Steam one-megabyte limit before creating a run', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'wm-command-preview-size-'))
+    const previewPath = join(root, 'preview.png')
+    await writeFile(previewPath, Buffer.alloc(1024 * 1024))
+
+    try {
+      const service = new WorkshopCommandService(join(root, 'runtime'))
+      await expect(service.prepare('alice', {
+        appId: '480', contentFolder: '/mods', previewFile: previewPath, title: 'Oversized preview'
+      }, 'upload')).rejects.toMatchObject({
+        code: 'validation',
+        message: expect.stringContaining('under 1 MB')
+      })
+      await expect(access(join(root, 'runtime'))).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects unsupported Workshop preview formats', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'wm-command-preview-format-'))
+    const previewPath = join(root, 'preview.webp')
+    await writeFile(previewPath, 'image')
+
+    try {
+      const service = new WorkshopCommandService(join(root, 'runtime'))
+      await expect(service.prepare('alice', {
+        appId: '480', contentFolder: '/mods', previewFile: previewPath, title: 'Unsupported preview'
+      }, 'upload')).rejects.toMatchObject({
+        code: 'validation',
+        message: expect.stringContaining('PNG, JPG, or GIF')
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

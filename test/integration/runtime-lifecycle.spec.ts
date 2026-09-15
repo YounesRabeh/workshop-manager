@@ -349,7 +349,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       {
         appId: '480',
         contentFolder: '/mods',
-        previewFile: '/mods/preview.png',
+        previewFile: '',
         title: 'My Mod',
         changenote: 'Initial release notes'
       },
@@ -400,7 +400,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
         appId: '480',
         publishedFileId: '123',
         contentFolder: '',
-        previewFile: '/mods/preview.png',
+        previewFile: '',
         title: 'My Mod'
       },
       'update'
@@ -445,7 +445,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
           appId: '480',
           publishedFileId: '123',
           contentFolder: '',
-          previewFile: '/mods/preview.png',
+          previewFile: '',
           title: 'My Mod'
         },
         'update'
@@ -508,7 +508,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
           appId: '480',
           publishedFileId: '123',
           contentFolder: '',
-          previewFile: '/mods/preview.png',
+          previewFile: '',
           title: 'My Mod'
         },
         'update'
@@ -521,7 +521,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
           appId: '480',
           publishedFileId: '123',
           contentFolder: '',
-          previewFile: '/mods/preview.png',
+          previewFile: '',
           title: 'My Mod'
         },
         'update'
@@ -802,7 +802,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       {
         appId: '480',
         contentFolder: '/mods',
-        previewFile: '/mods/preview.png',
+        previewFile: '',
         title: 'My Mod'
       },
       'upload'
@@ -862,7 +862,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
         {
           appId: '480',
           contentFolder: '/mods',
-          previewFile: '/mods/preview.png',
+          previewFile: '',
           title: 'My Mod'
         },
         'upload'
@@ -927,7 +927,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
         {
           appId: '480',
           contentFolder: '/mods',
-          previewFile: '/mods/preview.png',
+          previewFile: '',
           title: 'My Linux Mod'
         },
         'upload'
@@ -1392,7 +1392,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       {
         appId: '480',
         contentFolder: '/mods',
-        previewFile: '/mods/preview.png',
+        previewFile: '',
         title: 'My Mod'
       },
       'upload'
@@ -1513,7 +1513,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       {
         appId: '480',
         contentFolder: '/mods',
-        previewFile: '/mods/preview.png',
+        previewFile: '',
         title: 'My Mod'
       },
       'upload'

@@ -14,7 +14,7 @@ import {
   resolveLoginTimeoutMs,
   steamId64FromAccountId
 } from '@backend/services/steamcmd/runtime-service'
-import { isLoginSuccessLine } from '@backend/services/steam/output-parser'
+import { isLoginSuccessLine, parsePublishedFileId } from '@backend/services/steam/output-parser'
 
 describe('steamcmd runtime helpers', () => {
   it('builds workshop upload args in expected order', () => {
@@ -409,5 +409,40 @@ Steam>`)
     expect(failure).toBe(
       'Steam denied creating this Workshop item (Access Denied). Verify app ownership/permissions and ensure your Steam account can publish for this game.'
     )
+  })
+
+  it('classifies Steam limit-exceeded failures with preview and quota guidance', () => {
+    const failure = parseWorkshopRunFailure(
+      [
+        'Create new workshop item ( PublishFileID 3802050931).',
+        'Uploading content...ERROR! Failed to update workshop item (Limit exceeded).'
+      ],
+      'upload'
+    )
+
+    expect(failure).toContain('EResult 25')
+    expect(failure).toContain('Preview images must be under 1 MB')
+    expect(failure).toContain('Steam Cloud')
+    expect(failure).toContain('item 3802050931')
+  })
+
+  it('extracts the compact PublishFileID format emitted by real SteamCMD creates', () => {
+    expect(parsePublishedFileId([
+      'Create new workshop item ( PublishFileID 3802051045).'
+    ])).toBe('3802051045')
+  })
+
+  it.each([
+    ['Invalid Param', 'EResult 8'],
+    ['File Not Found', 'EResult 9'],
+    ['Insufficient Privilege', 'EResult 24'],
+    ['Duplicate Request', 'EResult 29']
+  ])('maps the Steam %s Workshop result', (result, expected) => {
+    const failure = parseWorkshopRunFailure(
+      [`ERROR! Failed to update workshop item (${result}).`],
+      'update'
+    )
+
+    expect(failure).toContain(expected)
   })
 })

@@ -129,6 +129,44 @@ export function parseWorkshopRunFailure(
   const retryMatches = joined.match(/\bretrying\.\.\./gi)
   const retryCount = retryMatches?.length ?? 0
 
+  const resultMatch = joined.match(/failed to (?:create new|update) workshop item\s*\(([^)]+)\)/i)
+  const steamResult = resultMatch?.[1]?.trim().toLowerCase()
+
+  if (steamResult === 'limit exceeded') {
+    if (mode === 'visibility') {
+      return 'Steam rejected the visibility change because a limit was exceeded (EResult 25). Wait briefly and retry; if it persists, check the account and app Workshop limits.'
+    }
+    const createdItemId = mode === 'upload' ? parsePublishedFileId(lines) : undefined
+    const createdItemNotice = createdItemId
+      ? ` Steam created item ${createdItemId} before rejecting its content, so the item may need to be updated or removed.`
+      : ''
+    return `Steam rejected the Workshop upload because a limit was exceeded (EResult 25). Preview images must be under 1 MB; app owners should also check the Steam Cloud per-user byte and file quotas.${createdItemNotice}`
+  }
+
+  if (steamResult === 'invalid param') {
+    return 'Steam rejected an invalid Workshop field (EResult 8). Check the app ID, item ID, title, visibility, and selected paths.'
+  }
+
+  if (steamResult === 'file not found') {
+    return 'Steam could not read an upload file (EResult 9). Check that the content folder and preview file still exist and are readable.'
+  }
+
+  if (steamResult === 'busy' || steamResult === 'service unavailable') {
+    return `Steam is temporarily ${steamResult === 'busy' ? 'busy' : 'unavailable'}. Wait briefly, then retry the Workshop operation.`
+  }
+
+  if (steamResult === 'insufficient privilege') {
+    return 'Steam account privileges do not allow this Workshop operation (EResult 24). Verify game ownership, Workshop permissions, and account restrictions.'
+  }
+
+  if (steamResult === 'duplicate request') {
+    return 'Steam reports this request was already processed (EResult 29). Refresh the Workshop item list before retrying.'
+  }
+
+  if (steamResult === 'persist failed' || steamResult === 'locking failed') {
+    return 'Steam could not save the Workshop update. This is usually temporary; wait briefly and retry.'
+  }
+
   if (/failed to create new workshop item\s*\(access denied\)|access denied/i.test(joined)) {
     return 'Steam denied creating this Workshop item (Access Denied). Verify app ownership/permissions and ensure your Steam account can publish for this game.'
   }
@@ -148,7 +186,7 @@ export function parseWorkshopRunFailure(
     return 'Steam connection failed. Check internet/Steam status and retry.'
   }
 
-  if (/failed to update workshop item\s*\(failure\)/i.test(joined)) {
+  if (steamResult === 'failure' || /failed to update workshop item\s*\(failure\)/i.test(joined)) {
     if (mode === 'visibility') {
       return 'Steam failed to change item visibility. Retry shortly.'
     }
@@ -176,7 +214,7 @@ export function isWorkshopSuccessLine(line: string): boolean {
 
 export function parsePublishedFileId(lines: string[]): string | undefined {
   const joined = lines.join('\n')
-  const idMatch = joined.match(/published file id\s*[:=]\s*(\d+)/i)
+  const idMatch = joined.match(/\bpublish(?:ed)?\s*file\s*id\b\s*[:=]?\s*(\d+)/i)
   return idMatch?.[1]
 }
 

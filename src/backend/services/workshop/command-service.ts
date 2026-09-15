@@ -4,9 +4,9 @@
  * Responsibility: Validates drafts, checks update content folders,
  *  writes run-scoped VDF files, and returns executable command arguments.
  */
-import { copyFile, mkdir, rm, statfs, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, rm, stat, statfs, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { dirname, join } from 'node:path'
+import { dirname, extname, join } from 'node:path'
 import type { UploadDraft } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
 import { validateDraft } from '@backend/utils/validation'
@@ -25,6 +25,9 @@ export interface PreparedWorkshopCommand {
 interface WorkshopCommandServiceDependencies {
   getAvailableDiskBytes?: (path: string) => Promise<number>
 }
+
+const MAX_WORKSHOP_PREVIEW_BYTES = 1024 * 1024
+const SUPPORTED_WORKSHOP_PREVIEW_EXTENSIONS = new Set(['.gif', '.jpeg', '.jpg', '.png'])
 
 async function getAvailableDiskBytes(path: string): Promise<number> {
   const filesystem = await statfs(path)
@@ -130,6 +133,37 @@ async function ensureUpdateContentFolderHasFiles(draft: UploadDraft): Promise<vo
   }
 }
 
+async function validatePreviewFile(previewFile: string | undefined): Promise<void> {
+  const previewPath = previewFile?.trim()
+  if (!previewPath) {
+    return
+  }
+
+  const extension = extname(previewPath).toLowerCase()
+  if (!SUPPORTED_WORKSHOP_PREVIEW_EXTENSIONS.has(extension)) {
+    throw new AppError('validation', 'Steam Workshop previews must be PNG, JPG, or GIF images.')
+  }
+
+  try {
+    const previewStats = await stat(previewPath)
+    if (!previewStats.isFile()) {
+      throw new AppError('validation', 'Selected Workshop preview is not a file.')
+    }
+    if (previewStats.size >= MAX_WORKSHOP_PREVIEW_BYTES) {
+      const sizeMiB = (previewStats.size / MAX_WORKSHOP_PREVIEW_BYTES).toFixed(2)
+      throw new AppError(
+        'validation',
+        `Workshop preview is ${sizeMiB} MB. Steam requires preview images under 1 MB.`
+      )
+    }
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error
+    }
+    throw new AppError('validation', 'Could not read the selected Workshop preview. Check the file path and permissions.')
+  }
+}
+
 export class WorkshopCommandService {
   private readonly resolveAvailableDiskBytes: (path: string) => Promise<number>
 
@@ -146,6 +180,9 @@ export class WorkshopCommandService {
     mode: 'upload' | 'update' | 'visibility'
   ): Promise<PreparedWorkshopCommand> {
     validateDraft(draft, mode)
+    if (mode !== 'visibility') {
+      await validatePreviewFile(draft.previewFile)
+    }
     const runId = createRunId()
     const filteredContent = await prepareFilteredContentFolder(
       draft,

@@ -439,7 +439,7 @@ app.whenReady().then(async () => {
   handleIpc(IPC_CHANNELS.pickFile, async () => {
     const result = await showOpenDialog({
       properties: ['openFile'],
-      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+      filters: [{ name: 'Steam Workshop images', extensions: ['png', 'jpg', 'jpeg', 'gif'] }]
     })
     const selectedPath = result.filePaths[0]
     await localImagePreviewAccess.approve(selectedPath)

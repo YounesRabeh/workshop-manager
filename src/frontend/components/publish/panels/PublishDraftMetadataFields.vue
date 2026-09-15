@@ -56,6 +56,7 @@ function onReleaseNotesInput(event: Event): void {
   <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
     <div class="max-w-[22rem]">
       <label class="text-sm text-slate-300">Thumbnail (optional)</label>
+      <p class="mt-0.5 text-[11px] text-slate-400">PNG, JPG, or GIF; must be under 1 MB.</p>
       <button
         type="button"
         class="publish-preview-picker mt-1"
