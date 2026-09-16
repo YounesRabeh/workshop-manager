@@ -20,7 +20,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN package_manager="$(node -p 'require("./package.json").packageManager')" \
   && case "${package_manager}" in pnpm@*) pnpm_version="${package_manager#pnpm@}" ;; *) exit 1 ;; esac \
   && pnpm_version="${pnpm_version%%+*}" \
-  && npm install --global "pnpm@${pnpm_version}" \
+  && corepack enable \
+  && corepack prepare "pnpm@${pnpm_version}" --activate \
   && pnpm --version \
   && pnpm install --frozen-lockfile
 

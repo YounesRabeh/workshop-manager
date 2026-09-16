@@ -30,7 +30,8 @@ WORKDIR C:\project
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN $packageManager = (Get-Content package.json -Raw | ConvertFrom-Json).packageManager; `
     if ($packageManager -notmatch '^pnpm@([^+]+)') { throw 'package.json must declare packageManager as pnpm@<version>.' }; `
-    npm install --global "pnpm@$($Matches[1])"; `
+    corepack.cmd enable; `
+    corepack.cmd prepare "pnpm@$($Matches[1])" --activate; `
     pnpm --version; `
     pnpm install --frozen-lockfile
 

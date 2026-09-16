@@ -25,7 +25,8 @@ RUN arch="$(dpkg --print-architecture)" \
   && (cd /tmp && grep " ${node_tarball}$" SHASUMS256.txt | sha256sum -c -) \
   && tar -xJf "/tmp/${node_tarball}" -C /usr/local --strip-components=1 --no-same-owner \
   && rm -f "/tmp/${node_tarball}" /tmp/SHASUMS256.txt \
-  && npm install --global "pnpm@${PNPM_VERSION}" \
+  && corepack enable \
+  && corepack prepare "pnpm@${PNPM_VERSION}" --activate \
   && pnpm --version
 
 RUN mkdir -p \
