@@ -306,10 +306,12 @@ function createOneShotGuardChallengeChild(options: {
 }
 
 function readRunScriptArg(args: string[]): string | undefined {
-  if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+  const runScriptIndex = args.indexOf('+runscript')
+  const scriptPath = args[runScriptIndex + 1]
+  if (runScriptIndex < 0 || typeof scriptPath !== 'string') {
     return undefined
   }
-  return readFileSync(args[1], 'utf8')
+  return readFileSync(scriptPath, 'utf8')
 }
 
 function jsonResponse(payload: unknown, status = 200): Response {
@@ -831,8 +833,8 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       let capturedWorkshopScript = ''
 
       ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-        if (args[0] === '+runscript' && typeof args[1] === 'string') {
-          const scriptContent = readFileSync(args[1], 'utf8')
+        const scriptContent = readRunScriptArg(args)
+        if (scriptContent !== undefined) {
           if (/workshop_build_item/i.test(scriptContent)) {
             capturedWorkshopScript = scriptContent
             return createOneShotFakeChild({
@@ -871,7 +873,8 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       expect(result.success).toBe(true)
       expect(spawn).toHaveBeenCalledTimes(2)
       const uploadArgs = vi.mocked(spawn).mock.calls[1]?.[1]
-      expect(uploadArgs?.[0]).toBe('+runscript')
+      expect(uploadArgs?.[0]).toBe('-noipv6')
+      expect(uploadArgs).toContain('+runscript')
       expect(uploadArgs).not.toContain('+workshop_build_item')
       expect(capturedWorkshopScript).toContain('@ShutdownOnFailedCommand 1')
       expect(capturedWorkshopScript).toContain('@NoPromptForPassword 1')
@@ -896,11 +899,11 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       const capturedScripts: string[] = []
 
       ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+        const scriptContent = readRunScriptArg(args)
+        if (scriptContent === undefined) {
           throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
         }
 
-        const scriptContent = readFileSync(args[1], 'utf8')
         capturedScripts.push(scriptContent)
         if (/workshop_build_item/i.test(scriptContent)) {
           return createOneShotFakeChild({
@@ -936,8 +939,8 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       expect(result.success).toBe(true)
       expect(result.publishedFileId).toBe('888')
       expect(spawn).toHaveBeenCalledTimes(2)
-      expect(vi.mocked(spawn).mock.calls[0]?.[1]?.[0]).toBe('+runscript')
-      expect(vi.mocked(spawn).mock.calls[1]?.[1]?.[0]).toBe('+runscript')
+      expect(vi.mocked(spawn).mock.calls[0]?.[1]).toContain('+runscript')
+      expect(vi.mocked(spawn).mock.calls[1]?.[1]).toContain('+runscript')
       expect(capturedScripts[1]).toContain('workshop_build_item')
       expect(capturedScripts[1]).toContain('@NoPromptForPassword 1')
     } finally {
@@ -959,10 +962,11 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       let capturedScript = ''
 
       ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+        const scriptContent = readRunScriptArg(args)
+        if (scriptContent === undefined) {
           throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
         }
-        capturedScript = readFileSync(args[1], 'utf8')
+        capturedScript = scriptContent
         return createOneShotFakeChild({
           lines: ['Logging in using cached credentials.']
         })
@@ -978,7 +982,9 @@ describe('SteamCmdRuntimeService lifecycle', () => {
 
       expect(hasStoredAuth).toBe(true)
       expect(spawn).toHaveBeenCalledTimes(1)
-      expect(vi.mocked(spawn).mock.calls[0]?.[1]?.[0]).toBe('+runscript')
+      const storedAuthArgs = vi.mocked(spawn).mock.calls[0]?.[1]
+      expect(storedAuthArgs?.[0]).toBe('-noipv6')
+      expect(storedAuthArgs).toContain('+runscript')
       expect(capturedScript).toContain('@NoPromptForPassword 1')
       expect(capturedScript).toContain('login alice')
       expect(capturedScript).toContain('\nquit\n')
@@ -1002,7 +1008,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       let childKill: ReturnType<typeof vi.fn> | undefined
 
       ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+        if (readRunScriptArg(args) === undefined) {
           throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
         }
 
@@ -1068,11 +1074,11 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       let childRef: OneShotGuardChallengeChild | undefined
 
       ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+        const scriptContent = readRunScriptArg(args)
+        if (scriptContent === undefined) {
           throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
         }
 
-        const scriptContent = readFileSync(args[1], 'utf8')
         generatedScripts.push(scriptContent)
 
         childRef = createOneShotGuardChallengeChild({
@@ -1143,7 +1149,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       let childRef: OneShotGuardChallengeChild | undefined
 
       ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+        if (readRunScriptArg(args) === undefined) {
           throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
         }
 
@@ -1208,7 +1214,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     let childRef: OneShotGuardChallengeChild | undefined
 
     ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-      if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+      if (readRunScriptArg(args) === undefined) {
         throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
       }
 
@@ -1321,7 +1327,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
       const store = new RunLogStore(join(root, 'runs'))
 
       ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
-        if (args[0] !== '+runscript' || typeof args[1] !== 'string') {
+        if (readRunScriptArg(args) === undefined) {
           throw new Error(`Unexpected spawn args: ${args.join(' ')}`)
         }
 

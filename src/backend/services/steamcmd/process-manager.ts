@@ -5,6 +5,7 @@
  * manages persistent-session invalidation, and writes interactive stdin input.
  */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { buildSteamCmdLaunchArgs } from '@shared/build-config'
 import type { SteamCmdPlatformBehavior } from './platform-profile'
 import type { SteamCmdSessionState } from './process-session-types'
 
@@ -52,7 +53,7 @@ class SteamCmdProcessManager {
   }
 
   spawnOneShot(executablePath: string, args: string[]): ChildProcessWithoutNullStreams {
-    return spawn(executablePath, args, this.buildChildProcessOptions())
+    return spawn(executablePath, buildSteamCmdLaunchArgs(args), this.buildChildProcessOptions())
   }
 
   async ensurePersistentProcess(
@@ -64,7 +65,11 @@ class SteamCmdProcessManager {
     }
 
     const resolvedExecutablePath = executablePath ?? (await this.deps.steamCmdExecutablePath())
-    const child = spawn(resolvedExecutablePath, startupArgs, this.buildChildProcessOptions())
+    const child = spawn(
+      resolvedExecutablePath,
+      buildSteamCmdLaunchArgs(startupArgs),
+      this.buildChildProcessOptions()
+    )
     this.deps.state.persistentProcess = child
     this.deps.state.persistentPromptReady = false
 

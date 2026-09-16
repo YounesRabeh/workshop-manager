@@ -23,6 +23,7 @@ import {
   normalizeSteamCmdTimeoutSettings,
   type SteamCmdTimeoutSettings
 } from '@shared/runtime-settings'
+import { buildSteamCmdLaunchArgs } from '@shared/build-config'
 import { AppError, isRunCancelledError } from '@backend/utils/errors'
 import { RunLogStore } from '@backend/stores/run-log-store'
 import {
@@ -458,7 +459,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
 
     const executeCheck = async (spawnArgs: string[]): Promise<boolean> => {
       return await new Promise<boolean>((resolve) => {
-        const child = spawn(executablePath, spawnArgs, {
+        const child = spawn(executablePath, buildSteamCmdLaunchArgs(spawnArgs), {
           cwd: this.runtimeDir,
           stdio: 'pipe',
           shell: this.platformBehavior.useShellHost,
