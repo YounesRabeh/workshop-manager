@@ -60,6 +60,29 @@ describe('build-executable script helpers', () => {
     })
   })
 
+  it('executes a native pnpm binary directly instead of parsing it with Node', () => {
+    expect(
+      createPnpmInvocation(['icon'], 'linux', {
+        npm_execpath: '/tools/pnpm/bin/pnpm'
+      })
+    ).toEqual({
+      command: '/tools/pnpm/bin/pnpm',
+      args: ['icon']
+    })
+  })
+
+  it('runs a pnpm command shim through the Windows command host', () => {
+    expect(
+      createPnpmInvocation(['icon'], 'win32', {
+        ComSpec: 'C:\\Windows\\System32\\cmd.exe',
+        npm_execpath: 'C:\\tools\\pnpm.cmd'
+      })
+    ).toEqual({
+      command: 'C:\\Windows\\System32\\cmd.exe',
+      args: ['/d', '/s', '/c', '"C:\\tools\\pnpm.cmd" icon']
+    })
+  })
+
   it('builds steps in required default order for linux', () => {
     const steps = buildStepsForPlatform('linux')
     expect(steps.map((s) => s.label)).toEqual([

@@ -5,7 +5,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -24,7 +24,6 @@ export const CONTAINER_PROJECT_DIR = '/project'
 export const CONTAINER_NODE_MODULES_DIR = '/project/node_modules'
 export const CONTAINER_HOME_DIR = '/home/builder'
 export const CONTAINER_PNPM_STORE_DIR = '/pnpm/store'
-export const CONTAINER_COREPACK_HOME = '/pnpm/corepack'
 export const CONTAINER_ELECTRON_CACHE_DIR = '/home/builder/.cache/electron'
 export const CONTAINER_ELECTRON_BUILDER_CACHE_DIR = '/home/builder/.cache/electron-builder'
 export const SUPPORTED_DOCKER_BUILD_HOSTS = ['linux', 'win32']
@@ -89,7 +88,6 @@ export function createDockerMountPaths(projectDir, hostCacheRoot = DEFAULT_HOST_
     homeCacheDir: resolve(homeDir, '.cache'),
     nodeModulesDir: resolve(cacheRoot, 'node_modules'),
     pnpmStoreDir: resolve(cacheRoot, 'pnpm-store'),
-    corepackDir: resolve(cacheRoot, 'corepack'),
     electronCacheDir: resolve(cacheRoot, 'electron-cache'),
     electronBuilderCacheDir: resolve(cacheRoot, 'electron-builder-cache')
   }
@@ -104,17 +102,39 @@ export function ensureDockerMountPathsExist(mountPaths, mkdirSyncImpl = mkdirSyn
 export function createDockerBuildArgs({
   projectDir,
   imageTag,
+  pnpmVersion,
   dockerfilePath = DEFAULT_DOCKERFILE_PATH,
   contextPath = DEFAULT_DOCKER_CONTEXT_PATH
 }) {
+  if (typeof pnpmVersion !== 'string' || pnpmVersion.length === 0) {
+    throw new Error('Docker builds require the pnpm version declared in package.json.')
+  }
+
   return [
     'build',
     '--file',
     resolve(projectDir, dockerfilePath),
+    '--build-arg',
+    `PNPM_VERSION=${pnpmVersion}`,
     '--tag',
     imageTag,
     resolve(projectDir, contextPath)
   ]
+}
+
+export function resolveProjectPnpmVersion(projectDir, readFileSyncImpl = readFileSync) {
+  const packageJsonPath = resolve(projectDir, 'package.json')
+  const packageJson = JSON.parse(readFileSyncImpl(packageJsonPath, 'utf8'))
+  const packageManager = packageJson?.packageManager
+  const match = typeof packageManager === 'string'
+    ? /^pnpm@([^\s+]+)(?:\+.*)?$/.exec(packageManager)
+    : null
+
+  if (!match?.[1]) {
+    throw new Error('package.json must declare packageManager as pnpm@<version>.')
+  }
+
+  return match[1]
 }
 
 export function createContainerForwardedArgs(scriptName, forwardedArgs = []) {
@@ -191,8 +211,6 @@ export function createDockerRunArgs({
     '--env',
     `PNPM_STORE_DIR=${CONTAINER_PNPM_STORE_DIR}`,
     '--env',
-    `COREPACK_HOME=${CONTAINER_COREPACK_HOME}`,
-    '--env',
     `XDG_CACHE_HOME=${resolve(CONTAINER_HOME_DIR, '.cache')}`,
     '--env',
     `ELECTRON_CACHE=${CONTAINER_ELECTRON_CACHE_DIR}`,
@@ -206,8 +224,6 @@ export function createDockerRunArgs({
     `${mountPaths.homeDir}:${CONTAINER_HOME_DIR}`,
     '--volume',
     `${mountPaths.pnpmStoreDir}:${CONTAINER_PNPM_STORE_DIR}`,
-    '--volume',
-    `${mountPaths.corepackDir}:${CONTAINER_COREPACK_HOME}`,
     '--volume',
     `${mountPaths.homeCacheDir}:${resolve(CONTAINER_HOME_DIR, '.cache')}`,
     '--volume',
@@ -316,6 +332,7 @@ export async function runDockerizedBuild(options, deps = {}) {
   const hostIds = options?.hostIds ?? resolveHostIds(platform)
   const mountPaths = createDockerMountPaths(projectDir, options?.hostCacheRoot)
   const identity = createDockerBuildIdentity(projectDir)
+  const pnpmVersion = options?.pnpmVersion ?? resolveProjectPnpmVersion(projectDir)
   const log = deps.log ?? console.log
   const captureCommandImpl = deps.captureCommandImpl ?? runCapturedCommand
   const streamingCommandImpl = deps.streamingCommandImpl ?? runStreamingCommand
@@ -342,7 +359,8 @@ export async function runDockerizedBuild(options, deps = {}) {
     'docker',
     createDockerBuildArgs({
       projectDir,
-      imageTag: identity.imageTag
+      imageTag: identity.imageTag,
+      pnpmVersion
     }),
     { cwd: projectDir },
     deps

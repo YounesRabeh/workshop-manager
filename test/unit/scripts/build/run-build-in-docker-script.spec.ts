@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { SKIP_KILL_INSTANCE_FLAG } from '../../../../scripts/build/build-executable.mjs'
 import {
-  CONTAINER_COREPACK_HOME,
   CONTAINER_ELECTRON_BUILDER_CACHE_DIR,
   CONTAINER_ELECTRON_CACHE_DIR,
   CONTAINER_HOME_DIR,
@@ -19,6 +18,7 @@ import {
   createDockerRunArgs,
   createHostPreflightSteps,
   ensureCommandSucceeded,
+  resolveProjectPnpmVersion,
   resolveHostIds,
   runDockerizedBuild
 } from '../../../../scripts/build/run-build-in-docker.mjs'
@@ -53,16 +53,27 @@ describe('run-build-in-docker script helpers', () => {
     expect(
       createDockerBuildArgs({
         projectDir: '/workspace/mod-manager',
-        imageTag: 'mod-manager:test'
+        imageTag: 'mod-manager:test',
+        pnpmVersion: '12.4.2'
       })
     ).toEqual([
       'build',
       '--file',
       '/workspace/mod-manager/docker/builder.Dockerfile',
+      '--build-arg',
+      'PNPM_VERSION=12.4.2',
       '--tag',
       'mod-manager:test',
       `/workspace/mod-manager/${DEFAULT_DOCKER_CONTEXT_PATH}`
     ])
+  })
+
+  it('reads the Docker pnpm version from the package manager declaration', () => {
+    expect(
+      resolveProjectPnpmVersion('/workspace/mod-manager', () => JSON.stringify({
+        packageManager: 'pnpm@12.4.2+sha512.example'
+      }))
+    ).toBe('12.4.2')
   })
 
   it('uses a stable host cache root for persistent Docker mounts', () => {
@@ -104,8 +115,6 @@ describe('run-build-in-docker script helpers', () => {
         '--env',
         `PNPM_STORE_DIR=${CONTAINER_PNPM_STORE_DIR}`,
         '--env',
-        `COREPACK_HOME=${CONTAINER_COREPACK_HOME}`,
-        '--env',
         `XDG_CACHE_HOME=${CONTAINER_HOME_DIR}/.cache`,
         '--env',
         `ELECTRON_CACHE=${CONTAINER_ELECTRON_CACHE_DIR}`,
@@ -119,8 +128,6 @@ describe('run-build-in-docker script helpers', () => {
         `${mountPaths.homeDir}:${CONTAINER_HOME_DIR}`,
         '--volume',
         `${mountPaths.pnpmStoreDir}:${CONTAINER_PNPM_STORE_DIR}`,
-        '--volume',
-        `${mountPaths.corepackDir}:${CONTAINER_COREPACK_HOME}`,
         '--volume',
         `${mountPaths.homeCacheDir}:${CONTAINER_HOME_DIR}/.cache`,
         '--volume',
@@ -169,6 +176,7 @@ describe('run-build-in-docker script helpers', () => {
         scriptName: 'build:exe:native',
         forwardedArgs: ['--win', '--generate-icon'],
         platform: 'linux',
+        pnpmVersion: '12.4.2',
         hostCacheRoot: '/var/cache/workshop-manager',
         hostIds: { uid: 1000, gid: 1000 }
       },
@@ -218,7 +226,8 @@ describe('run-build-in-docker script helpers', () => {
         commandName: 'docker',
         args: createDockerBuildArgs({
           projectDir,
-          imageTag: identity.imageTag
+          imageTag: identity.imageTag,
+          pnpmVersion: '12.4.2'
         }),
         cwd: projectDir
       },

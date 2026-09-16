@@ -77,7 +77,7 @@ Choose a guide by task, or browse the complete [documentation hub](docs/README.m
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 5"></a>
   <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&amp;logo=tailwindcss&amp;logoColor=white" alt="Tailwind CSS 4"></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-22%20%7C%2024-5FA04E?style=for-the-badge&amp;logo=nodedotjs&amp;logoColor=white" alt="Node.js 22 or 24"></a>
-  <a href="https://pnpm.io/"><img src="https://img.shields.io/badge/pnpm-11-F69220?style=for-the-badge&amp;logo=pnpm&amp;logoColor=white" alt="pnpm 11"></a>
+  <a href="https://pnpm.io/"><img src="https://img.shields.io/badge/pnpm-12-F69220?style=for-the-badge&amp;logo=pnpm&amp;logoColor=white" alt="pnpm 12"></a>
   <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&amp;logo=docker&amp;logoColor=white" alt="Docker"></a>
 </p>
 

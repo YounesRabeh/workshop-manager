@@ -1,7 +1,7 @@
 FROM electronuserland/builder:wine@sha256:8bb6fa0f99a00a5b845521910508958ebbb682b59221f0aa4b82102c22174164
 
 ARG NODE_VERSION=22.22.0
-ARG PNPM_VERSION=11.4.0
+ARG PNPM_VERSION
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=/pnpm:$PATH
@@ -13,6 +13,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 RUN arch="$(dpkg --print-architecture)" \
+  && test -n "${PNPM_VERSION}" \
   && case "$arch" in \
     amd64) node_arch='x64' ;; \
     arm64) node_arch='arm64' ;; \
@@ -24,13 +25,12 @@ RUN arch="$(dpkg --print-architecture)" \
   && (cd /tmp && grep " ${node_tarball}$" SHASUMS256.txt | sha256sum -c -) \
   && tar -xJf "/tmp/${node_tarball}" -C /usr/local --strip-components=1 --no-same-owner \
   && rm -f "/tmp/${node_tarball}" /tmp/SHASUMS256.txt \
-  && corepack enable \
-  && corepack prepare "pnpm@${PNPM_VERSION}" --activate
+  && npm install --global "pnpm@${PNPM_VERSION}" \
+  && pnpm --version
 
 RUN mkdir -p \
   /project \
   /project/node_modules \
-  /pnpm/corepack \
   /pnpm/store \
   /home/builder \
   /home/builder/.cache/electron \
@@ -41,7 +41,6 @@ WORKDIR /project
 
 ENV HOME=/home/builder
 ENV PNPM_STORE_DIR=/pnpm/store
-ENV COREPACK_HOME=/pnpm/corepack
 ENV XDG_CACHE_HOME=/home/builder/.cache
 ENV ELECTRON_CACHE=/home/builder/.cache/electron
 ENV ELECTRON_BUILDER_CACHE=/home/builder/.cache/electron-builder

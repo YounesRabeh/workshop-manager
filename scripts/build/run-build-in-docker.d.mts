@@ -6,7 +6,6 @@ export const CONTAINER_PROJECT_DIR: '/project'
 export const CONTAINER_NODE_MODULES_DIR: '/project/node_modules'
 export const CONTAINER_HOME_DIR: '/home/builder'
 export const CONTAINER_PNPM_STORE_DIR: '/pnpm/store'
-export const CONTAINER_COREPACK_HOME: '/pnpm/corepack'
 export const CONTAINER_ELECTRON_CACHE_DIR: '/home/builder/.cache/electron'
 export const CONTAINER_ELECTRON_BUILDER_CACHE_DIR: '/home/builder/.cache/electron-builder'
 export const SUPPORTED_DOCKER_BUILD_HOSTS: readonly ['linux', 'win32']
@@ -24,7 +23,6 @@ export interface DockerMountPaths {
   homeCacheDir: string
   nodeModulesDir: string
   pnpmStoreDir: string
-  corepackDir: string
   electronCacheDir: string
   electronBuilderCacheDir: string
 }
@@ -53,6 +51,7 @@ export interface RunDockerizedBuildOptions {
   scriptName: string
   forwardedArgs?: string[]
   platform?: string
+  pnpmVersion?: string
   hostCacheRoot?: string
   hostIds?: { uid?: number; gid?: number }
 }
@@ -94,9 +93,14 @@ export function ensureDockerMountPathsExist(
 export function createDockerBuildArgs(input: {
   projectDir: string
   imageTag: string
+  pnpmVersion: string
   dockerfilePath?: string
   contextPath?: string
 }): string[]
+export function resolveProjectPnpmVersion(
+  projectDir: string,
+  readFileSyncImpl?: (path: string, encoding: 'utf8') => string
+): string
 export function createContainerForwardedArgs(scriptName: string, forwardedArgs?: string[]): string[]
 export function createHostPreflightSteps(
   scriptName: string,

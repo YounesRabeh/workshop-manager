@@ -37,28 +37,43 @@ export function quoteWindowsCommandArg(value) {
   return `"${normalized.replace(/(["^&|<>%])/g, '^$1')}"`
 }
 
+function createWindowsCommandInvocation(command, args, env) {
+  return {
+    command: env?.ComSpec || 'cmd.exe',
+    args: [
+      '/d',
+      '/s',
+      '/c',
+      [command, ...args].map(quoteWindowsCommandArg).join(' ')
+    ]
+  }
+}
+
 export function createPnpmInvocation(args = [], platform = process.platform, env = process.env) {
   const normalizedArgs = Array.isArray(args) ? args : []
   const pnpmCliPath = resolvePnpmCliPath(env)
 
   if (pnpmCliPath) {
+    if (/\.[cm]?js$/i.test(pnpmCliPath)) {
+      return {
+        command: process.execPath,
+        args: [pnpmCliPath, ...normalizedArgs]
+      }
+    }
+
+    if (platform === 'win32' && /\.(?:cmd|bat)$/i.test(pnpmCliPath)) {
+      return createWindowsCommandInvocation(pnpmCliPath, normalizedArgs, env)
+    }
+
     return {
-      command: process.execPath,
-      args: [pnpmCliPath, ...normalizedArgs]
+      command: pnpmCliPath,
+      args: normalizedArgs
     }
   }
 
   const pnpmCommand = resolvePnpmCommand(platform)
   if (platform === 'win32') {
-    return {
-      command: env?.ComSpec || 'cmd.exe',
-      args: [
-        '/d',
-        '/s',
-        '/c',
-        [pnpmCommand, ...normalizedArgs].map(quoteWindowsCommandArg).join(' ')
-      ]
-    }
+    return createWindowsCommandInvocation(pnpmCommand, normalizedArgs, env)
   }
 
   return {
