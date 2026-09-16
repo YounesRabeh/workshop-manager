@@ -1,6 +1,4 @@
-FROM node:22.22.0-bookworm-slim
-
-ARG PNPM_VERSION=11.4.0
+FROM node:24.18.0-bookworm-slim
 
 ENV CI=true \
     STEAMCMD_CONTRACT_PROFILE=linux \
@@ -18,11 +16,13 @@ RUN dpkg --add-architecture i386 \
     tar \
   && rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable \
-  && corepack prepare "pnpm@${PNPM_VERSION}" --activate
-
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN package_manager="$(node -p 'require("./package.json").packageManager')" \
+  && case "${package_manager}" in pnpm@*) pnpm_version="${package_manager#pnpm@}" ;; *) exit 1 ;; esac \
+  && pnpm_version="${pnpm_version%%+*}" \
+  && npm install --global "pnpm@${pnpm_version}" \
+  && pnpm --version \
+  && pnpm install --frozen-lockfile
 
 COPY . .
 

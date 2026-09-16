@@ -9,7 +9,7 @@
   "type": "module",
   "packageManager": "pnpm@12.4.2",
   "engines": {
-    "node": "22.x || 24.x",
+    "node": "24.x",
     "pnpm": "12.x"
   },
   "main": "out/main/index.js",

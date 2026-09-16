@@ -1,7 +1,6 @@
 FROM electronuserland/builder:wine@sha256:8bb6fa0f99a00a5b845521910508958ebbb682b59221f0aa4b82102c22174164
 
-ARG NODE_VERSION=22.22.0
-ARG PNPM_VERSION=11.4.0
+ARG NODE_VERSION=24.18.0
 
 ENV CI=true \
     PNPM_HOME=/pnpm \
@@ -29,14 +28,17 @@ RUN arch="$(dpkg --print-architecture)" \
   && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt" -o /tmp/SHASUMS256.txt \
   && (cd /tmp && grep " ${node_tarball}$" SHASUMS256.txt | sha256sum -c -) \
   && tar -xJf "/tmp/${node_tarball}" -C /usr/local --strip-components=1 --no-same-owner \
-  && rm -f "/tmp/${node_tarball}" /tmp/SHASUMS256.txt \
-  && corepack enable \
-  && corepack prepare "pnpm@${PNPM_VERSION}" --activate
+  && rm -f "/tmp/${node_tarball}" /tmp/SHASUMS256.txt
 
 WORKDIR /project
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN package_manager="$(node -p 'require("./package.json").packageManager')" \
+  && case "${package_manager}" in pnpm@*) pnpm_version="${package_manager#pnpm@}" ;; *) exit 1 ;; esac \
+  && pnpm_version="${pnpm_version%%+*}" \
+  && npm install --global "pnpm@${pnpm_version}" \
+  && pnpm --version \
+  && pnpm install --frozen-lockfile
 
 COPY . .
 

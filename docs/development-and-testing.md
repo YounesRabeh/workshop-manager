@@ -3,8 +3,8 @@
 
 ## Requirements
 
-- Node.js `22.x` or `24.x` (`.nvmrc` pins the CI version, `22.22.0`)
-- pnpm `11.x` (`package.json` pins `11.21.0`)
+- Node.js `24.x` (`.nvmrc` pins the CI version, `24.18.0`)
+- pnpm `12.x` (`package.json` pins `12.4.2`)
 - Docker for reproducible bundle and package builds
 
 Install dependencies and start the app:
@@ -73,7 +73,7 @@ Live login is opt-in. Follow [the Docker runtime guide](../docker/README.md) for
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on pushes to `main` and when called by the release workflow. It installs frozen dependencies under Node `22.22.0`, then runs typecheck and the full non-live test suite.
+`.github/workflows/ci.yml` runs on pushes to `main` and when called by the release workflow. It installs frozen dependencies under Node `24.18.0`, then runs typecheck and the full non-live test suite.
 
 Before opening a change, run:
 

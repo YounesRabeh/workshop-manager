@@ -1,8 +1,7 @@
 # escape=`
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
-ARG NODE_VERSION=22.22.0
-ARG PNPM_VERSION=11.4.0
+ARG NODE_VERSION=24.18.0
 
 ENV NODE_VERSION=${NODE_VERSION}
 
@@ -23,16 +22,17 @@ RUN $archiveName = "node-v$env:NODE_VERSION-win-x64.zip"; `
 
 ENV PATH="C:\nodejs;${PATH}" `
     CI=true `
-    PNPM_VERSION=${PNPM_VERSION} `
     STEAMCMD_CONTRACT_PROFILE=windows `
     STEAMCMD_CONTRACT_OUTPUT_DIR=C:\contract-output
 
 WORKDIR C:\project
 
-RUN corepack.cmd enable; corepack.cmd prepare "pnpm@$env:PNPM_VERSION" --activate
-
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN $packageManager = (Get-Content package.json -Raw | ConvertFrom-Json).packageManager; `
+    if ($packageManager -notmatch '^pnpm@([^+]+)') { throw 'package.json must declare packageManager as pnpm@<version>.' }; `
+    npm install --global "pnpm@$($Matches[1])"; `
+    pnpm --version; `
+    pnpm install --frozen-lockfile
 
 COPY . .
 
