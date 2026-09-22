@@ -6,7 +6,7 @@
 import { createHash } from 'node:crypto'
 import { readdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { isCliEntrypoint } from '../shared/cli-entrypoint.mjs'
 
 export const DEFAULT_RELEASE_DIR = 'dist'
 export const CHECKSUM_MANIFEST_FILE_NAME = 'SHA256SUMS'
@@ -67,14 +67,6 @@ export async function writeChecksumManifest(releaseDir = DEFAULT_RELEASE_DIR) {
   }
 }
 
-function isCliEntrypoint() {
-  const entry = process.argv[1]
-  if (!entry) {
-    return false
-  }
-  return pathToFileURL(resolve(entry)).href === import.meta.url
-}
-
 async function main(argv = process.argv.slice(2)) {
   const releaseDir = argv[0] ?? DEFAULT_RELEASE_DIR
   const result = await writeChecksumManifest(releaseDir)
@@ -83,7 +75,7 @@ async function main(argv = process.argv.slice(2)) {
   )
 }
 
-if (isCliEntrypoint()) {
+if (isCliEntrypoint(import.meta.url)) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error))
     process.exit(1)

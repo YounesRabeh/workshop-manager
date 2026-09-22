@@ -163,12 +163,24 @@ export class RunLogStore {
     if (this.backgroundFlush) {
       return
     }
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer)
+      this.flushTimer = null
+    }
     this.backgroundFlush = this.flushPendingLines()
       .catch((error: unknown) => {
         this.backgroundFlushError ??= error
       })
       .finally(() => {
         this.backgroundFlush = null
+        if (this.backgroundFlushError || this.pendingLines.length === 0) {
+          return
+        }
+        if (this.pendingLines.length >= FLUSH_BATCH_SIZE) {
+          this.startBackgroundFlush()
+          return
+        }
+        this.scheduleFlush()
       })
   }
 

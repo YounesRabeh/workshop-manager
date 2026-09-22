@@ -306,6 +306,54 @@ describe('WorkshopFetchService', () => {
     ).toBe(true)
   })
 
+  it('continues Web API pagination when normalization drops a row from a full page', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input)
+
+      if (url.includes('IPublishedFileService/GetUserFiles')) {
+        const parsed = new URL(url)
+        const privacy = parsed.searchParams.get('privacy')
+        const page = Number(parsed.searchParams.get('page'))
+        if (privacy !== null) {
+          return new Response(JSON.stringify({ response: { publishedfiledetails: [] } }), { status: 200 })
+        }
+        if (page === 1) {
+          const rows = Array.from({ length: 100 }, (_, index) => ({
+            publishedfileid: String(index + 1),
+            title: index === 99 ? '' : `Item ${index + 1}`,
+            consumer_appid: '480'
+          }))
+          return new Response(JSON.stringify({ response: { publishedfiledetails: rows } }), { status: 200 })
+        }
+        return new Response(JSON.stringify({
+          response: {
+            publishedfiledetails: [{ publishedfileid: '101', title: 'Next page item', consumer_appid: '480' }]
+          }
+        }), { status: 200 })
+      }
+
+      if (url.includes('/myworkshopfiles/')) {
+        return new Response('<html><body>No items here</body></html>', { status: 200 })
+      }
+
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    const service = new WorkshopFetchService({
+      getLoginState: () => ({ username: 'Alice', steamId64: '76561198000000000' })
+    })
+
+    const items = await service.getMyWorkshopItems('480', 'api-key', { allowWebApi: true })
+
+    expect(items.some((item) => item.publishedFileId === '101')).toBe(true)
+    expect(fetchSpy.mock.calls.some(([input]) => {
+      const parsed = new URL(String(input))
+      return parsed.hostname === 'api.steampowered.com' &&
+        parsed.pathname.includes('GetUserFiles') &&
+        parsed.searchParams.get('privacy') === null &&
+        parsed.searchParams.get('page') === '2'
+    })).toBe(true)
+  })
+
   it('logs web api request diagnostics without exposing the api key', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url

@@ -6,9 +6,10 @@
 import { cp, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
+import { isCliEntrypoint } from '../shared/cli-entrypoint.mjs'
 
 const thisDir = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(thisDir, '..', '..')
@@ -193,15 +194,7 @@ async function syncIcon() {
   )
 }
 
-function isCliEntrypoint() {
-  const entry = process.argv[1]
-  if (!entry) {
-    return false
-  }
-  return pathToFileURL(resolve(entry)).href === import.meta.url
-}
-
-if (isCliEntrypoint()) {
+if (isCliEntrypoint(import.meta.url)) {
   syncIcon().catch((error) => {
     console.error(`Failed to sync app icon from ${sourceIconPath}`)
     console.error(error instanceof Error ? error.message : String(error))

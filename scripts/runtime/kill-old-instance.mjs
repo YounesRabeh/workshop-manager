@@ -4,8 +4,9 @@
  *  them before starting a new dev session or packaging run.
  */
 import { dirname, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
+import { isCliEntrypoint } from '../shared/cli-entrypoint.mjs'
 
 const thisDir = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(thisDir, '..', '..')
@@ -184,15 +185,7 @@ async function main() {
   await killOnUnix()
 }
 
-function isCliEntrypoint() {
-  const entry = process.argv[1]
-  if (!entry) {
-    return false
-  }
-  return pathToFileURL(resolve(entry)).href === import.meta.url
-}
-
-if (isCliEntrypoint()) {
+if (isCliEntrypoint(import.meta.url)) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error))
     process.exit(1)

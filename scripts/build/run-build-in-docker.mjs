@@ -8,8 +8,8 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { createPnpmStep, SKIP_KILL_INSTANCE_FLAG } from './build-executable.mjs'
+import { isCliEntrypoint } from '../shared/cli-entrypoint.mjs'
 
 export const SUPPORTED_INTERNAL_BUILD_SCRIPTS = ['build:bundle:native', 'build:exe:native']
 export const DEFAULT_DOCKERFILE_PATH = 'docker/builder.Dockerfile'
@@ -386,14 +386,6 @@ export async function runDockerizedBuild(options, deps = {}) {
   ensureCommandSucceeded('docker', 'Dockerized build execution', dockerRunResult)
 }
 
-function isCliEntrypoint() {
-  const entry = process.argv[1]
-  if (!entry) {
-    return false
-  }
-  return pathToFileURL(resolve(entry)).href === import.meta.url
-}
-
 async function main(argv = process.argv.slice(2)) {
   const [scriptName, ...forwardedArgs] = argv
   if (!scriptName) {
@@ -408,7 +400,7 @@ async function main(argv = process.argv.slice(2)) {
   })
 }
 
-if (isCliEntrypoint()) {
+if (isCliEntrypoint(import.meta.url)) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error))
     process.exit(1)

@@ -5,9 +5,8 @@
  */
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { createPnpmInvocation } from '../build/build-executable.mjs'
+import { isCliEntrypoint } from '../shared/cli-entrypoint.mjs'
 
 const require = createRequire(import.meta.url)
 export const SUPPORTED_ELECTRON_VITE_COMMANDS = ['dev', 'preview']
@@ -226,14 +225,6 @@ function ensureCommandSucceeded(result) {
   throw new Error(`electron-vite command failed with exit code ${result?.status ?? 1}.`)
 }
 
-function isCliEntrypoint() {
-  const entry = process.argv[1]
-  if (!entry) {
-    return false
-  }
-  return pathToFileURL(resolve(entry)).href === import.meta.url
-}
-
 async function main(argv = process.argv.slice(2)) {
   const [commandName, ...forwardedArgs] = argv
   if (!commandName) {
@@ -251,7 +242,7 @@ async function main(argv = process.argv.slice(2)) {
   ensureCommandSucceeded(result)
 }
 
-if (isCliEntrypoint()) {
+if (isCliEntrypoint(import.meta.url)) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error))
     process.exit(1)

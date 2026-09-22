@@ -4,7 +4,11 @@
  * and handles SteamCMD missing-configuration status messaging side effects.
  */
 import type { Ref } from 'vue'
-import { logError, normalizeError as normalizeSharedError } from '@shared/api-error-utils'
+import {
+  isSteamCmdMissingConfigurationMessage,
+  logError,
+  normalizeError as normalizeSharedError
+} from '@shared/api-error-utils'
 import type { AuthIssue } from '../types/ui'
 
 export interface ApiFailure {
@@ -111,13 +115,6 @@ export function useAuthErrorUtils(options: UseAuthErrorUtilsOptions) {
 
   function isSavedSessionFallbackError(error: ApiFailure): boolean {
     return error.code === 'auth' || error.code === 'timeout' || error.code === 'command_failed'
-  }
-
-  function isSteamCmdMissingConfigurationMessage(message: string): boolean {
-    return (
-      /steamcmd/i.test(message) &&
-      /(not found|not configured|missing|no such file|cannot find|executable|path)/i.test(message)
-    )
   }
 
   function handleSteamCmdMissingStatus(message: string): boolean {

@@ -24,6 +24,7 @@ import { RunLogStore } from '@backend/stores/run-log-store'
 import { SteamCmdInstallManager } from '@backend/services/steamcmd/install-manager'
 import { resolveSteamCmdPlatformProfile } from '@backend/services/steamcmd/platform-profile'
 import { SteamCmdRuntimeService } from '@backend/services/steamcmd/runtime-service'
+import type { WorkshopWebApiAccessState } from '@backend/services/workshop/fetch-service'
 import { getAppPaths } from '@backend/services/app/path-provider'
 import { listContentFolderFiles } from '@backend/services/workshop/content-folder-scanner'
 import { validateWorkshopPreviewFile } from '@backend/services/workshop/preview-validator'
@@ -128,6 +129,7 @@ app.whenReady().then(async () => {
   const resolveSavedWebApiKey = async (): Promise<{
     key?: string
     hasUsableKey: boolean
+    hasConfiguredKey: boolean
     secureStorageAvailable: boolean
   }> => {
     const encryptedKey = await profileStore.getWebApiKeyEncrypted()
@@ -135,6 +137,7 @@ app.whenReady().then(async () => {
     if (!encryptedKey || encryptedKey.trim().length === 0 || !secureStorageAvailable) {
       return {
         hasUsableKey: false,
+        hasConfiguredKey: Boolean(encryptedKey?.trim()),
         secureStorageAvailable
       }
     }
@@ -144,19 +147,45 @@ app.whenReady().then(async () => {
       if (!key) {
         return {
           hasUsableKey: false,
+          hasConfiguredKey: true,
           secureStorageAvailable
         }
       }
       return {
         key,
         hasUsableKey: true,
+        hasConfiguredKey: true,
         secureStorageAvailable
       }
     } catch {
       return {
         hasUsableKey: false,
+        hasConfiguredKey: true,
         secureStorageAvailable
       }
+    }
+  }
+
+  const resolveWorkshopWebApiAccess = async (): Promise<{
+    key?: string
+    allowWebApi: boolean
+    webApiAccess: WorkshopWebApiAccessState
+  }> => {
+    const storedWebApiEnabled = await profileStore.getWebApiEnabled()
+    const resolvedKey = await resolveSavedWebApiKey()
+    const allowWebApi = storedWebApiEnabled && resolvedKey.hasUsableKey
+    const webApiAccess: WorkshopWebApiAccessState = allowWebApi
+      ? 'active'
+      : resolvedKey.hasConfiguredKey
+        ? 'configured_unavailable'
+        : 'disabled'
+    if (storedWebApiEnabled !== allowWebApi) {
+      await profileStore.setWebApiEnabled(allowWebApi)
+    }
+    return {
+      key: allowWebApi ? resolvedKey.key : undefined,
+      allowWebApi,
+      webApiAccess
     }
   }
 
@@ -242,7 +271,7 @@ app.whenReady().then(async () => {
 
   handleIpc(IPC_CHANNELS.clearStoredSession, async () => {
     // Explicit clear must invalidate SteamCMD cached auth.
-    runtimeService.logout({ clearStoredAuth: true })
+    await runtimeService.clearAuthCacheForStrictLogin()
     await profileStore.setRememberAuth(false)
     return { ok: true }
   })
@@ -374,33 +403,16 @@ app.whenReady().then(async () => {
   })
 
   handleIpc(IPC_CHANNELS.getMyWorkshopItems, async (payload: { appId?: string }) => {
-    const encryptedKey = await profileStore.getWebApiKeyEncrypted()
-    const storedWebApiEnabled = await profileStore.getWebApiEnabled()
-    const resolvedKey = await resolveSavedWebApiKey()
-    const allowWebApi = storedWebApiEnabled && resolvedKey.hasUsableKey
-    const webApiAccess =
-      allowWebApi
-        ? 'active'
-        : encryptedKey?.trim()
-          ? 'configured_unavailable'
-          : 'disabled'
-    if (storedWebApiEnabled !== allowWebApi) {
-      await profileStore.setWebApiEnabled(allowWebApi)
-    }
-
-    return await runtimeService.getMyWorkshopItems(payload.appId, allowWebApi ? resolvedKey.key : undefined, {
+    const { key, allowWebApi, webApiAccess } = await resolveWorkshopWebApiAccess()
+    return await runtimeService.getMyWorkshopItems(payload.appId, key, {
       allowWebApi,
       webApiAccess
     })
   })
 
   handleIpc(IPC_CHANNELS.getMyWorkshopItemsPage, async (payload: WorkshopItemsPageInput) => {
-    const encryptedKey = await profileStore.getWebApiKeyEncrypted()
-    const storedWebApiEnabled = await profileStore.getWebApiEnabled()
-    const resolvedKey = await resolveSavedWebApiKey()
-    const allowWebApi = storedWebApiEnabled && resolvedKey.hasUsableKey
-    const webApiAccess = allowWebApi ? 'active' : encryptedKey?.trim() ? 'configured_unavailable' : 'disabled'
-    return await runtimeService.getMyWorkshopItemsPage(payload, allowWebApi ? resolvedKey.key : undefined, {
+    const { key, allowWebApi, webApiAccess } = await resolveWorkshopWebApiAccess()
+    return await runtimeService.getMyWorkshopItemsPage(payload, key, {
       allowWebApi,
       webApiAccess
     })

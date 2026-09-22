@@ -4,9 +4,8 @@
  *  place, and delegates reproducible packaging work to the Docker build helper.
  */
 import { spawn } from 'node:child_process'
-import { resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { createPnpmStep } from './build-executable.mjs'
+import { isCliEntrypoint } from '../shared/cli-entrypoint.mjs'
 
 export const DEFAULT_BUILD_TARGET = 'bundle'
 export const RELEASE_BUILD_TARGETS = ['linux', 'win']
@@ -123,15 +122,7 @@ async function main(argv = process.argv.slice(2)) {
   }
 }
 
-function isCliEntrypoint() {
-  const entry = process.argv[1]
-  if (!entry) {
-    return false
-  }
-  return pathToFileURL(resolve(entry)).href === import.meta.url
-}
-
-if (isCliEntrypoint()) {
+if (isCliEntrypoint(import.meta.url)) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error))
     process.exit(1)

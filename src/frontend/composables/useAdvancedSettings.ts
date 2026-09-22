@@ -4,6 +4,7 @@
  */
 import { reactive, ref } from 'vue'
 import type { AdvancedSettings } from '@shared/contracts'
+import { isSteamCmdMissingConfigurationMessage } from '@shared/api-error-utils'
 import {
   STEAMCMD_TIMEOUT_DISABLED_VALUE,
   STEAMCMD_TIMEOUT_LIMITS,
@@ -68,13 +69,6 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
 
   function openAdvancedOptions(): void {
     isAdvancedOptionsOpen.value = true
-  }
-
-  function isSteamCmdMissingConfigurationMessage(message: string): boolean {
-    return (
-      /steamcmd/i.test(message) &&
-      /(not found|not configured|missing|no such file|cannot find|executable|path)/i.test(message)
-    )
   }
 
   function millisecondsToSecondsString(value: number): string {

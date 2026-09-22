@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { RunLogStore } from '@backend/stores/run-log-store'
 
 describe('RunLogStore batching', () => {
@@ -87,5 +87,50 @@ describe('RunLogStore batching', () => {
     await expect(
       store.finalize('run-failure', { success: false, status: 'failed' })
     ).rejects.toMatchObject({ code: 'ENOTDIR' })
+  })
+
+  it('reschedules pending lines when a flush timer fires during an active flush', async () => {
+    vi.useFakeTimers()
+    const root = await mkdtemp(join(tmpdir(), 'run-log-store-overlap-'))
+    const store = new RunLogStore(join(root, 'logs'))
+    await store.create('run-overlap')
+
+    type StoreInternals = {
+      flushPendingLines: () => Promise<void>
+      backgroundFlush: Promise<void> | null
+    }
+    const internals = store as unknown as StoreInternals
+    const originalFlush = internals.flushPendingLines.bind(store)
+    let releaseFirstFlush!: () => void
+    const firstFlushGate = new Promise<void>((resolve) => {
+      releaseFirstFlush = resolve
+    })
+    const flushSpy = vi.spyOn(internals, 'flushPendingLines')
+      .mockImplementationOnce(async () => {
+        await originalFlush()
+        await firstFlushGate
+      })
+      .mockImplementation(originalFlush)
+
+    try {
+      for (let index = 0; index < 24; index += 1) {
+        await store.appendLine('run-overlap', `first-${index}`)
+      }
+      await store.appendLine('run-overlap', 'arrived-during-flush')
+
+      await vi.advanceTimersByTimeAsync(120)
+      expect(flushSpy).toHaveBeenCalledTimes(1)
+
+      releaseFirstFlush()
+      await internals.backgroundFlush
+      await vi.runAllTimersAsync()
+      await internals.backgroundFlush
+
+      expect(flushSpy).toHaveBeenCalledTimes(2)
+      const persisted = await readFile(join(root, 'logs', 'steamcmd-output.log'), 'utf8')
+      expect(persisted).toContain('arrived-during-flush')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

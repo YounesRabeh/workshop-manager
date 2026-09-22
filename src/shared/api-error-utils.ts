@@ -100,6 +100,13 @@ export function normalizeError(error: unknown): NormalizedError {
   return fallback
 }
 
+export function isSteamCmdMissingConfigurationMessage(message: string): boolean {
+  return (
+    /steamcmd/i.test(message) &&
+    /(not found|not configured|missing|no such file|cannot find|executable|path)/i.test(message)
+  )
+}
+
 function readProcessEnv(): Record<string, string | undefined> {
   return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
 }

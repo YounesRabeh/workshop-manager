@@ -40,7 +40,12 @@ const mocks = vi.hoisted(() => {
     ensureInstalled: vi.fn(async () => ({ installed: true, executablePath: '/steamcmd', source: 'auto' })),
     getInstallLog: vi.fn(async () => ({ path: '/log', content: '', exists: true }))
   }
-  return { handlers, profileStore, runtime, installManager }
+  const secretStore = {
+    decryptSecret: vi.fn(() => TEST_ACCOUNT.apiKey),
+    encryptSecret: vi.fn(() => 'encrypted-new-key'),
+    isSecureStorageAvailable: vi.fn(() => true)
+  }
+  return { handlers, profileStore, runtime, installManager, secretStore }
 })
 
 vi.mock('electron', () => ({
@@ -77,9 +82,9 @@ vi.mock('../../../src/electron/main-window', () => ({
   createMainWindow: vi.fn(async () => ({ webContents: { send: vi.fn() } }))
 }))
 vi.mock('../../../src/electron/secret-store', () => ({
-  decryptSecret: vi.fn(() => TEST_ACCOUNT.apiKey),
-  encryptSecret: vi.fn(() => 'encrypted-new-key'),
-  isSecureStorageAvailable: vi.fn(() => true)
+  decryptSecret: mocks.secretStore.decryptSecret,
+  encryptSecret: mocks.secretStore.encryptSecret,
+  isSecureStorageAvailable: mocks.secretStore.isSecureStorageAvailable
 }))
 vi.mock('../../../src/electron/ipc-helpers', () => ({
   handleIpc: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => mocks.handlers.set(channel, handler))
@@ -121,6 +126,20 @@ describe('Electron main-process wiring', () => {
     })
   })
 
+  it('disables Web API access consistently when secure storage is unavailable', async () => {
+    mocks.secretStore.isSecureStorageAvailable.mockReturnValueOnce(false)
+    const payload = { page: 1, pageSize: 12 }
+    const handler = mocks.handlers.get('workshop:getMyWorkshopItemsPage')!
+
+    await handler(payload)
+
+    expect(mocks.profileStore.setWebApiEnabled).toHaveBeenLastCalledWith(false)
+    expect(mocks.runtime.getMyWorkshopItemsPage).toHaveBeenLastCalledWith(payload, undefined, {
+      allowWebApi: false,
+      webApiAccess: 'configured_unavailable'
+    })
+  })
+
   it('normalizes login persistence and delegates uploads', async () => {
     const login = mocks.handlers.get('workshop:login')!
     await expect(login({
@@ -133,5 +152,14 @@ describe('Electron main-process wiring', () => {
     const draft = createUploadDraft({ title: 'Test' })
     await upload({ draft })
     expect(mocks.runtime.upload).toHaveBeenCalledWith(draft, 'upload')
+  })
+
+  it('deletes cached authentication files when the saved session is cleared', async () => {
+    const clearStoredSession = mocks.handlers.get('workshop:clearStoredSession')!
+
+    await expect(clearStoredSession()).resolves.toEqual({ ok: true })
+
+    expect(mocks.runtime.clearAuthCacheForStrictLogin).toHaveBeenCalledTimes(1)
+    expect(mocks.profileStore.setRememberAuth).toHaveBeenCalledWith(false)
   })
 })

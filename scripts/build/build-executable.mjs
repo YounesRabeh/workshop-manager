@@ -6,7 +6,7 @@
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { isCliEntrypoint } from '../shared/cli-entrypoint.mjs'
 
 const require = createRequire(import.meta.url)
 export const NATIVE_BUNDLE_SCRIPT = 'build:bundle:native'
@@ -233,15 +233,7 @@ async function main() {
   }
 }
 
-function isCliEntrypoint() {
-  const entry = process.argv[1]
-  if (!entry) {
-    return false
-  }
-  return pathToFileURL(resolve(entry)).href === import.meta.url
-}
-
-if (isCliEntrypoint()) {
+if (isCliEntrypoint(import.meta.url)) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error))
     process.exit(1)

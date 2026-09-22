@@ -450,13 +450,13 @@ export class WorkshopFetchService {
           }
         }
 
-        if (pageItems.length === 0) {
+        if (rawRows === 0) {
           break
         }
 
         collected.push(...pageItems)
 
-        if (pageItems.length < perPage) {
+        if (rawRows < perPage) {
           break
         }
       }
