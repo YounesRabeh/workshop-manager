@@ -14,6 +14,10 @@ The SteamCMD runtime owns executable discovery, installation, platform behavior,
 
 Linux additionally requires the executable bit. Manual paths are validated before they are persisted.
 
+Windows ZIP downloads are extracted into a private staging directory with `yauzl`. Symlinks, special files, unsafe Windows paths and duplicate paths are rejected. Extraction is limited to 4,096 entries and 512 MiB of declared and actual output; the parser also checks each file's actual size. Only a complete archive containing `steamcmd.exe` is published. Concurrent installation requests share one attempt. An incomplete, nonempty managed installation directory must be moved aside (or an existing executable selected in Advanced Settings); auto-install never merges into existing files or links.
+
+Downloads require HTTPS and the allowlisted Valve CDN hostname, including redirects. Archive magic bytes check the format, not publisher authenticity. No stable publisher-provided SHA-256 checksum or signature source for the bootstrap ZIP was identified during the October 2026 review of the [SteamCMD download documentation](https://developer.valvesoftware.com/wiki/SteamCMD). The documentation endpoint returned HTTP 403 during verification, so publisher authentication remains unverified; no self-computed digest is treated as a publisher checksum.
+
 ## Execution model
 
 The packaged application currently forces script mode while the cross-platform behavior is being validated. Login and Workshop operations use an ephemeral UTF-8 SteamCMD script passed through `+runscript`.

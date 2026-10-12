@@ -5,13 +5,13 @@
  *  and performs OS-aware download/extraction when SteamCMD is missing.
  */
 import { constants, createWriteStream } from 'node:fs'
-import { access, appendFile, mkdir, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { access, appendFile, lstat, mkdir, mkdtemp, open, readFile, readdir, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
 import type { IncomingMessage } from 'node:http'
 import { get } from 'node:https'
 import type { ClientRequest } from 'node:http'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
-import extractZip from 'extract-zip'
+import { extractSteamCmdZip } from './zip-extractor'
 import type { InstallLogSnapshot, InstallStatus } from '@shared/contracts'
 import { logError, normalizeError } from '@shared/api-error-utils'
 import { AppError } from '@backend/utils/errors'
@@ -294,6 +294,7 @@ async function validateArchiveSignature(path: string, kind: 'tar.gz' | 'zip'): P
 export class SteamCmdInstallManager {
   private manualExecutablePath: string | null = null
   private logWriteChain: Promise<void> = Promise.resolve()
+  private installAttempt: Promise<InstallStatus> | null = null
 
   constructor(
     private readonly rootDir: string,
@@ -430,6 +431,16 @@ export class SteamCmdInstallManager {
   }
 
   async ensureInstalled(): Promise<InstallStatus> {
+    if (this.installAttempt) return await this.installAttempt
+    this.installAttempt = this.install()
+    try {
+      return await this.installAttempt
+    } finally {
+      this.installAttempt = null
+    }
+  }
+
+  private async install(): Promise<InstallStatus> {
     const status = await this.getStatus()
     if (status.installed) {
       await this.writeInstallLog(
@@ -446,21 +457,38 @@ export class SteamCmdInstallManager {
     await this.startInstallLog()
 
     const archivePath = join(this.installDir, this.platformBehavior.archiveFileName)
+    let stagingDir: string | undefined
+    let ownsArchive = false
     try {
       const downloadUrl = this.platformBehavior.downloadUrl
       await mkdir(this.installDir, { recursive: true })
+      if (this.platformBehavior.archiveKind === 'zip' &&
+        ((await lstat(this.installDir)).isSymbolicLink() || (await readdir(this.installDir)).length > 0)) {
+        throw new AppError('install', 'SteamCMD installation directory is not empty or is a link. Move it aside or select an existing SteamCMD executable in Advanced Settings.')
+      }
       await this.logInstallDirectorySnapshot('Install directory before download')
 
       await this.appendInstallLog(`Downloading SteamCMD from ${downloadUrl}`)
       await this.appendInstallLog(`Archive target path=${archivePath}`)
+      ownsArchive = true
       await download(downloadUrl, archivePath)
       await validateArchiveSignature(archivePath, this.platformBehavior.archiveKind)
       await this.appendInstallLog('Download completed successfully')
 
       if (this.platformBehavior.archiveKind === 'zip') {
-        await this.appendInstallLog(`Extracting ZIP archive in-process to ${this.installDir}`)
+        stagingDir = await mkdtemp(join(this.rootDir, '.steamcmd-extract-'))
+        await this.appendInstallLog(`Extracting ZIP archive in-process to ${stagingDir}`)
         try {
-          await extractZip(archivePath, { dir: this.installDir })
+          await extractSteamCmdZip(archivePath, stagingDir)
+          if (!await findExecutableInDir(stagingDir, this.platformBehavior.expectedExecutableName, 2, false)) {
+            throw new AppError('install', 'SteamCMD was downloaded but executable validation failed')
+          }
+          await rm(archivePath)
+          ownsArchive = false
+          // Refuse a nonempty destination rather than merge through existing filesystem links.
+          await rmdir(this.installDir)
+          await rename(stagingDir, this.installDir)
+          stagingDir = undefined
         } catch (error) {
           throw toInstallError('ZIP extraction failed', error)
         }
@@ -470,7 +498,10 @@ export class SteamCmdInstallManager {
       }
 
       await this.logInstallDirectorySnapshot('Install directory after extraction')
-      await rm(archivePath, { force: true })
+      if (ownsArchive) {
+        await rm(archivePath, { force: true })
+        ownsArchive = false
+      }
       await this.appendInstallLog('Installer archive removed after extraction')
 
       const resolvedExecutablePath = await this.resolveAutoExecutablePath()
@@ -486,11 +517,13 @@ export class SteamCmdInstallManager {
         source: 'auto'
       }
     } catch (error) {
-      await rm(archivePath, { force: true }).catch(() => undefined)
+      if (ownsArchive) await rm(archivePath, { force: true }).catch(() => undefined)
       await this.appendInstallLog(`Install failed: ${describeUnknownError(error)}`)
       await this.logInstallDirectorySnapshot('Install directory at failure')
       logError('SteamCmdInstallManager::ensureInstalled', normalizeError(error))
       throw error
+    } finally {
+      if (stagingDir) await rm(stagingDir, { recursive: true, force: true })
     }
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "workshop-manager",
   "productName": "Workshop Manager",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "Create and update items for Steam's Workshop.",
   "author": "Younes Rabeh",
   "license": "MIT",
@@ -100,12 +100,13 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "extract-zip": "^2.0.1",
-    "vue": "^3.5.43"
+    "vue": "^3.5.43",
+    "yauzl": "^3.4.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.6.5",
+    "@types/yauzl": "^2.10.3",
     "@vitejs/plugin-vue": "^6.0.10",
     "@vitest/coverage-v8": "^5.0.3",
     "@vue/test-utils": "^2.5.1",

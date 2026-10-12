@@ -1,0 +1,38 @@
+import { crc32, deflateRawSync } from 'node:zlib'
+
+// Real ZIP records let security tests exercise the parser rather than mock extraction.
+export function zipFixture(entries: { name: string; content?: string; mode?: number; size?: number }[]): Buffer {
+  const files: Buffer[] = []
+  const directory: Buffer[] = []
+  let offset = 0
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name)
+    const content = Buffer.from(entry.content ?? '')
+    const compressed = deflateRawSync(content)
+    const local = Buffer.alloc(30)
+    local.writeUInt32LE(0x04034b50)
+    local.writeUInt16LE(20, 4)
+    local.writeUInt16LE(8, 8)
+    local.writeUInt32LE(crc32(content), 14)
+    local.writeUInt32LE(compressed.length, 18)
+    local.writeUInt32LE(entry.size ?? content.length, 22)
+    local.writeUInt16LE(name.length, 26)
+    const central = Buffer.alloc(46)
+    central.writeUInt32LE(0x02014b50)
+    central.writeUInt16LE(0x0314, 4)
+    local.copy(central, 6, 4, 30)
+    central.writeUInt32LE(((entry.mode ?? 0o100644) << 16) >>> 0, 38)
+    central.writeUInt32LE(offset, 42)
+    files.push(local, name, compressed)
+    directory.push(central, name)
+    offset += local.length + name.length + compressed.length
+  }
+  const central = Buffer.concat(directory)
+  const end = Buffer.alloc(22)
+  end.writeUInt32LE(0x06054b50)
+  end.writeUInt16LE(entries.length, 8)
+  end.writeUInt16LE(entries.length, 10)
+  end.writeUInt32LE(central.length, 12)
+  end.writeUInt32LE(offset, 16)
+  return Buffer.concat([...files, central, end])
+}
