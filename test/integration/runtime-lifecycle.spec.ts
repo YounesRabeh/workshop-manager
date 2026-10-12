@@ -1005,7 +1005,7 @@ describe('SteamCmdRuntimeService lifecycle', () => {
     try {
       const root = await mkdtemp(join(tmpdir(), 'runtime-service-script-slow-stored-auth-'))
       const store = new RunLogStore(join(root, 'runs'))
-      let childKill: ReturnType<typeof vi.fn> | undefined
+      let childKill: (() => void) | undefined
 
       ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((_command: string, args: string[]) => {
         if (readRunScriptArg(args) === undefined) {
