@@ -66,12 +66,12 @@ vi.mock('electron', () => ({
   shell: { openPath: vi.fn(async () => ''), openExternal: vi.fn(async () => undefined) }
 }))
 vi.mock('node:fs/promises', () => ({ mkdir: vi.fn(async () => undefined) }))
-vi.mock('@backend/stores/profile-store', () => ({ ProfileStore: vi.fn(() => mocks.profileStore) }))
+vi.mock('@backend/stores/profile-store', () => ({ ProfileStore: vi.fn(function () { return mocks.profileStore }) }))
 vi.mock('@backend/stores/run-log-store', () => ({
-  RunLogStore: vi.fn(() => ({ list: vi.fn(async () => []), get: vi.fn(async () => null) }))
+  RunLogStore: vi.fn(function () { return { list: vi.fn(async () => []), get: vi.fn(async () => null) } })
 }))
-vi.mock('@backend/services/steamcmd/install-manager', () => ({ SteamCmdInstallManager: vi.fn(() => mocks.installManager) }))
-vi.mock('@backend/services/steamcmd/runtime-service', () => ({ SteamCmdRuntimeService: vi.fn(() => mocks.runtime) }))
+vi.mock('@backend/services/steamcmd/install-manager', () => ({ SteamCmdInstallManager: vi.fn(function () { return mocks.installManager }) }))
+vi.mock('@backend/services/steamcmd/runtime-service', () => ({ SteamCmdRuntimeService: vi.fn(function () { return mocks.runtime }) }))
 vi.mock('@backend/services/steamcmd/platform-profile', () => ({ resolveSteamCmdPlatformProfile: vi.fn(() => 'linux') }))
 vi.mock('@backend/services/app/path-provider', () => ({
   getAppPaths: vi.fn(() => ({ dataDir: '/data', profilesPath: '/data/profiles.json', runLogsDir: '/data/logs', runtimeDir: '/data/runtime' }))
@@ -91,7 +91,7 @@ vi.mock('../../../src/electron/ipc-helpers', () => ({
 }))
 vi.mock('../../../src/electron/ipc-security', () => ({
   isSafeExternalUrl: vi.fn((url: string) => /^https?:/.test(url)),
-  LocalImagePreviewAccess: vi.fn(() => ({ approve: vi.fn(async () => true), load: vi.fn(async () => undefined) }))
+  LocalImagePreviewAccess: vi.fn(function () { return { approve: vi.fn(async () => true), load: vi.fn(async () => undefined) } })
 }))
 vi.mock('../../../src/electron/user-data-migration', () => ({
   configureStableUserDataPath: vi.fn(() => '/data'),
