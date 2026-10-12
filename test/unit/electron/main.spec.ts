@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { app, dialog, shell } from 'electron'
 import { TEST_ACCOUNT, TEST_APP_VERSION, TEST_WORKSHOP, createUploadDraft } from '../../fixtures/workshop-seed'
 
 const mocks = vi.hoisted(() => {
@@ -41,7 +42,7 @@ const mocks = vi.hoisted(() => {
     getInstallLog: vi.fn(async () => ({ path: '/log', content: '', exists: true }))
   }
   const secretStore = {
-    decryptSecret: vi.fn(() => TEST_ACCOUNT.apiKey),
+    decryptSecret: vi.fn((): string => TEST_ACCOUNT.apiKey),
     encryptSecret: vi.fn(() => 'encrypted-new-key'),
     isSecureStorageAvailable: vi.fn(() => true)
   }
@@ -112,6 +113,103 @@ describe('Electron main-process wiring', () => {
       'workshop:getMyWorkshopItemsPage',
       'workshop:openExternal'
     ]))
+  })
+
+  it('delegates installation, version, authentication and profile queries', async () => {
+    await expect(mocks.handlers.get('workshop:ensureSteamCmdInstalled')!()).resolves.toMatchObject({ installed: true })
+    expect(mocks.installManager.ensureInstalled).toHaveBeenCalledTimes(1)
+    await expect(mocks.handlers.get('workshop:getAppVersion')!()).resolves.toEqual({ version: TEST_APP_VERSION })
+    await expect(mocks.handlers.get('workshop:getProfiles')!()).resolves.toMatchObject({
+      profiles: [], rememberedUsername: TEST_ACCOUNT.username, rememberAuth: true, hasStoredAuth: true, preferredAuthMode: 'otp'
+    })
+    expect(mocks.runtime.hasStoredAuthFor).toHaveBeenCalledWith(TEST_ACCOUNT.username)
+    await expect(mocks.handlers.get('workshop:getCurrentProfile')!()).resolves.toMatchObject({ steamId64: '1' })
+    await mocks.handlers.get('workshop:logout')!()
+    expect(mocks.runtime.logout).toHaveBeenCalledTimes(1)
+    await mocks.handlers.get('workshop:quitApp')!()
+    expect(app.quit).toHaveBeenCalledTimes(1)
+  })
+
+  it('delegates saved profiles and run logs', async () => {
+    const profile = { id: 'profile-1', title: 'Saved' }
+    await expect(mocks.handlers.get('workshop:saveProfile')!({ profile })).resolves.toEqual(profile)
+    expect(mocks.profileStore.saveProfile).toHaveBeenCalledWith(profile)
+    await expect(mocks.handlers.get('workshop:deleteProfile')!({ profileId: profile.id })).resolves.toEqual({ ok: true })
+    expect(mocks.profileStore.deleteProfile).toHaveBeenCalledWith(profile.id)
+    await expect(mocks.handlers.get('workshop:getRunLogs')!()).resolves.toEqual([])
+    await expect(mocks.handlers.get('workshop:getRunLog')!({ runId: 'run-1' })).resolves.toBeNull()
+    await expect(mocks.handlers.get('workshop:getInstallLog')!()).resolves.toEqual({ path: '/log', content: '', exists: true })
+  })
+
+  it('normalizes authentication preference and forwards Steam Guard codes', async () => {
+    await mocks.handlers.get('workshop:savePreferredAuthMode')!({ preferredAuthMode: 'unexpected' })
+    expect(mocks.profileStore.setPreferredAuthMode).toHaveBeenLastCalledWith('otp')
+    await mocks.handlers.get('workshop:savePreferredAuthMode')!({ preferredAuthMode: 'steam_guard_mobile' })
+    expect(mocks.profileStore.setPreferredAuthMode).toHaveBeenLastCalledWith('steam_guard_mobile')
+    await mocks.handlers.get('workshop:submitSteamGuardCode')!({ sessionId: 'session-1', code: '12345' })
+    expect(mocks.runtime.submitSteamGuardCode).toHaveBeenCalledWith('session-1', '12345')
+  })
+
+  it('uses update and visibility modes without requiring upload content', async () => {
+    const draft = createUploadDraft()
+    await mocks.handlers.get('workshop:updateMod')!({ draft })
+    expect(mocks.runtime.upload).toHaveBeenLastCalledWith(draft, 'update')
+    await mocks.handlers.get('workshop:updateVisibility')!({ appId: '480', publishedFileId: '123', visibility: 2 })
+    expect(mocks.runtime.upload).toHaveBeenLastCalledWith({
+      appId: '480', publishedFileId: '123', visibility: 2, contentFolder: '', previewFile: '', title: ''
+    }, 'visibility')
+  })
+
+  it('reports advanced settings and disables an absent, blank or unreadable API key', async () => {
+    const handler = mocks.handlers.get('workshop:getAdvancedSettings')!
+    await expect(handler()).resolves.toMatchObject({ webApiEnabled: true, hasWebApiKey: true, steamCmdInstalled: true })
+    mocks.profileStore.getWebApiKeyEncrypted.mockResolvedValueOnce('')
+    await expect(handler()).resolves.toMatchObject({ webApiEnabled: false, hasWebApiKey: false })
+    mocks.secretStore.decryptSecret.mockReturnValueOnce(' ')
+    await expect(handler()).resolves.toMatchObject({ webApiEnabled: false, hasWebApiKey: false })
+    mocks.secretStore.decryptSecret.mockImplementationOnce(() => { throw new Error('decryption failed') })
+    await expect(handler()).resolves.toMatchObject({ webApiEnabled: false, hasWebApiKey: false })
+  })
+
+  it('encrypts a trimmed API key and persists normalized settings', async () => {
+    await mocks.handlers.get('workshop:saveAdvancedSettings')!({ webApiKey: ' new-key ', steamCmdManualPath: '', timeouts: { loginTimeoutMs: 9000 } })
+    expect(mocks.secretStore.encryptSecret).toHaveBeenCalledWith('new-key')
+    expect(mocks.profileStore.setAdvancedSettingsState).toHaveBeenLastCalledWith({
+      webApiEnabled: true, webApiKeyEncrypted: 'encrypted-new-key', steamCmdManualPath: undefined,
+      timeoutSettings: { loginTimeoutMs: 9000, storedSessionTimeoutMs: 10000, workshopTimeoutMs: 60000 }
+    })
+    await mocks.handlers.get('workshop:saveAdvancedSettings')!({ clearWebApiKey: true })
+    expect(mocks.profileStore.setAdvancedSettingsState).toHaveBeenLastCalledWith(expect.objectContaining({ webApiEnabled: false, webApiKeyEncrypted: undefined }))
+  })
+
+  it('rolls back an unusable manual SteamCMD path', async () => {
+    mocks.installManager.getStatus.mockResolvedValueOnce({ installed: false, executablePath: '/bad', source: 'missing' })
+    await expect(mocks.handlers.get('workshop:saveAdvancedSettings')!({ steamCmdManualPath: '/bad' })).rejects.toMatchObject({ code: 'install' })
+    expect(mocks.installManager.setManualExecutablePath).toHaveBeenLastCalledWith(undefined)
+  })
+
+  it('validates external URLs and local paths before opening them', async () => {
+    const openExternal = mocks.handlers.get('workshop:openExternal')!
+    await expect(openExternal({ url: 'javascript:alert(1)' })).rejects.toMatchObject({ code: 'validation' })
+    await expect(openExternal({ url: '  ' })).rejects.toMatchObject({ code: 'validation' })
+    await expect(openExternal({ url: ' https://steamcommunity.com ' })).resolves.toEqual({ ok: true })
+    expect(shell.openExternal).toHaveBeenCalledWith('https://steamcommunity.com')
+    const openPath = mocks.handlers.get('workshop:openPath')!
+    await expect(openPath({ path: ' ' })).rejects.toMatchObject({ code: 'validation' })
+    await expect(openPath({ path: ' /content ' })).resolves.toEqual({ ok: true })
+    expect(shell.openPath).toHaveBeenCalledWith('/content')
+    vi.mocked(shell.openPath).mockResolvedValueOnce('permission denied')
+    await expect(openPath({ path: '/content' })).resolves.toEqual({ ok: true, error: 'permission denied' })
+  })
+
+  it('returns canceled picker results and preserves folder and multi-file selections', async () => {
+    await expect(mocks.handlers.get('workshop:pickFile')!()).resolves.toBeUndefined()
+    vi.mocked(dialog.showOpenDialog).mockResolvedValueOnce({ canceled: false, filePaths: ['/content'] })
+    await expect(mocks.handlers.get('workshop:pickFolder')!()).resolves.toBe('/content')
+    vi.mocked(dialog.showOpenDialog).mockResolvedValueOnce({ canceled: false, filePaths: ['/steamcmd'] })
+    await expect(mocks.handlers.get('workshop:pickSteamCmdExecutable')!()).resolves.toBe('/steamcmd')
+    vi.mocked(dialog.showOpenDialog).mockResolvedValueOnce({ canceled: false, filePaths: ['/a', '/b'] })
+    await expect(mocks.handlers.get('workshop:pickFiles')!()).resolves.toEqual(['/a', '/b'])
   })
 
   it('passes paged workshop requests through with the main-process secret', async () => {

@@ -7,6 +7,23 @@ describe('WorkshopFetchService', () => {
     vi.restoreAllMocks()
   })
 
+  it('reports Web API failure even when diagnostic logging also rejects', async () => {
+    const log = vi.fn(async () => { throw new Error('log disk full') })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input =>
+      String(input).includes('/myworkshopfiles/')
+        ? new Response('<html>No items</html>')
+        : new Response('unavailable', { status: 503 }))
+    const service = new WorkshopFetchService({
+      getLoginState: () => ({ username: 'Alice', steamId64: '76561198000000000' }),
+      appendDiagnosticLog: log
+    })
+
+    await expect(service.getMyWorkshopItems(undefined, 'api-key')).rejects.toMatchObject({
+      code: 'command_failed', message: expect.stringContaining('Web API:')
+    })
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('web_api outcome=failed'))
+  })
+
   it('fetches only the requested Web API page and returns paging metadata', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
       response: {

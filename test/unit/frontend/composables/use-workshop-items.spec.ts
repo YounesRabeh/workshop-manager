@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { nextTick } from 'vue'
 import { useWorkshopItems } from '@frontend/composables/useWorkshopItems'
 import { TEST_WORKSHOP, createWorkshopItem } from '../../../fixtures/workshop-seed'
 
@@ -9,13 +10,66 @@ describe('useWorkshopItems composable', () => {
     getMyWorkshopItems: vi.fn(async () => [
       createWorkshopItem({ publishedFileId: '1', title: 'Item One' })
     ]),
-    openExternal: vi.fn(async () => ({ ok: true }))
+    openExternal: vi.fn(async (): Promise<{ ok: true; error?: string }> => ({ ok: true }))
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
     delete (workshop as typeof workshop & { getMyWorkshopItemsPage?: unknown }).getMyWorkshopItemsPage
     ;(window as unknown as { workshop: typeof workshop }).workshop = workshop
+  })
+
+  it('clears the App ID filter, reloads when signed in, and handles an already-empty filter', async () => {
+    let signedIn = true
+    const setStatusMessage = vi.fn()
+    const store = useWorkshopItems({ canAccessMods: () => signedIn, normalizeError: () => ({ code: 'failed', message: 'failed' }), setStatusMessage, onSelectWorkshopItem: vi.fn() })
+    await store.resetAppIdFilter()
+    expect(workshop.getMyWorkshopItems).not.toHaveBeenCalled()
+    store.onChangeAppId('480')
+    await store.resetAppIdFilter()
+    expect(store.workshopFilterAppId.value).toBe('')
+    expect(workshop.getMyWorkshopItems).toHaveBeenCalledExactlyOnceWith({ appId: undefined })
+    signedIn = false
+    store.onChangeAppId('123')
+    await store.resetAppIdFilter()
+    expect(setStatusMessage).toHaveBeenLastCalledWith('App ID filter cleared.')
+    store.onChangeWorkshopVisibilityFilter('friends')
+    expect(workshop.getMyWorkshopItems).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens the selected item with an encoded ID and reports browser failures', async () => {
+    const setStatusMessage = vi.fn()
+    const store = useWorkshopItems({ canAccessMods: () => true, normalizeError: () => ({ code: 'network', message: 'offline' }), setStatusMessage, onSelectWorkshopItem: vi.fn() })
+    await store.openSelectedWorkshopItem()
+    expect(setStatusMessage).toHaveBeenLastCalledWith('Select a workshop item first.')
+    expect(workshop.openExternal).not.toHaveBeenCalled()
+    store.selectedWorkshopItemId.value = '123&other=1'
+    await store.openSelectedWorkshopItem()
+    expect(workshop.openExternal).toHaveBeenCalledWith({ url: 'https://steamcommunity.com/sharedfiles/filedetails/?id=123%26other%3D1' })
+    expect(setStatusMessage).toHaveBeenLastCalledWith('Opened workshop page in your browser.')
+    workshop.openExternal.mockResolvedValueOnce({ ok: true, error: 'browser unavailable' })
+    await store.openSelectedWorkshopItem()
+    expect(setStatusMessage).toHaveBeenLastCalledWith('Could not open workshop page: browser unavailable')
+    workshop.openExternal.mockRejectedValueOnce(new Error('offline'))
+    await store.openSelectedWorkshopItem()
+    expect(setStatusMessage).toHaveBeenLastCalledWith('Open workshop page failed (network): offline')
+  })
+
+  it.each([['public', 0], ['friends', 1], ['unlisted', 3], ['unknown', undefined]] as const)('filters legacy items by %s visibility', async (filter, visibility) => {
+    workshop.getMyWorkshopItems.mockResolvedValueOnce([
+      createWorkshopItem({ publishedFileId: 'wanted', title: 'Wanted', visibility }),
+      createWorkshopItem({ publishedFileId: 'other', title: 'Other', visibility: 2 })
+    ])
+    const store = useWorkshopItems({ canAccessMods: () => true, normalizeError: () => ({ code: 'failed', message: 'failed' }), setStatusMessage: vi.fn(), onSelectWorkshopItem: vi.fn() })
+    await store.loadWorkshopItems()
+    store.onChangeWorkshopVisibilityFilter(filter)
+    expect(store.workshopItems.value.map(item => item.publishedFileId)).toEqual(['wanted'])
+    store.goToWorkshopItemsPage(NaN)
+    expect(store.workshopItemsPage.value).toBe(1)
+    store.workshopItemsPage.value = 10
+    store.workshopItemsTotalCount.value = 25
+    await nextTick()
+    expect(store.workshopItemsPage.value).toBe(3)
   })
 
   it('uses the production paged API and sends page, size, app, and visibility filters', async () => {
