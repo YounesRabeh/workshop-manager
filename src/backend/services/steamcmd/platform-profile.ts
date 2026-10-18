@@ -58,6 +58,7 @@ const STEAMCMD_PLATFORM_BEHAVIORS: Record<SteamCmdPlatformProfile, SteamCmdPlatf
   }
 }
 
+/** Resolves SteamCMD platform profile from the available inputs. */
 export function resolveSteamCmdPlatformProfile(platform: NodeJS.Platform = process.platform): SteamCmdPlatformProfile {
   if (platform === 'linux') {
     return 'linux'
@@ -68,6 +69,7 @@ export function resolveSteamCmdPlatformProfile(platform: NodeJS.Platform = proce
   throw new Error(`Unsupported SteamCMD platform profile for runtime platform: ${platform}`)
 }
 
+/** Returns the SteamCMD platform behavior. */
 export function getSteamCmdPlatformBehavior(profile: SteamCmdPlatformProfile): SteamCmdPlatformBehavior {
   return STEAMCMD_PLATFORM_BEHAVIORS[profile]
 }

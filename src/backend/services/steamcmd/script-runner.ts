@@ -16,12 +16,15 @@ interface RunWithEphemeralScriptOptions<T> {
 }
 
 class SteamCmdScriptRunner {
+  /** Stores the private directory and file operations for temporary scripts. */
   constructor(private readonly runtimeDir: string) {}
 
+  /** Returns the private directory used for temporary SteamCMD scripts. */
   private scriptsDirPath(): string {
     return join(this.runtimeDir, 'scripts')
   }
 
+  /** Creates the restricted-permission directory used for temporary scripts. */
   private async ensurePrivateScriptsDir(): Promise<string> {
     const scriptsDir = this.scriptsDirPath()
     await mkdir(scriptsDir, { recursive: true, mode: 0o700 })
@@ -31,6 +34,7 @@ class SteamCmdScriptRunner {
     return scriptsDir
   }
 
+  /** Removes stale stale scripts from its storage location. */
   async purgeStaleScripts(): Promise<number> {
     const scriptsDir = this.scriptsDirPath()
     let entries
@@ -48,6 +52,7 @@ class SteamCmdScriptRunner {
     return scriptFileNames.length
   }
 
+  /** Runs with ephemeral script and returns its completion result. */
   async runWithEphemeralScript<T>(options: RunWithEphemeralScriptOptions<T>): Promise<T> {
     const runId = options.runId.trim()
     if (!runId) {

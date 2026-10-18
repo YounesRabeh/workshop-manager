@@ -16,6 +16,7 @@ const IMAGE_MIME_TYPES = new Map([
   ['.gif', 'image/gif']
 ])
 
+/** Allows only HTTP(S) destinations for links opened outside the application. */
 export function isSafeExternalUrl(targetUrl: string): boolean {
   try {
     const parsed = new URL(targetUrl)
@@ -28,6 +29,7 @@ export function isSafeExternalUrl(targetUrl: string): boolean {
 export class LocalImagePreviewAccess {
   private readonly approvedRealPaths = new Set<string>()
 
+  /** Approves a canonical, bounded image file only after its bytes match the extension. */
   async approve(path: string | undefined): Promise<boolean> {
     const normalizedPath = path?.trim()
     if (!normalizedPath || !IMAGE_MIME_TYPES.has(extname(normalizedPath).toLowerCase())) {
@@ -52,6 +54,7 @@ export class LocalImagePreviewAccess {
     }
   }
 
+  /** Loads only a previously approved file, rechecking its type and size before returning a data URL. */
   async load(path: string | undefined): Promise<string | undefined> {
     const normalizedPath = path?.trim()
     if (!normalizedPath) {

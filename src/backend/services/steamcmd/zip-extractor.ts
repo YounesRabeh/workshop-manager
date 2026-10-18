@@ -9,6 +9,7 @@ const MAX_EXTRACTED_BYTES = 512 * 1024 * 1024
 const MAX_ZIP_ENTRIES = 4096
 
 // The caller supplies a new private staging directory; never merge into an existing installation.
+/** Extracts regular files only, rejecting unsafe paths, duplicate names, and archives over the resource limits. */
 export async function extractSteamCmdZip(archivePath: string, stagingDir: string): Promise<void> {
   const root = await realpath(stagingDir)
   const zip = await new Promise<ZipFile>((resolveZip, reject) => {
@@ -20,11 +21,13 @@ export async function extractSteamCmdZip(archivePath: string, stagingDir: string
   let extractedBytes = 0
   let entryCount = 0
 
+  /** Returns whether a destination path is a strict descendant of the extraction root. */
   function contained(path: string): boolean {
     const part = relative(root, path)
     return part !== '' && !isAbsolute(part) && part !== '..' && !part.startsWith(`..${sep}`)
   }
 
+/** Writes a ZIP file entry only after validating its type and destination path. */
   async function extractEntry(entry: Entry): Promise<void> {
     if (++entryCount > MAX_ZIP_ENTRIES) throw new Error('ZIP entry limit exceeded')
     const type = (entry.externalFileAttributes >>> 16) & 0o170000
@@ -56,6 +59,7 @@ export async function extractSteamCmdZip(archivePath: string, stagingDir: string
       zip.openReadStream(entry, (error, stream) => error ? reject(error) : resolveStream(stream))
     })
     await pipeline(input, new Transform({
+      /** Converts operation to the representation expected by the caller. */
       transform(chunk: Buffer, _encoding, callback) {
         extractedBytes += chunk.length
         callback(extractedBytes > MAX_EXTRACTED_BYTES ? new Error('ZIP extracted size limit exceeded') : null, chunk)

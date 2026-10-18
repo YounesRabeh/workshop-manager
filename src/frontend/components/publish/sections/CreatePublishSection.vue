@@ -39,6 +39,7 @@ const emit = defineEmits<{
   (e: 'toggle-content-file', relativePath: string): void
 }>()
 
+/** Emits only a valid Steam visibility value selected in the create form. */
 function onVisibilitySelectChange(event: Event): void {
   const target = event.target as HTMLSelectElement | null
   const parsed = Number(target?.value)
@@ -48,6 +49,7 @@ function onVisibilitySelectChange(event: Event): void {
   emit('change-visibility-selection', parsed as 0 | 1 | 2 | 3)
 }
 
+/** Normalizes the App ID input before updating the Workshop filter. */
 function onAppIdInput(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit('update-app-id', target?.value ?? '')
@@ -105,6 +107,7 @@ const readinessContext = computed(() => ({
   createAppIdHasInvalidFormat: createAppIdHasInvalidFormat.value
 }))
 
+/** Runs whichever create or update action is active in the form. */
 function submitPrimaryAction(): void {
   emit('upload')
 }

@@ -27,11 +27,13 @@ interface WorkshopCommandServiceDependencies {
   getAvailableDiskBytes?: (path: string) => Promise<number>
 }
 
+/** Returns free bytes for the filesystem containing the selected content folder. */
 async function getAvailableDiskBytes(path: string): Promise<number> {
   const filesystem = await statfs(path)
   return Number(filesystem.bavail) * Number(filesystem.bsize)
 }
 
+/** Normalizes an excluded relative path and rejects paths that escape the content root. */
 function normalizeExcludedPath(path: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/^\.\//, '')
   const segments = normalized.split('/')
@@ -41,6 +43,7 @@ function normalizeExcludedPath(path: string): string {
   return normalized
 }
 
+/** Creates a temporary upload folder containing only files not excluded by the draft. */
 async function prepareFilteredContentFolder(
   draft: UploadDraft,
   runtimeDir: string,
@@ -105,10 +108,12 @@ async function prepareFilteredContentFolder(
   }
 }
 
+/** Creates a unique identifier for a SteamCMD run. */
 function createRunId(): string {
   return `${Date.now()}-${randomUUID().replaceAll('-', '')}`
 }
 
+/** Rejects an update whose filtered content folder contains no uploadable files. */
 async function ensureUpdateContentFolderHasFiles(draft: UploadDraft): Promise<void> {
   const contentFolder = draft.contentFolder?.trim()
   if (!contentFolder) {
@@ -134,6 +139,7 @@ async function ensureUpdateContentFolderHasFiles(draft: UploadDraft): Promise<vo
 export class WorkshopCommandService {
   private readonly resolveAvailableDiskBytes: (path: string) => Promise<number>
 
+  /** Connects Workshop commands to SteamCMD execution and current profile state. */
   constructor(
     private readonly runtimeDir: string,
     dependencies: WorkshopCommandServiceDependencies = {}
@@ -141,6 +147,7 @@ export class WorkshopCommandService {
     this.resolveAvailableDiskBytes = dependencies.getAvailableDiskBytes ?? getAvailableDiskBytes
   }
 
+  /** Validates the draft and prepares the exact content folder and VDF used by a Workshop run. */
   async prepare(
     username: string,
     draft: UploadDraft,
@@ -160,6 +167,7 @@ export class WorkshopCommandService {
     )
     const effectiveDraft = filteredContent.draft
     const vdfPath = join(this.runtimeDir, `${runId}.vdf`)
+    /** Removes the temporary filtered content folder after the run completes. */
     const cleanup = async (): Promise<void> => {
       const results = await Promise.allSettled([
         rm(vdfPath, { force: true }),

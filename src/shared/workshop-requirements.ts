@@ -20,14 +20,17 @@ type CreateMissingField = 'appId' | 'contentFolder' | 'title'
 type UpdateMissingField = 'appId' | 'publishedFileId' | 'title'
 type VisibilityMissingField = 'appId' | 'publishedFileId' | 'visibility'
 
+/** Checks whether a required text field contains non-whitespace content. */
 function hasText(value: string | undefined): boolean {
   return typeof value === 'string' && value.trim().length > 0
 }
 
+/** Checks whether a value contains digits only. */
 function isNumericText(value: string | undefined): boolean {
   return typeof value === 'string' && /^\d+$/.test(value.trim())
 }
 
+/** Identifies whether an update changes content, preview, both, or neither. */
 export function getUpdateDraftPath(fields: RequirementFields): UpdateDraftPath {
   const hasContentFolder = hasText(fields.contentFolder)
   const hasPreviewFile = hasText(fields.previewFile)
@@ -44,6 +47,7 @@ export function getUpdateDraftPath(fields: RequirementFields): UpdateDraftPath {
   return 'none'
 }
 
+/** Evaluates create requirements against the shared requirements. */
 export function evaluateCreateRequirements(fields: RequirementFields): {
   appId: boolean
   contentFolder: boolean
@@ -75,6 +79,7 @@ export function evaluateCreateRequirements(fields: RequirementFields): {
   }
 }
 
+/** Evaluates update requirements against the shared requirements. */
 export function evaluateUpdateRequirements(fields: RequirementFields): {
   appId: boolean
   publishedFileId: boolean
@@ -112,6 +117,7 @@ export function evaluateUpdateRequirements(fields: RequirementFields): {
   }
 }
 
+/** Evaluates visibility requirements against the shared requirements. */
 export function evaluateVisibilityRequirements(fields: RequirementFields): {
   appId: boolean
   publishedFileId: boolean

@@ -8,6 +8,7 @@ export const BUILD_FLAGS = Object.freeze({
   steamCmdNoIpv6: true
 })
 
+/** Adds platform-aware flags and the startup command to SteamCMD arguments. */
 export function buildSteamCmdLaunchArgs(
   args: readonly string[],
   noIpv6: boolean = BUILD_FLAGS.steamCmdNoIpv6

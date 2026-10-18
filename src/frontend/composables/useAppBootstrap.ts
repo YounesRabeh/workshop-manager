@@ -17,6 +17,7 @@ interface UseAppBootstrapOptions {
   setStatusMessage: (message: string) => void
 }
 
+/** Loads startup state and tracks whether the renderer is ready. */
 export function useAppBootstrap(options: UseAppBootstrapOptions): { isBootstrapping: Ref<boolean> } {
   const isBootstrapping = ref(true)
   let disposeRunEventListener: (() => void) | null = null

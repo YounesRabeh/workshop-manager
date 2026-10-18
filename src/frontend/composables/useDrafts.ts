@@ -7,6 +7,7 @@ import { computed, reactive, ref } from 'vue'
 import type { ContentFolderFileEntry } from '@shared/contracts'
 import type { ContentTreeNode, StagedContentFile, UploadDraftState } from '../types/ui'
 
+/** Creates a new draft with all upload fields and staged-file state initialized. */
 export function createEmptyDraft(): UploadDraftState {
   return {
     appId: '',
@@ -18,6 +19,7 @@ export function createEmptyDraft(): UploadDraftState {
   }
 }
 
+/** Creates an independent copy of draft. */
 export function cloneDraft(source: UploadDraftState): UploadDraftState {
   return {
     appId: source.appId,
@@ -29,6 +31,7 @@ export function cloneDraft(source: UploadDraftState): UploadDraftState {
   }
 }
 
+/** Copies every upload field from the source draft into the reactive target. */
 export function applyDraft(target: UploadDraftState, source: UploadDraftState): void {
   target.appId = source.appId
   target.publishedFileId = source.publishedFileId
@@ -38,14 +41,17 @@ export function applyDraft(target: UploadDraftState, source: UploadDraftState): 
   target.releaseNotes = source.releaseNotes
 }
 
+/** Normalizes filesystem separators and removes trailing slashes for path comparisons. */
 export function normalizeFsPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+$/, '')
 }
 
+/** Normalizes a relative content path to forward slashes without a leading slash. */
 export function normalizeRelativePath(path: string): string {
   return path.replace(/\\/g, '/').replace(/^\/+/, '')
 }
 
+/** Removes duplicate entries from content files. */
 export function dedupeContentFiles(files: StagedContentFile[]): StagedContentFile[] {
   const byPath = new Map<string, StagedContentFile>()
   for (const file of files) {
@@ -56,10 +62,12 @@ export function dedupeContentFiles(files: StagedContentFile[]): StagedContentFil
   )
 }
 
+/** Combines content files while preserving distinct entries. */
 export function mergeContentFiles(existing: StagedContentFile[], incoming: StagedContentFile[]): StagedContentFile[] {
   return dedupeContentFiles([...existing, ...incoming])
 }
 
+/** Converts a scanned file entry into the renderer's staged-file representation. */
 export function toStagedContentFile(entry: ContentFolderFileEntry): StagedContentFile {
   return {
     absolutePath: entry.absolutePath,
@@ -69,11 +77,13 @@ export function toStagedContentFile(entry: ContentFolderFileEntry): StagedConten
   }
 }
 
+/** Loads content folder files from its configured source. */
 export async function loadContentFolderFiles(contentFolder: string): Promise<StagedContentFile[]> {
   const payload = await window.workshop.listContentFolderFiles({ folderPath: contentFolder })
   return dedupeContentFiles(payload.map(toStagedContentFile))
 }
 
+/** Groups staged files into the nested folder tree shown in the content explorer. */
 export function buildContentTree(files: StagedContentFile[]): ContentTreeNode[] {
   interface MutableFileNode {
     id: string
@@ -149,6 +159,7 @@ export function buildContentTree(files: StagedContentFile[]): ContentTreeNode[] 
     }
   }
 
+  /** Records the final outcome of node and releases its active state. */
   const finalizeNode = (node: MutableNode): ContentTreeNode => {
     if (node.type === 'file') {
       return node
@@ -178,6 +189,7 @@ export function buildContentTree(files: StagedContentFile[]): ContentTreeNode[] 
   return tree.children ?? []
 }
 
+/** Provides create/update drafts and helpers for staged content and preview files. */
 export function useDrafts() {
   const createDraft = reactive<UploadDraftState>(createEmptyDraft())
   const updateDraft = reactive<UploadDraftState>(createEmptyDraft())
@@ -199,18 +211,22 @@ export function useDrafts() {
     buildContentTree(updateStagedContentFiles.value)
   )
 
+  /** Removes the selected preview image from the create draft. */
   function clearCreatePreviewFile(): void {
     createDraft.previewFile = ''
   }
 
+  /** Removes the selected preview image from the update draft. */
   function clearUpdatePreviewFile(): void {
     updateDraft.previewFile = ''
   }
 
+  /** Returns the create or update draft selected by the requested mode. */
   function getDraftForMode(mode: 'create' | 'update'): UploadDraftState {
     return mode === 'create' ? createDraft : updateDraft
   }
 
+  /** Sets one typed field on the create or update draft. */
   function setDraftField<K extends keyof UploadDraftState>(
     mode: 'create' | 'update',
     field: K,
@@ -220,6 +236,7 @@ export function useDrafts() {
     draft[field] = value
   }
 
+  /** Replaces the staged-file list for the selected publish mode. */
   function setStagedFilesForMode(mode: 'create' | 'update', files: StagedContentFile[]): void {
     if (mode === 'create') {
       createStagedContentFiles.value = files
@@ -228,6 +245,7 @@ export function useDrafts() {
     updateStagedContentFiles.value = files
   }
 
+  /** Toggles whether the selected staged file is excluded from upload. */
   function toggleStagedFileForMode(mode: 'create' | 'update', relativePath: string): void {
     const files = mode === 'create' ? createStagedContentFiles : updateStagedContentFiles
     files.value = files.value.map((file) =>
@@ -235,12 +253,14 @@ export function useDrafts() {
     )
   }
 
+  /** Clears the selected mode's content folder and staged-file list. */
   function clearWorkspaceForMode(mode: 'create' | 'update'): void {
     const draft = getDraftForMode(mode)
     draft.contentFolder = ''
     setStagedFilesForMode(mode, [])
   }
 
+  /** Restores drafts state to its initial state. */
   function resetDraftsState(): void {
     applyDraft(createDraft, createEmptyDraft())
     applyDraft(updateDraft, createEmptyDraft())

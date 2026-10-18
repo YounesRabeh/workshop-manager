@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { isSafeExternalUrl } from './ipc-security'
 
+/** Finds the preload script for the current packaged or development build. */
 function resolvePreloadPath(): string {
   const jsPath = join(__dirname, '../preload/index.js')
   if (existsSync(jsPath)) {
@@ -16,6 +17,7 @@ function resolvePreloadPath(): string {
   return join(__dirname, '../preload/index.mjs')
 }
 
+/** Finds the application icon for the current platform and build. */
 function resolveWindowIconPath(): string | undefined {
   const iconCandidates =
     process.platform === 'win32'
@@ -47,6 +49,7 @@ function resolveWindowIconPath(): string | undefined {
   return undefined
 }
 
+/** Builds the only renderer origin allowed to load in the Electron window. */
 function resolveAllowedNavigationTarget(): URL {
   const devServerUrl = resolveDevServerUrl()
   if (devServerUrl) {
@@ -56,6 +59,7 @@ function resolveAllowedNavigationTarget(): URL {
   return new URL(pathToFileURL(join(__dirname, '../renderer/index.html')).toString())
 }
 
+/** Returns the configured development-server URL when one is available. */
 function resolveDevServerUrl(): string | undefined {
   if (app.isPackaged) return undefined
   const value = process.env['ELECTRON_RENDERER_URL']?.trim()
@@ -69,6 +73,7 @@ function resolveDevServerUrl(): string | undefined {
   return url.toString()
 }
 
+/** Allows only the configured renderer origin to navigate inside the app window. */
 function isAllowedRendererNavigation(targetUrl: string): boolean {
   try {
     const allowedTarget = resolveAllowedNavigationTarget()
@@ -84,6 +89,7 @@ function isAllowedRendererNavigation(targetUrl: string): boolean {
   }
 }
 
+/** Creates the isolated Electron window with its preload and navigation restrictions. */
 export async function createMainWindow(): Promise<BrowserWindow> {
   const iconPath = resolveWindowIconPath()
   const mainWindow = new BrowserWindow({

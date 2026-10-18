@@ -24,15 +24,18 @@ const emit = defineEmits<{
   (e: 'preview-error'): void
 }>()
 
+/** Forwards the image-load event so the preview composable can inspect dimensions. */
 function onPreviewLoad(event: Event): void {
   emit('preview-load', event)
 }
 
+/** Emits the title currently entered in the publish form. */
 function onTitleInput(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit('update-title', target?.value ?? '')
 }
 
+/** Emits the release notes currently entered in the publish form. */
 function onReleaseNotesInput(event: Event): void {
   const target = event.target as HTMLTextAreaElement | null
   emit('update-release-notes', target?.value ?? '')

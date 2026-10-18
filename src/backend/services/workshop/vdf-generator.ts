@@ -7,6 +7,7 @@
 import type { UploadDraft } from '@shared/contracts'
 import { AppError } from '@backend/utils/errors'
 
+/** Escapes VDF for safe use in the target format. */
 function escapeVdf(value: string, preserveNewlines = false): string {
   const normalized = value.replace(/\r\n/g, '\n')
   const escaped = normalized.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
@@ -16,6 +17,7 @@ function escapeVdf(value: string, preserveNewlines = false): string {
   return escaped.replace(/\n/g, '\\n')
 }
 
+/** Throws a validation error when string violates its required constraint. */
 function assertString(name: string, value: string | undefined): string {
   if (!value || value.trim().length === 0) {
     throw new AppError('validation', `${name} is required`)
@@ -23,6 +25,7 @@ function assertString(name: string, value: string | undefined): string {
   return value.trim()
 }
 
+/** Serializes a validated publish draft into SteamCMD's Workshop VDF format. */
 export function generateWorkshopVdf(draft: UploadDraft, mode: 'upload' | 'update' | 'visibility'): string {
   const appId = assertString('appid', draft.appId)
   const hasVisibility = draft.visibility !== undefined

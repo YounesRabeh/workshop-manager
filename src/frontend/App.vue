@@ -65,17 +65,26 @@ const {
 
 // These late-bound callbacks let independently-scoped composables notify one
 // another without collapsing the entire app shell into a single mega-composable.
+/** Handles show timeout logs events from the application. */
 let showTimeoutLogsHandler: () => Promise<void> = async () => undefined
+/** Handles hide timeout logs events from the application. */
 let hideTimeoutLogsHandler: () => void = () => undefined
+/** Handles signed in events from the application. */
 let signedInHandler: () => Promise<void> = async () => undefined
+/** Handles signed out events from the application. */
 let signedOutHandler: () => void = () => undefined
 let openAdvancedOptionsHandler: (() => void) | null = null
 
 const authFlow = useAuthFlow({
+  /** Shows SteamCMD timeout diagnostics when the auth flow requests them. */
   onShowTimeoutLogs: async () => showTimeoutLogsHandler(),
+  /** Hides SteamCMD timeout diagnostics when the auth flow closes them. */
   onHideTimeoutLogs: () => hideTimeoutLogsHandler(),
+  /** Refreshes profile and Workshop state after authentication succeeds. */
   onSignedIn: async () => signedInHandler(),
+  /** Clears profile and Workshop state after sign-out. */
   onSignedOut: () => signedOutHandler(),
+  /** Opens advanced settings when login requires a SteamCMD path. */
   onSteamCmdPathRequired: () => {
     openAdvancedOptionsHandler?.()
   }
@@ -120,15 +129,22 @@ const {
 
 const isWebApiKeyPeek = ref(false)
 
+/** Shows or masks the Web API key in the settings form. */
 function setWebApiKeyPeek(value: boolean): void {
   isWebApiKeyPeek.value = value
 }
 
+/** Handles can access update events from the application. */
 let canAccessUpdateHandler: () => boolean = () => false
+/** Handles selected Workshop item ID events from the application. */
 let selectedWorkshopItemIdHandler: () => string = () => ''
+/** Handles update draft published file ID events from the application. */
 let updateDraftPublishedFileIdHandler: () => string = () => ''
+/** Handles set update draft published file ID events from the application. */
 let setUpdateDraftPublishedFileIdHandler: (value: string) => void = () => undefined
+/** Handles signed in refresh events from the application. */
 let signedInRefreshHandler: () => Promise<void> = async () => undefined
+/** Handles signed out reset events from the application. */
 let signedOutResetHandler: () => void = () => undefined
 
 const {
@@ -144,17 +160,25 @@ const {
   setFlowStep,
   destroy: destroyPublishOrchestration
 } = usePublishOrchestration({
+  /** Supplies the current authentication state to publish orchestration. */
   isAuthenticated: () => isAuthenticated.value,
+  /** Supplies whether the selected Workshop item can be updated. */
   canAccessUpdate: () => canAccessUpdateHandler(),
+  /** Supplies the currently selected Workshop item ID. */
   getSelectedWorkshopItemId: () => selectedWorkshopItemIdHandler(),
+  /** Supplies the published-file ID currently stored in the update draft. */
   getUpdateDraftPublishedFileId: () => updateDraftPublishedFileIdHandler(),
+  /** Copies the selected item's published-file ID into the update draft. */
   setUpdateDraftPublishedFileId: (value) => {
     setUpdateDraftPublishedFileIdHandler(value)
   },
+  /** Updates the status message shared by the application shell. */
   setStatusMessage: (message) => {
     statusMessage.value = message
   },
+  /** Refreshes authenticated data after sign-in completes. */
   onSignedInRefresh: async () => signedInRefreshHandler(),
+  /** Clears authenticated data after sign-out completes. */
   onSignedOutReset: () => signedOutResetHandler()
 })
 
@@ -178,6 +202,7 @@ const {
   clearSavedWebApiKey
 } = useAdvancedSettings({
   normalizeError,
+  /** Updates the status message shared by the application shell. */
   setStatusMessage: (message) => {
     statusMessage.value = message
   }
@@ -199,8 +224,10 @@ const loginHeaderStatusMessage = computed(() => {
 
 const uiShell = useUiShell({
   flowStep,
+  /** Supplies the current authentication state to the app shell. */
   isAuthenticated: () => isAuthenticated.value,
   goToStep,
+  /** Displays an error when the browser cannot change fullscreen state. */
   onFullscreenFailure: () => {
     statusMessage.value = 'Fullscreen toggle failed.'
   }
@@ -240,6 +267,7 @@ const { isBootstrapping } = useAppBootstrap({
   refreshRememberedLoginState,
   loadAdvancedSettings,
   loadAppVersion,
+  /** Updates the status message shared by the application shell. */
   setStatusMessage: (message) => {
     statusMessage.value = message
   }
@@ -248,11 +276,14 @@ const { isBootstrapping } = useAppBootstrap({
 // These three composables form the authenticated workshop loop:
 // browse/select an item, derive publish affordances, then hydrate/sync update drafts.
 const workshopStore = useWorkshopItems({
+  /** Supplies whether the current session may browse Workshop items. */
   canAccessMods: () => canAccessMods.value,
   normalizeError,
+  /** Updates the status message shared by the application shell. */
   setStatusMessage: (message) => {
     statusMessage.value = message
   },
+  /** Hydrates the update draft when a Workshop item is selected. */
   onSelectWorkshopItem: (item) => {
     hydrateSelectedWorkshopItem(item)
   }
@@ -302,7 +333,9 @@ const shouldShowWorkshopItemsEmptyState = computed(() => {
 
   return workshopListMessage.value.trim().length > 0 || workshopItems.value.length > 0
 })
+/** Handles has pending update changes events from the application. */
 let hasPendingUpdateChangesHandler: () => boolean = () => false
+/** Handles set visibility from selection events from the application. */
 let setVisibilityFromSelectionHandler: (value: 0 | 1 | 2 | 3) => void = () => undefined
 
 const publishActions = usePublishActions({
@@ -315,14 +348,17 @@ const publishActions = usePublishActions({
   updateDraft,
   createRequirements,
   updateRequirements,
+  /** Supplies whether the update draft differs from the selected item's saved details. */
   hasPendingUpdateChanges: () => hasPendingUpdateChangesHandler(),
   updateDraftCache,
   createStagedContentFiles,
   updateStagedContentFiles,
+  /** Updates the status message shared by the application shell. */
   setStatusMessage: (message) => {
     statusMessage.value = message
   },
   showToast,
+  /** Updates the selected item when a publish action refreshes Workshop data. */
   onSelectWorkshopItem: (item) => {
     selectWorkshopItem(item)
   },
@@ -359,7 +395,9 @@ const updateFlowCoordinator = useUpdateDraftCoordinator({
   updateDraft,
   updateDraftCache,
   isHydratingUpdateDraft,
+  /** Keeps the draft visibility choices aligned with the selected Workshop item. */
   setVisibilityFromSelection: (value) => setVisibilityFromSelectionHandler(value),
+  /** Updates the status message shared by the application shell. */
   setStatusMessage: (message) => {
     statusMessage.value = message
   }
@@ -424,6 +462,7 @@ onUnmounted(() => {
 
 // Folder scans update both the staged-file tree and the shared status area so
 // create/update flows report the same success message format.
+/** Replaces staged files for a mode after its content folder has been scanned. */
 function setStagedContentFilesFromFolder(mode: 'create' | 'update', contentFolder: string, files: StagedContentFile[]): void {
   setStagedFilesForMode(mode, files)
   if (files.length === 0) {
@@ -435,26 +474,31 @@ function setStagedContentFilesFromFolder(mode: 'create' | 'update', contentFolde
 }
 
 // Keep scan failures consistent with successful folder-selection messaging.
+/** Stores the folder-specific scan error shown by the selected publish mode. */
 function setContentFolderSelectionError(mode: 'create' | 'update', contentFolder: string, message: string): void {
   setStagedFilesForMode(mode, [])
   statusMessage.value = `Content folder selected: ${contentFolder}. Scan failed: ${message}`
 }
 
+/** Loads Workshop items from its configured source. */
 async function loadWorkshopItems(): Promise<void> {
   await workshopStore.loadWorkshopItems()
   reconcileWorkshopSelection()
 }
 
+/** Restores Workshop app ID filter to its initial state. */
 async function resetWorkshopAppIdFilter(): Promise<void> {
   await workshopStore.resetAppIdFilter()
   reconcileWorkshopSelection()
 }
 
+/** Updates the current Workshop selection and hydrates its update draft when needed. */
 function selectWorkshopItem(item: WorkshopItemSummary): void {
   workshopStore.selectWorkshopItem(item)
 }
 
 // Create and update use the same picker/scan flow; only the target draft changes.
+/** Opens a picker so the user can select content folder for mode. */
 async function pickContentFolderForMode(mode: 'create' | 'update'): Promise<void> {
   const path = await window.workshop.pickFolder()
   if (path) {
@@ -470,15 +514,18 @@ async function pickContentFolderForMode(mode: 'create' | 'update'): Promise<void
   }
 }
 
+/** Opens selected Workshop item and updates related UI state. */
 async function openSelectedWorkshopItem(): Promise<void> {
   await workshopStore.openSelectedWorkshopItem()
 }
 
+/** Reloads the active Workshop page and reconciles the selected item. */
 async function refreshSelectedWorkshopItem(): Promise<void> {
   await workshopStore.refreshSelectedWorkshopItem()
   reconcileWorkshopSelection()
 }
 
+/** Opens a picker so the user can select preview file for mode. */
 async function pickPreviewFileForMode(mode: 'create' | 'update'): Promise<void> {
   try {
     const path = await window.workshop.pickFile()
@@ -490,33 +537,40 @@ async function pickPreviewFileForMode(mode: 'create' | 'update'): Promise<void> 
   }
 }
 
+/** Opens a picker so the user can select create preview file. */
 async function pickCreatePreviewFile(): Promise<void> {
   await pickPreviewFileForMode('create')
 }
 
+/** Opens a picker so the user can select create content folder. */
 async function pickCreateContentFolder(): Promise<void> {
   await pickContentFolderForMode('create')
 }
 
+/** Opens a picker so the user can select update content folder. */
 async function pickUpdateContentFolder(): Promise<void> {
   await pickContentFolderForMode('update')
 }
 
+/** Removes the create draft's content folder and staged files. */
 function clearCreateWorkspace(): void {
   clearWorkspaceForMode('create')
   statusMessage.value = 'Mod content cleared.'
 }
 
+/** Removes the update draft's content folder and staged files. */
 function clearUpdateWorkspace(): void {
   clearWorkspaceForMode('update')
   statusMessage.value = 'Mod content cleared.'
 }
 
+/** Opens settings stage and updates related UI state. */
 async function openSettingsStage(): Promise<void> {
   await loadAdvancedSettings()
   setFlowStep('settings')
 }
 
+/** Opens a picker so the user can select update preview file. */
 async function pickUpdatePreviewFile(): Promise<void> {
   await pickPreviewFileForMode('update')
 }

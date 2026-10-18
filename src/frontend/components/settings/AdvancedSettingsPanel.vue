@@ -45,21 +45,25 @@ const emit = defineEmits<{
   (e: 'clear-web-api-key'): void
 }>()
 
+/** Emits the Web API key currently entered in advanced settings. */
 function onWebApiKeyInput(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit('update-web-api-key', target?.value ?? '')
 }
 
+/** Emits the manually selected SteamCMD executable path. */
 function onSteamCmdManualPathInput(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit('update-steamcmd-manual-path', target?.value ?? '')
 }
 
+/** Emits the login timeout value entered in seconds. */
 function onLoginTimeoutInput(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit('update-login-timeout-ms', target?.value ?? '')
 }
 
+/** Emits the login timeout's enabled or disabled value. */
 function onLoginTimeoutDisabledChange(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit(
@@ -71,11 +75,13 @@ function onLoginTimeoutDisabledChange(event: Event): void {
   )
 }
 
+/** Emits the saved-session timeout value entered in seconds. */
 function onStoredSessionTimeoutInput(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit('update-stored-session-timeout-ms', target?.value ?? '')
 }
 
+/** Emits the saved-session timeout's enabled or disabled value. */
 function onStoredSessionTimeoutDisabledChange(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit(
@@ -87,11 +93,13 @@ function onStoredSessionTimeoutDisabledChange(event: Event): void {
   )
 }
 
+/** Emits the Workshop timeout value entered in seconds. */
 function onWorkshopTimeoutInput(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit('update-workshop-timeout-ms', target?.value ?? '')
 }
 
+/** Emits the Workshop timeout's enabled or disabled value. */
 function onWorkshopTimeoutDisabledChange(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit(
@@ -189,15 +197,18 @@ const isWorkshopTimeoutDisabled = computed(() => {
   return isTimeoutDisabled(props.advancedSettings.workshopTimeoutMs)
 })
 
+/** Applies the configured timeout behavior to limit seconds. */
 function timeoutLimitSeconds(timeoutMs: number): number {
   return Math.round(timeoutMs / 1000)
 }
 
+/** Checks whether the input contains the sentinel value used to disable a timeout. */
 function isTimeoutDisabled(value: string): boolean {
   const normalized = value.trim()
   return /^\d+$/.test(normalized) && Number(normalized) === STEAMCMD_TIMEOUT_DISABLED_VALUE
 }
 
+/** Converts a timeout between its disabled sentinel and the chosen duration. */
 function toggleTimeoutValue(disabled: boolean, defaultTimeoutMs: number): string {
   return String(
     disabled

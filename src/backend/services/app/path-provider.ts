@@ -12,6 +12,7 @@ export interface AppPaths {
   runtimeDir: string
 }
 
+/** Returns the application data, runtime, and log directories used by the current process. */
 export function getAppPaths(): AppPaths {
   const dataDir = app.getPath('userData')
   return {

@@ -57,6 +57,7 @@ export const STEAMCMD_TIMEOUT_LIMITS = {
   }
 } as const
 
+/** Accepts only a finite, non-negative timeout and preserves zero as disabled. */
 function normalizeTimeoutField(key: TimeoutKey, value: unknown): number {
   const { defaultValue, min, max } = TIMEOUT_FIELD_DEFINITIONS[key]
   const normalized =
@@ -77,6 +78,7 @@ function normalizeTimeoutField(key: TimeoutKey, value: unknown): number {
   return Math.min(max, Math.max(min, Math.round(normalized)))
 }
 
+/** Fills missing SteamCMD timeouts with defaults and validates supplied values. */
 export function normalizeSteamCmdTimeoutSettings(
   input?: Partial<SteamCmdTimeoutSettings> | null
 ): SteamCmdTimeoutSettings {

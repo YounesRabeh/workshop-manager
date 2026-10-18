@@ -34,10 +34,12 @@ interface SteamCmdOutputProcessorDeps {
   onScheduleActiveRunSettle: (activeRun: ActiveInteractiveRun) => void
 }
 
+/** Detects the SteamCMD prompt that signals the process is ready for input. */
 function isSteamPromptLine(line: string): boolean {
   return /steam>\s*$/i.test(line)
 }
 
+/** Recognizes incomplete prompt text at the end of a buffered output chunk. */
 function isTrailingSteamGuardPromptBuffer(line: string): boolean {
   const normalized = stripAnsi(line).trim()
   if (!normalized) {
@@ -52,6 +54,7 @@ function isTrailingSteamGuardPromptBuffer(line: string): boolean {
     /\botp\b\s*:\s*$/i.test(normalized)
 }
 
+/** Detects output explicitly asking for an authentication code. */
 function isExplicitSteamGuardCodePrompt(line: string): boolean {
   const normalized = stripAnsi(line).trim()
   return /steam guard code\s*:\s*$/i.test(normalized) ||
@@ -60,6 +63,7 @@ function isExplicitSteamGuardCodePrompt(line: string): boolean {
     /\botp\b\s*:\s*$/i.test(normalized)
 }
 
+/** Redacts Steam Guard and OTP values before output is logged or shown. */
 function sanitizeSensitiveOutputLine(line: string): string {
   return line
     .replace(/(steam guard code\s*:)\s*[^\s]+/gi, '$1 [REDACTED]')
@@ -72,12 +76,15 @@ class SteamCmdOutputProcessor {
   private stdoutBuffer = ''
   private stderrBuffer = ''
 
+  /** Stores the callbacks and logger used to process SteamCMD output. */
   constructor(private readonly deps: SteamCmdOutputProcessorDeps) {}
 
+  /** Creates separate stdout and stderr buffers for a one-shot process. */
   createOneShotBuffers(): OneShotBuffers {
     return { stdout: '', stderr: '' }
   }
 
+  /** Buffers persistent-process output, routes complete lines, and detects prompts. */
   handlePersistentChunk(stream: 'stdout' | 'stderr', chunk: Buffer): void {
     const incoming = chunk.toString('utf8')
     if (stream === 'stdout') {
@@ -106,6 +113,7 @@ class SteamCmdOutputProcessor {
     }
   }
 
+  /** Buffers one-shot output and routes each complete line to the active run. */
   handleOneShotProcessChunk(
     stream: 'stdout' | 'stderr',
     chunk: Buffer,
@@ -125,6 +133,7 @@ class SteamCmdOutputProcessor {
     }
   }
 
+  /** Routes any final unterminated output from the persistent process. */
   flushPersistentTrailingLines(): void {
     const trailingStdout = this.stdoutBuffer.trim()
     const trailingStderr = this.stderrBuffer.trim()
@@ -138,6 +147,7 @@ class SteamCmdOutputProcessor {
     }
   }
 
+  /** Routes any final unterminated output from a one-shot process. */
   flushOneShotTrailingLines(buffers: OneShotBuffers): void {
     const trailingStdout = buffers.stdout.trim()
     const trailingStderr = buffers.stderr.trim()
@@ -151,6 +161,7 @@ class SteamCmdOutputProcessor {
     }
   }
 
+  /** Converts one-shot output and exit status into a login or Workshop result. */
   deriveOneShotPendingResult(
     phase: RunPhase,
     lines: string[],
@@ -183,6 +194,7 @@ class SteamCmdOutputProcessor {
     return { exitCode: exitCode ?? 1 }
   }
 
+  /** Routes line to active run to the handler for the active run. */
   private routeLineToActiveRun(line: string, type: 'stdout' | 'stderr'): void {
     const normalizedLine = stripAnsi(line).trim()
     if (!normalizedLine) {
@@ -281,6 +293,7 @@ class SteamCmdOutputProcessor {
                   this.deps.logger.formatRunMeta('login_challenge prompt=steam_guard_code')
                 )
               }
+              /** Clears the pending Steam Guard challenge after the prompt is resolved. */
               const clearPendingGuardChallenge = () => {
                 const currentPendingPrompt = this.deps.state.pendingSteamGuard.get(activeRun.runId)
                 if (currentPendingPrompt !== pendingGuardPrompt) {

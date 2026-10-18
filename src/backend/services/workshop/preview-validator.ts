@@ -12,6 +12,7 @@ export const MAX_WORKSHOP_PREVIEW_BYTES = 1024 * 1024
 
 const SUPPORTED_WORKSHOP_PREVIEW_EXTENSIONS = new Set(['.gif', '.jpeg', '.jpg', '.png'])
 
+/** Validates Workshop preview file before the operation proceeds. */
 export async function validateWorkshopPreviewFile(previewFile: string | undefined): Promise<void> {
   const previewPath = previewFile?.trim()
   if (!previewPath) return

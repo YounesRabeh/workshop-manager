@@ -67,16 +67,19 @@ const DEFAULT_DB: ProfileDb = {
  */
 class CorruptProfileDbError extends Error {}
 
+/** Creates a fresh default database object for an empty or recovered store. */
 function cloneDefaultDb(): ProfileDb {
   return {
     profiles: [...DEFAULT_DB.profiles]
   }
 }
 
+/** Checks whether an unknown error carries the requested Node.js error code. */
 function isNodeErrorWithCode(error: unknown, code: string): boolean {
   return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === code)
 }
 
+/** Validates persisted profile data and normalizes optional settings from older database versions. */
 function normalizeDb(parsed: unknown): ProfileDb {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new CorruptProfileDbError('Profile database root must be an object.')
@@ -110,6 +113,7 @@ function normalizeDb(parsed: unknown): ProfileDb {
   }
 }
 
+/** Throws a validation error when optional type violates its required constraint. */
 function assertOptionalType(record: Record<string, unknown>, field: string, expectedType: 'string' | 'boolean' | 'number'): void {
   const value = record[field]
   if (value !== undefined && (typeof value !== expectedType || (expectedType === 'number' && !Number.isFinite(value)))) {
@@ -117,6 +121,7 @@ function assertOptionalType(record: Record<string, unknown>, field: string, expe
   }
 }
 
+/** Validates the required fields and optional file references of a saved mod profile. */
 function isModProfile(value: unknown): value is ModProfile {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return false
@@ -132,6 +137,7 @@ function isModProfile(value: unknown): value is ModProfile {
   )
 }
 
+/** Accepts only the supported Steam Guard authentication modes from persisted data. */
 function normalizePreferredAuthMode(value: unknown): PreferredAuthMode | undefined {
   if (value === 'otp' || value === 'steam_guard_mobile') {
     return value
@@ -153,6 +159,7 @@ export class ProfileStore {
    */
   constructor(private readonly dbPath: string) {}
 
+  /** Queues database writes so concurrent read-modify-write operations cannot overwrite one another. */
   private async withWriteLock<T>(operation: () => Promise<T>): Promise<T> {
     const next = this.writeChain.then(operation, operation)
     this.writeChain = next.then(
@@ -162,6 +169,7 @@ export class ProfileStore {
     return await next
   }
 
+  /** Preserves corrupt profile JSON beside the database, then writes a fresh default database. */
   private async recoverCorruptDb(originalBytes: string): Promise<ProfileDb> {
     await mkdir(dirname(this.dbPath), { recursive: true })
     const parsedPath = parse(this.dbPath)
@@ -172,6 +180,7 @@ export class ProfileStore {
     return defaultDb
   }
 
+  /** Reads and validates the profile database without acquiring another write lock. */
   private async readDbUnlocked(): Promise<ProfileDb> {
     try {
       const data = await readFile(this.dbPath, 'utf8')
@@ -191,11 +200,13 @@ export class ProfileStore {
     }
   }
 
+  /** Loads the profile database, using defaults when it does not yet exist. */
   private async readDb(): Promise<ProfileDb> {
     await this.writeChain
     return await this.readDbUnlocked()
   }
 
+  /** Writes a temporary profile database file, then renames it into place to avoid partial writes. */
   private async writeDbFile(db: ProfileDb): Promise<void> {
     await mkdir(dirname(this.dbPath), { recursive: true })
     const tempPath = `${this.dbPath}.${process.pid}.${Date.now()}.tmp`
@@ -203,6 +214,7 @@ export class ProfileStore {
     await rename(tempPath, this.dbPath)
   }
 
+  /** Serializes a profile-database read-modify-write operation. */
   private async updateDb<T>(mutate: (db: ProfileDb) => T | Promise<T>): Promise<T> {
     return await this.withWriteLock(async () => {
       const db = await this.readDbUnlocked()

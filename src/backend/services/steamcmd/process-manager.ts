@@ -21,8 +21,10 @@ interface SteamCmdProcessManagerDeps {
 }
 
 class SteamCmdProcessManager {
+  /** Stores the executable, arguments, and callbacks used to launch SteamCMD. */
   constructor(private readonly deps: SteamCmdProcessManagerDeps) {}
 
+  /** Adds SteamCMD-specific settings to the child process environment. */
   private buildChildProcessEnv(): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = { ...process.env }
     if (this.deps.platformBehavior.profile === 'linux') {
@@ -35,27 +37,33 @@ class SteamCmdProcessManager {
     return env
   }
 
+  /** Returns true when the persistent process is available. */
   hasPersistentProcess(): boolean {
     return this.deps.state.persistentProcess !== null
   }
 
+  /** Returns the persistent process. */
   getPersistentProcess(): ChildProcessWithoutNullStreams | null {
     return this.deps.state.persistentProcess
   }
 
+  /** Checks whether output contains the prompt that makes the persistent process ready. */
   isPersistentPromptReady(): boolean {
     return this.deps.state.persistentPromptReady
   }
 
+  /** Sends a response to the running SteamCMD process. */
   writeInteractiveInput(value: string): void {
     this.deps.state.persistentPromptReady = false
     this.deps.state.persistentProcess?.stdin.write(`${value}${this.deps.platformBehavior.interactiveLineEnding}`)
   }
 
+  /** Starts one shot with the configured executable and arguments. */
   spawnOneShot(executablePath: string, args: string[]): ChildProcessWithoutNullStreams {
     return spawn(executablePath, buildSteamCmdLaunchArgs(args), this.buildChildProcessOptions())
   }
 
+  /** Reuses the persistent process or starts it when none is available. */
   async ensurePersistentProcess(
     executablePath?: string,
     startupArgs: string[] = []
@@ -91,12 +99,14 @@ class SteamCmdProcessManager {
     return child
   }
 
+  /** Marks persistent session unusable so it will be recreated before the next run. */
   invalidatePersistentSession(): void {
     this.deps.state.persistentProcess = null
     this.deps.state.persistentPromptReady = false
     this.deps.onSessionInvalidated()
   }
 
+  /** Builds spawn options, including the platform-specific executable and environment. */
   private buildChildProcessOptions() {
     return {
       cwd: this.deps.runtimeDir,

@@ -8,6 +8,7 @@ import { access, copyFile, mkdir, readdir } from 'node:fs/promises'
 
 const STABLE_USER_DATA_DIR_NAME = 'workshop-manager'
 
+/** Checks whether a path can be accessed without treating a missing path as an error. */
 async function pathExists(path: string): Promise<boolean> {
   try {
     await access(path)
@@ -17,6 +18,7 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+/** Recursively copies regular legacy files, skipping files already present in the stable directory. */
 async function copyMissingTree(sourceDir: string, targetDir: string): Promise<void> {
   await mkdir(targetDir, { recursive: true })
   const entries = await readdir(sourceDir, { withFileTypes: true })
@@ -38,12 +40,14 @@ async function copyMissingTree(sourceDir: string, targetDir: string): Promise<vo
   }
 }
 
+/** Points Electron at the canonical application data directory before stores are opened. */
 export function configureStableUserDataPath(): string {
   const stablePath = join(app.getPath('appData'), STABLE_USER_DATA_DIR_NAME)
   app.setPath('userData', stablePath)
   return stablePath
 }
 
+/** Copies legacy files only when the stable location lacks them; existing user data is never overwritten. */
 export async function migrateLegacyUserData(stableUserDataPath: string): Promise<void> {
   const appDataPath = app.getPath('appData')
   const legacyCandidates = [

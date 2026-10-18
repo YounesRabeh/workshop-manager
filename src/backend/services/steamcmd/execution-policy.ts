@@ -10,6 +10,7 @@ export interface SteamCmdExecutionPolicy {
   mode: SteamCmdExecutionMode
 }
 
+/** Resolves SteamCMD execution policy from the available inputs. */
 export function resolveSteamCmdExecutionPolicy(
   env: NodeJS.ProcessEnv = process.env
 ): SteamCmdExecutionPolicy {

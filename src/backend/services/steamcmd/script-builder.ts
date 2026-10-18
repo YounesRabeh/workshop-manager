@@ -23,6 +23,7 @@ interface WorkshopScriptOptions extends ScriptDirectiveOptions {
   vdfPath: string
 }
 
+/** Throws a validation error when non empty value violates its required constraint. */
 function assertNonEmptyValue(field: string, value: string | undefined): string {
   const normalized = value?.trim()
   if (!normalized) {
@@ -31,6 +32,7 @@ function assertNonEmptyValue(field: string, value: string | undefined): string {
   return normalized
 }
 
+/** Produces quoted SteamCMD directives from validated login and Workshop fields. */
 export function buildSteamCmdScriptDirectives(options: ScriptDirectiveOptions): string[] {
   const directives: string[] = []
   if (options.shutdownOnFailedCommand !== false) {
@@ -42,6 +44,7 @@ export function buildSteamCmdScriptDirectives(options: ScriptDirectiveOptions): 
   return directives
 }
 
+/** Builds the login script, choosing password or stored-auth instructions. */
 export function buildSteamCmdLoginScript(options: LoginScriptOptions): string {
   const username = assertNonEmptyValue('username', options.username)
   const password = options.password?.trim()
@@ -60,6 +63,7 @@ export function buildSteamCmdLoginScript(options: LoginScriptOptions): string {
   return `${[...directives, loginParts.join(' '), 'quit'].join('\n')}\n`
 }
 
+/** Builds the script that uploads, updates, or changes visibility for a Workshop item. */
 export function buildSteamCmdWorkshopScript(options: WorkshopScriptOptions): string {
   const username = assertNonEmptyValue('username', options.username)
   const password = options.password?.trim()

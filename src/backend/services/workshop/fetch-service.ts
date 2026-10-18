@@ -36,12 +36,14 @@ const WEB_API_PRIVACY_BY_FILTER: Partial<Record<WorkshopVisibilityFilter, string
   unlisted: '3'
 }
 
+/** Keeps only items whose visibility matches the selected Workshop filter. */
 function matchesVisibility(item: WorkshopItemSummary, filter: WorkshopVisibilityFilter): boolean {
   if (filter === 'all') return true
   if (filter === 'unknown') return item.visibility === undefined
   return item.visibility === Number(WEB_API_PRIVACY_BY_FILTER[filter])
 }
 
+/** Validates page bounds and normalizes optional app ID and visibility filters. */
 function normalizePageInput(input: WorkshopItemsPageInput): Required<Pick<WorkshopItemsPageInput, 'page' | 'pageSize'>> & Pick<WorkshopItemsPageInput, 'appId' | 'visibility'> {
   if (!Number.isSafeInteger(input.page) || input.page < 1) throw new AppError('validation', 'Workshop page must be a positive integer.')
   if (!Number.isSafeInteger(input.pageSize) || input.pageSize < 1 || input.pageSize > 100) {
@@ -59,10 +61,12 @@ function normalizePageInput(input: WorkshopItemsPageInput): Required<Pick<Worksh
   }
 }
 
+/** Extracts a readable message from an unknown error value. */
 function errorMessage(error: unknown): string {
   return normalizeError(error).message
 }
 
+/** Builds the user-facing explanation for an unresolved Steam identity. */
 function unresolvedIdentityMessage(
   target: 'profile' | 'workshop',
   webApiAccess: WorkshopWebApiAccessState = 'disabled'
@@ -81,6 +85,7 @@ function unresolvedIdentityMessage(
   return `Signed in to Steam, but account identity could not be resolved on this platform. ${action}${webApiHint}`
 }
 
+/** Collects unique published-file IDs from a Steam Web API response. */
 function extractPublishedFileIds(payload: unknown): string[] {
   if (!payload || typeof payload !== 'object') {
     return []
@@ -110,14 +115,17 @@ function extractPublishedFileIds(payload: unknown): string[] {
 export class WorkshopFetchService {
   private readonly policy: WorkshopFetchPolicy
 
+  /** Applies the configured fetch limits to Workshop API and Community requests. */
   constructor(private readonly context: WorkshopFetchContext, policy: Partial<WorkshopFetchPolicy> = {}) {
     this.policy = resolveWorkshopFetchPolicy(policy)
   }
 
+  /** Fetches Steam from the selected Steam data source. */
   private fetchSteam(input: string, init: RequestInit = {}): Promise<Response> {
     return fetch(input, { ...init, signal: AbortSignal.timeout(this.policy.requestTimeoutMs) })
   }
 
+  /** Appends the supplied entry to diagnostic log. */
   private appendDiagnosticLog(line: string): void {
     const result = this.context.appendDiagnosticLog?.(`[API_META] ${line}`)
     if (result) {
@@ -125,6 +133,7 @@ export class WorkshopFetchService {
     }
   }
 
+  /** Counts published-file rows before invalid or duplicate IDs are discarded. */
   private countRawPublishedFileRows(payload: unknown): number {
     if (!payload || typeof payload !== 'object') {
       return 0
@@ -140,6 +149,7 @@ export class WorkshopFetchService {
     return (response.response?.publishedfiledetails ?? response.response?.publishedfileids ?? []).length
   }
 
+  /** Requests detail records for the supplied published-file IDs. */
   private async fetchPublishedFileDetails(ids: string[]): Promise<WorkshopItemSummary[]> {
     const items: WorkshopItemSummary[] = []
     const batchSize = this.policy.detailsBatchSize
@@ -182,6 +192,7 @@ export class WorkshopFetchService {
     return mergeWorkshopItems(items)
   }
 
+  /** Fetches the currently authenticated Steam profile. */
   async getCurrentProfile(): Promise<SteamProfileSummary> {
     const loginState = this.context.getLoginState()
     if (!loginState) {
@@ -223,6 +234,7 @@ export class WorkshopFetchService {
     }
   }
 
+  /** Fetches the current account's Workshop items using the configured access policy. */
   async getMyWorkshopItems(
     appId?: string,
     savedWebApiKey?: string,
@@ -315,6 +327,7 @@ export class WorkshopFetchService {
     return []
   }
 
+  /** Fetches one page of the current account's Workshop items. */
   async getMyWorkshopItemsPage(
     input: WorkshopItemsPageInput,
     savedWebApiKey?: string,
@@ -338,6 +351,7 @@ export class WorkshopFetchService {
     return await this.getWorkshopItemsPageWithCommunity(loginState.steamId64, request)
   }
 
+  /** Fetches and filters a Workshop page through the Steam Web API. */
   private async getWorkshopItemsPageWithWebApi(
     apiKey: string,
     steamId64: string,
@@ -377,6 +391,7 @@ export class WorkshopFetchService {
     }
   }
 
+  /** Fetches a Workshop page from Steam Community when Web API access is unavailable. */
   private async getWorkshopItemsPageWithCommunity(
     steamId64: string,
     request: ReturnType<typeof normalizePageInput>
@@ -394,6 +409,7 @@ export class WorkshopFetchService {
     }
   }
 
+  /** Fetches the current account's Workshop items through the Steam Web API. */
   private async getMyWorkshopItemsWithWebApi(
     apiKey: string,
     steamId64: string,
@@ -474,6 +490,7 @@ export class WorkshopFetchService {
     return []
   }
 
+  /** Fetches the current account's Workshop items from Steam Community. */
   private async getMyWorkshopItemsWithCommunity(
     steamId64: string,
     appId?: string

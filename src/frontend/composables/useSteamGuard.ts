@@ -21,6 +21,7 @@ interface UseSteamGuardOptions {
   toAuthIssue: (error: ApiFailure) => AuthIssue
 }
 
+/** Provides state and actions for Steam Guard challenges, including queued OTP submission. */
 export function useSteamGuard(options: UseSteamGuardOptions) {
   const steamGuardSessionId = ref<string | null>(null)
   const steamGuardCode = ref('')
@@ -29,16 +30,19 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
   const queuedOtpCode = ref('')
   const queuedOtpRunId = ref<string | null>(null)
 
+  /** Returns true when the queued OTP is available. */
   function hasQueuedOtp(): boolean {
     return queuedOtpCode.value.trim().length > 0
   }
 
+  /** Recognizes the SteamCMD error returned when no Guard prompt is awaiting a code. */
   function isNoPendingPromptError(message: string): boolean {
     return /no steam guard prompt is currently waiting for this session|no active steam login is available for this session/i.test(
       message
     )
   }
 
+  /** Replaces the active Steam Guard challenge details shown in the login flow. */
   function setChallengeState(mode: ActiveChallengeMode): void {
     activeChallengeMode.value = mode
     if (mode === 'otp') {
@@ -51,15 +55,18 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
     }
   }
 
+  /** Stores the code entered for the active Steam Guard challenge. */
   function setSteamGuardCode(value: string): void {
     steamGuardCode.value = value
   }
 
+  /** Discards a queued one-time code after it is submitted or no longer needed. */
   function clearQueuedOtp(): void {
     queuedOtpCode.value = ''
     queuedOtpRunId.value = null
   }
 
+  /** Associates queued OTP to run with its target run. */
   function bindQueuedOtpToRun(runId: string): void {
     if (!hasQueuedOtp()) {
       return
@@ -75,6 +82,7 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
     }
   }
 
+  /** Restores Steam Guard state to its initial state. */
   function resetSteamGuardState(): void {
     steamGuardSessionId.value = null
     steamGuardCode.value = ''
@@ -83,6 +91,7 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
     clearQueuedOtp()
   }
 
+  /** Submits OTP code to Steam to the active service. */
   async function submitOtpCodeToSteam(sessionId: string, code: string): Promise<void> {
     options.authIssue.value = null
     await window.workshop.submitSteamGuardCode({
@@ -92,6 +101,7 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
     options.statusMessage.value = 'OTP / Email code submitted. Waiting for Steam...'
   }
 
+  /** Submits queued OTP if ready to the active service. */
   async function submitQueuedOtpIfReady(runId: string): Promise<void> {
     bindQueuedOtpToRun(runId)
 
@@ -127,6 +137,7 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
     }
   }
 
+  /** Submits Steam Guard code to the active service. */
   async function submitSteamGuardCode(): Promise<void> {
     const sessionId = steamGuardSessionId.value
     const code = steamGuardCode.value.trim()
@@ -176,6 +187,7 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
     }
   }
 
+  /** Submits the entered one-time code and reports any authentication error. */
   function applyOtpChallengeStatus(fromSavedSession: boolean): void {
     setChallengeState('otp')
     if (fromSavedSession) {
@@ -188,6 +200,7 @@ export function useSteamGuard(options: UseSteamGuardOptions) {
         : 'OTP / Email code required. Enter the code to continue.'
   }
 
+  /** Waits for Steam mobile approval and reports whether authentication completed. */
   function applyMobileChallengeStatus(fromSavedSession: boolean): void {
     setChallengeState('steam_guard_mobile')
     if (fromSavedSession) {

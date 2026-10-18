@@ -46,6 +46,7 @@ interface UsePublishActionsOptions {
   reloadWorkshopPage?: () => Promise<void>
 }
 
+/** Returns the concise title shown for an upload, update, or visibility failure. */
 function actionFailureTitle(operation: 'upload' | 'update' | 'visibility'): string {
   if (operation === 'upload') {
     return 'Upload Failed'
@@ -56,6 +57,7 @@ function actionFailureTitle(operation: 'upload' | 'update' | 'visibility'): stri
   return 'Visibility Update Failed'
 }
 
+/** Builds the user-facing status message for a failed publish action. */
 function actionFailureStatus(operation: 'upload' | 'update' | 'visibility', message: string): string {
   if (operation === 'upload') {
     return `Upload failed: ${message}`
@@ -66,6 +68,7 @@ function actionFailureStatus(operation: 'upload' | 'update' | 'visibility', mess
   return `Visibility update failed: ${message}`
 }
 
+  /** Combines draft fields, visibility, and staged files into an IPC upload request. */
 function buildUploadDraft(
   source: UploadDraftState,
   mode: 'update' | 'create',
@@ -89,6 +92,7 @@ function buildUploadDraft(
   }
 }
 
+/** Provides validation, confirmation, and execution actions for Workshop create/update flows. */
 export function usePublishActions(options: UsePublishActionsOptions) {
   const committedVisibility = ref<0 | 1 | 2 | 3>(0)
   const pendingVisibility = ref<0 | 1 | 2 | 3>(0)
@@ -122,19 +126,23 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     )
   })
 
+  /** Sets the visibility that will be applied by the next update. */
   function setPendingVisibility(value: 0 | 1 | 2 | 3): void {
     pendingVisibility.value = value
   }
 
+  /** Sets the visibility for a newly published Workshop item. */
   function setCreateVisibility(value: 0 | 1 | 2 | 3): void {
     createVisibility.value = value
   }
 
+  /** Synchronizes both create and update visibility with the selected item. */
   function setVisibilityFromSelection(value: 0 | 1 | 2 | 3): void {
     committedVisibility.value = value
     pendingVisibility.value = value
   }
 
+  /** Checks whether required create fields and visibility are ready for submission. */
   function canCreate(): boolean {
     const hasIncludedContent =
       options.createStagedContentFiles.value.length === 0 ||
@@ -142,6 +150,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     return options.loginState.value === 'signed_in' && options.createRequirements.value.valid && hasIncludedContent
   }
 
+  /** Explains which create requirements still prevent submission. */
   function resolveCreateBlockedMessage(): string {
     if (options.loginState.value !== 'signed_in') {
       return 'Create blocked: login required.'
@@ -162,6 +171,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     return 'Create blocked: requirements not met.'
   }
 
+  /** Checks whether required update fields and a content or preview change are ready. */
   function canUpdate(): boolean {
     return (
       options.loginState.value === 'signed_in' &&
@@ -171,6 +181,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     )
   }
 
+  /** Explains which update requirements or draft changes are still missing. */
   function resolveUpdateBlockedMessage(): string {
     if (
       !options.updateRequirements.value.appId ||
@@ -185,6 +196,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     return 'Update blocked: requirements not met.'
   }
 
+  /** Normalizes a publish failure, updates status, and displays an error toast. */
   function handleActionFailure(operation: 'upload' | 'update' | 'visibility', error: unknown): void {
     const parsed = normalizeError(error)
     logError(`usePublishActions::${operation}`, parsed)
@@ -196,6 +208,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     })
   }
 
+  /** Refreshes the current Workshop page and optionally processes the refreshed items. */
   async function refreshWorkshopItems(afterRefresh?: (items: WorkshopItemSummary[]) => void): Promise<void> {
     if (options.reloadWorkshopPage) {
       await options.reloadWorkshopPage()
@@ -209,6 +222,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     afterRefresh?.(refreshedItems)
   }
 
+  /** Uploads a new Workshop item and refreshes the list after success. */
   async function upload(): Promise<void> {
     if (!canCreate()) {
       options.setStatusMessage(resolveCreateBlockedMessage())
@@ -247,6 +261,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     }
   }
 
+  /** Opens create confirmation and updates related UI state. */
   function openCreateConfirmation(): void {
     if (!canCreate()) {
       options.setStatusMessage(resolveCreateBlockedMessage())
@@ -255,15 +270,18 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     isCreateConfirmOpen.value = true
   }
 
+  /** Closes create confirmation and updates related UI state. */
   function closeCreateConfirmation(): void {
     isCreateConfirmOpen.value = false
   }
 
+  /** Confirms the create dialog and starts the upload. */
   async function confirmCreateItem(): Promise<void> {
     isCreateConfirmOpen.value = false
     await upload()
   }
 
+  /** Updates item from the current inputs. */
   async function updateItem(): Promise<void> {
     if (!canUpdate()) {
       options.setStatusMessage(resolveUpdateBlockedMessage())
@@ -322,6 +340,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     }
   }
 
+  /** Opens update confirmation and updates related UI state. */
   function openUpdateConfirmation(): void {
     if (!canUpdate()) {
       options.setStatusMessage(resolveUpdateBlockedMessage())
@@ -330,15 +349,18 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     isUpdateConfirmOpen.value = true
   }
 
+  /** Closes update confirmation and updates related UI state. */
   function closeUpdateConfirmation(): void {
     isUpdateConfirmOpen.value = false
   }
 
+  /** Confirms the update dialog and submits the selected item's changes. */
   async function confirmUpdateItem(): Promise<void> {
     isUpdateConfirmOpen.value = false
     await updateItem()
   }
 
+  /** Updates visibility only from the current inputs. */
   async function updateVisibilityOnly(): Promise<void> {
     if (!canChangeVisibility.value) {
       options.setStatusMessage('Select a different visibility first.')
@@ -373,6 +395,7 @@ export function usePublishActions(options: UsePublishActionsOptions) {
     }
   }
 
+  /** Restores publish action state to its initial state. */
   function resetPublishActionState(): void {
     committedVisibility.value = 0
     pendingVisibility.value = 0

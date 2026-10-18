@@ -50,11 +50,13 @@ const appIdHasInvalidFormat = computed(() => {
   return value.length > 0 && !/^\d+$/.test(value)
 })
 
+/** Normalizes the App ID input before updating the Workshop filter. */
 function onAppIdInput(event: Event): void {
   const target = event.target as HTMLInputElement | null
   emit('change-app-id', target?.value ?? '')
 }
 
+/** Updates the Workshop list filter from the selected visibility value. */
 function onVisibilityFilterInput(event: Event): void {
   const target = event.target as HTMLSelectElement | null
   const value = target?.value as WorkshopVisibilityFilter | undefined
@@ -64,6 +66,7 @@ function onVisibilityFilterInput(event: Event): void {
   emit('change-visibility-filter', value)
 }
 
+/** Returns the visibility badge. */
 function getVisibilityBadge(visibility: WorkshopItemSummary['visibility']): VisibilityBadge {
   if (visibility === 0) {
     return { label: 'Public', toneClass: 'workshop-visibility-public' }

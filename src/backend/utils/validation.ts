@@ -10,6 +10,7 @@ import {
 } from '@shared/workshop-requirements'
 import { AppError } from './errors'
 
+/** Rejects missing or non-numeric Steam application and published-file IDs. */
 function validateNumericId(value: string | undefined, label: string, context: string): void {
   const normalized = value?.trim()
   if (!normalized) {
@@ -20,6 +21,7 @@ function validateNumericId(value: string | undefined, label: string, context: st
   }
 }
 
+/** Validates untrusted draft data before it is translated into SteamCMD arguments. */
 export function validateDraft(draft: UploadDraft, mode: 'upload' | 'update' | 'visibility'): void {
   const excludedContentPaths = draft.excludedContentPaths as unknown
   if (

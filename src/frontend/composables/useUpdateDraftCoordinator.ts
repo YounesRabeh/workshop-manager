@@ -20,6 +20,7 @@ interface UseUpdateDraftCoordinatorOptions {
   setStatusMessage: (message: string) => void
 }
 
+/** Normalizes a title for case- and whitespace-insensitive comparison. */
 function normalizeComparableTitle(value: string | undefined): string {
   if (typeof value !== 'string') {
     return ''
@@ -28,6 +29,7 @@ function normalizeComparableTitle(value: string | undefined): string {
   return value.replace(/\s+/g, ' ').trim().toLocaleLowerCase()
 }
 
+/** Provides reactive state and actions for update draft coordinator. */
 export function useUpdateDraftCoordinator(options: UseUpdateDraftCoordinatorOptions) {
   const hasMeaningfulUpdateTitleChange = computed(() => {
     const selectedTitle = normalizeComparableTitle(options.selectedWorkshopItem.value?.title)
@@ -65,6 +67,7 @@ export function useUpdateDraftCoordinator(options: UseUpdateDraftCoordinatorOpti
     )
   })
 
+  /** Populates selected Workshop item from the selected Workshop item. */
   function hydrateSelectedWorkshopItem(
     item: WorkshopItemSummary,
     config: { navigateToUpdate?: boolean } = {}
@@ -93,6 +96,7 @@ export function useUpdateDraftCoordinator(options: UseUpdateDraftCoordinatorOpti
     }
   }
 
+  /** Synchronizes Workshop selection with its latest source state. */
   function reconcileWorkshopSelection(): void {
     const selectedId = options.selectedWorkshopItemId.value.trim()
     const hasCurrentSelection =

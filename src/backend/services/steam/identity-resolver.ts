@@ -22,11 +22,13 @@ interface ResolveLoginSteamId64Options {
   connectionLogPaths?: string[]
 }
 
+/** Extracts a SteamID64 value from Steam profile XML. */
 export function parseSteamId64FromProfileXml(xml: string): string | undefined {
   const candidate = extractXmlTagValue(xml, 'steamID64')
   return isValidSteamId64(candidate) ? candidate : undefined
 }
 
+/** Converts a Steam profile URL or vanity name into a canonical lookup value. */
 function normalizeSteamCommunityReference(
   value: string
 ): { steamId64?: string; profileXmlUrl?: string } | undefined {
@@ -68,6 +70,7 @@ function normalizeSteamCommunityReference(
   return undefined
 }
 
+/** Extracts the authenticated SteamID64 from a Steam connection log. */
 export function parseSteamId64FromConnectionLog(logContent: string): string | undefined {
   const tail = logContent.slice(-CONNECTION_LOG_TAIL_BYTES)
   const steamIdMatches = [...tail.matchAll(/\b(7656119\d{10})\b/g)]
@@ -92,10 +95,12 @@ export function parseSteamId64FromConnectionLog(logContent: string): string | un
 export class SteamIdentityResolver {
   private readonly platformBehavior: SteamCmdPlatformBehavior
 
+  /** Sets up the profile and connection-log sources used to resolve Steam identity. */
   constructor(platformProfile: SteamCmdPlatformProfile) {
     this.platformBehavior = getSteamCmdPlatformBehavior(platformProfile)
   }
 
+  /** Finds the logged-in SteamID64 using available profile and connection-log sources. */
   async resolveLoginSteamId64(
     username: string,
     loginLines: string[],
@@ -118,6 +123,7 @@ export class SteamIdentityResolver {
     return await this.resolveFromCustomProfile(username)
   }
 
+  /** Searches candidate Steam connection logs for the current account's SteamID64. */
   async resolveFromConnectionLogs(paths: string[]): Promise<string | undefined> {
     const candidates = [...new Set(paths.map((path) => path.trim()).filter((path) => path.length > 0))]
     for (const path of candidates) {
@@ -135,6 +141,7 @@ export class SteamIdentityResolver {
     return undefined
   }
 
+  /** Resolves a vanity name or profile URL through Steam Community profile data. */
   async resolveFromCustomProfile(username: string): Promise<string | undefined> {
     const reference = normalizeSteamCommunityReference(username)
     if (!reference) {

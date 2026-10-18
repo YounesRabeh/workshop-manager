@@ -4,6 +4,7 @@
  */
 import { computed, ref, watch, type ComputedRef } from 'vue'
 
+/** Converts a local filesystem path into a URL that the renderer can load. */
 export function toLocalFileUrl(path: string): string {
   if (!path) {
     return ''
@@ -27,6 +28,7 @@ export function toLocalFileUrl(path: string): string {
   return ''
 }
 
+/** Validates and exposes the selected local image preview to the publish form. */
 export function useUploadPreview(previewFileValue: ComputedRef<string>): {
   uploadPreviewImageSrc: ComputedRef<string>
   previewImageLoadFailed: ComputedRef<boolean>
@@ -77,11 +79,13 @@ export function useUploadPreview(previewFileValue: ComputedRef<string>): {
     { immediate: true }
   )
 
+  /** Marks the selected preview as unreadable so the form can show its fallback. */
   function onUploadPreviewError(): void {
     previewImageLoadFailedRef.value = true
     previewImageIsSquareRef.value = null
   }
 
+  /** Records whether the loaded thumbnail has a square aspect ratio. */
   function onUploadPreviewLoad(event: Event): void {
     const image = event.target as HTMLImageElement | null
     if (!image) {

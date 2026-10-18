@@ -11,6 +11,7 @@ export interface ReadinessStyleContext {
   createAppIdHasInvalidFormat?: boolean
 }
 
+/** Returns checklist-item classes based on completion and publish-flow context. */
 export function readinessItemClass(item: PublishChecklistItem, context: ReadinessStyleContext): string {
   if (
     context.isUpdateMode &&
@@ -35,6 +36,7 @@ export function readinessItemClass(item: PublishChecklistItem, context: Readines
   return 'border-rose-400/45 bg-rose-500/18'
 }
 
+/** Returns status classes for a checklist item in its current context. */
 export function readinessStatusClass(item: PublishChecklistItem, context: ReadinessStyleContext): string {
   if (
     context.isUpdateMode &&
@@ -59,6 +61,7 @@ export function readinessStatusClass(item: PublishChecklistItem, context: Readin
   return 'text-rose-200'
 }
 
+/** Returns the status text shown beside a checklist item. */
 export function readinessStatusLabel(item: PublishChecklistItem, context: ReadinessStyleContext): string {
   if (
     context.isUpdateMode &&

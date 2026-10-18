@@ -4,6 +4,7 @@
  */
 import type { PublishVisibility } from '../model/visibility'
 
+/** Returns the CSS classes for the card representing a visibility level. */
 export function visibilityCardClass(value: PublishVisibility): string {
   if (value === 0) {
     return 'border-[#58c796] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(88,199,150,0.44)_0%,rgba(60,130,105,0.28)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(88,199,150,0.38),0_0_24px_rgba(45,152,112,0.26)]'
@@ -17,6 +18,7 @@ export function visibilityCardClass(value: PublishVisibility): string {
   return 'border-[#9f81df] bg-[radial-gradient(120%_160%_at_0%_0%,rgba(159,129,223,0.36)_0%,rgba(104,75,168,0.22)_30%,rgba(19,36,55,0.96)_72%),linear-gradient(135deg,rgba(24,44,64,0.96)_0%,rgba(16,31,46,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(159,129,223,0.35),0_0_22px_rgba(105,75,170,0.22)]'
 }
 
+/** Returns the CSS classes for a visibility choice and its selected state. */
 export function visibilityOptionClass(option: PublishVisibility, selected: boolean): string {
   const base =
     'group relative flex h-9 w-[132px] items-center justify-center gap-1.5 rounded border px-2 text-xs font-semibold transition-colors duration-200'
@@ -37,6 +39,7 @@ export function visibilityOptionClass(option: PublishVisibility, selected: boole
   return `${base} border-[#9d83d8] bg-[#4a356f] text-[#f0e8ff] shadow-[inset_0_0_0_1px_rgba(157,131,216,0.34)]`
 }
 
+/** Returns the CSS classes for the action associated with a visibility level. */
 export function visibilityActionClass(value: PublishVisibility): string {
   if (value === 0) {
     return 'border-[#61c799] bg-[#3c8f6a] hover:bg-[#4ca982]'
@@ -50,6 +53,7 @@ export function visibilityActionClass(value: PublishVisibility): string {
   return 'border-[#9379c8] bg-[#5b448d] hover:bg-[#7156a8]'
 }
 
+/** Returns the preview border classes associated with the selected visibility level. */
 export function previewBorderClass(value: PublishVisibility): string {
   if (value === 0) {
     return 'border-[#58c796] shadow-[0_0_0_1px_rgba(88,199,150,0.3)]'

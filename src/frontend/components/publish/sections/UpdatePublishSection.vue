@@ -87,6 +87,7 @@ const readinessContext = computed(() => ({
   createAppIdHasInvalidFormat: false
 }))
 
+/** Runs whichever create or update action is active in the form. */
 function submitPrimaryAction(): void {
   emit('update-item')
 }

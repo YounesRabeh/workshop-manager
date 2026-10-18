@@ -18,6 +18,7 @@ export const DEFAULT_WORKSHOP_FETCH_POLICY: Readonly<WorkshopFetchPolicy> = Obje
   detailsBatchSize: 100
 })
 
+/** Resolves Workshop fetch policy from the available inputs. */
 export function resolveWorkshopFetchPolicy(overrides: Partial<WorkshopFetchPolicy>): WorkshopFetchPolicy {
   const policy = { ...DEFAULT_WORKSHOP_FETCH_POLICY, ...overrides }
   for (const [key, value] of Object.entries(policy)) {

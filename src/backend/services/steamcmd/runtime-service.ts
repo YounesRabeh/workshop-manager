@@ -69,10 +69,12 @@ interface LoginState {
   steamId64?: string
 }
 
+/** Creates a unique identifier for a SteamCMD run. */
 function createRunId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
 }
 
+/** Selects the login timeout while preserving zero as the disabled value. */
 function resolveLoginTimeoutMs(
   useStoredAuth: boolean,
   settings: SteamCmdTimeoutSettings = DEFAULT_STEAMCMD_TIMEOUT_SETTINGS
@@ -80,6 +82,7 @@ function resolveLoginTimeoutMs(
   return useStoredAuth ? settings.storedSessionTimeoutMs : settings.loginTimeoutMs
 }
 
+/** Extracts a readable message from an unknown error value. */
 function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
@@ -87,6 +90,7 @@ function errorMessage(error: unknown): string {
   return 'unknown error'
 }
 
+/** Builds the environment passed to SteamCMD, including platform-specific settings. */
 function buildSteamCmdChildEnv(runtimeDir: string, platformBehavior: SteamCmdPlatformBehavior): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env }
   if (platformBehavior.profile === 'linux') {
@@ -126,6 +130,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
   private readonly scriptRunner: SteamCmdScriptRunner
   private timeoutSettings = DEFAULT_STEAMCMD_TIMEOUT_SETTINGS
 
+  /** Initializes SteamCMD process, identity, logging, and Workshop services. */
   constructor(
     private readonly steamCmdExecutablePath: () => Promise<string>,
     private readonly runLogStore: RunLogStore,
@@ -141,14 +146,18 @@ export class SteamCmdRuntimeService extends EventEmitter {
       steamCmdExecutablePath: this.steamCmdExecutablePath,
       runLogStore: this.runLogStore,
       runtimeDir: this.runtimeDir,
+      /** Publishes a run event to listeners and records it in the run log. */
       emitRunEvent: (event) => this.emitRunEvent(event),
+      /** Clears runtime authentication state when the process session becomes unusable. */
       onSessionInvalidated: () => {
         this.loginState = null
       }
     }, platformProfile)
     this.steamIdentityResolver = new SteamIdentityResolver(platformProfile)
     this.workshopFetchService = new WorkshopFetchService({
+      /** Returns the login state. */
       getLoginState: () => this.loginState,
+      /** Appends the supplied entry to diagnostic log. */
       appendDiagnosticLog: async (line) => {
         await this.runLogStore.appendDiagnosticLine(line)
       }
@@ -156,26 +165,32 @@ export class SteamCmdRuntimeService extends EventEmitter {
     this.workshopCommandService = new WorkshopCommandService(this.runtimeDir)
   }
 
+  /** Returns the SteamCMD execution policy for the current runtime. */
   getExecutionPolicy(): SteamCmdExecutionPolicy {
     return this.executionPolicy
   }
 
+  /** Determines whether SteamCMD can run commands from temporary scripts. */
   private shouldUseSteamCmdScripts(): boolean {
     return this.executionPolicy.mode === 'script' || this.platformBehavior.profile === 'windows'
   }
 
+  /** Deletes temporary script files left by earlier SteamCMD runs. */
   async purgeStaleScriptArtifacts(): Promise<void> {
     await this.scriptRunner.purgeStaleScripts()
   }
 
+  /** Replaces the login, stored-session, and Workshop timeout settings. */
   setTimeoutSettings(settings: SteamCmdTimeoutSettings): void {
     this.timeoutSettings = normalizeSteamCmdTimeoutSettings(settings)
   }
 
+  /** Publishes a run event to listeners and records it in the run log. */
   private emitRunEvent(event: RunEvent): void {
     this.emit('run-event', event)
   }
 
+  /** Collects candidate Steam connection-log paths for the active installation. */
   private async getSteamIdentityLogPaths(): Promise<string[]> {
     const candidates = [
       join(this.runtimeDir, 'connection_log.txt'),
@@ -197,6 +212,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     return [...new Set(candidates)]
   }
 
+  /** Finds the logged-in SteamID64 using available profile and connection-log sources. */
   private async resolveLoginSteamId64(runId: string, username: string, lines: string[]): Promise<string | undefined> {
     const parsedSteamId64 = parseSteamId64(lines)
     if (parsedSteamId64) {
@@ -247,6 +263,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     return undefined
   }
 
+  /** Removes Steam authentication-cache files from one installation directory. */
   private async clearAuthCacheFilesInDirectory(targetDir: string): Promise<void> {
     let entries
     try {
@@ -261,6 +278,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     await Promise.all(ssfnFiles)
   }
 
+  /** Clears cached Steam credentials before strict login to require fresh authentication. */
   async clearAuthCacheForStrictLogin(): Promise<void> {
     this.logout({ clearStoredAuth: true })
     await mkdir(this.runtimeDir, { recursive: true })
@@ -282,6 +300,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     ])
   }
 
+  /** Authenticates the Steam account and establishes an active session. */
   async login(
     username: string,
     password: string,
@@ -399,6 +418,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     return { sessionId: runId }
   }
 
+  /** Ends the Steam session and clears its active authentication state. */
   logout(options?: { clearStoredAuth?: boolean }): void {
     const currentState = this.loginState ?? this.lastAuthenticatedState
     this.loginState = null
@@ -415,6 +435,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     }
   }
 
+  /** Checks whether stored authentication can be reused for the requested account. */
   async hasStoredAuthFor(username: string | undefined): Promise<boolean> {
     const normalizedUsername = username?.trim()
     if (!normalizedUsername) {
@@ -457,6 +478,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     const runId = createRunId()
     const timeoutMs = resolveLoginTimeoutMs(true, this.timeoutSettings)
 
+    /** Runs a bounded SteamCMD command and converts its exit result into a boolean. */
     const executeCheck = async (spawnArgs: string[]): Promise<boolean> => {
       return await new Promise<boolean>((resolve) => {
         const child = spawn(executablePath, buildSteamCmdLaunchArgs(spawnArgs), {
@@ -472,6 +494,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
         let timeout: ReturnType<typeof setTimeout> | null = null
         let settled = false
 
+        /** Settles operation exactly once and releases its waiters. */
         const settle = (value: boolean): void => {
           if (settled) {
             return
@@ -491,6 +514,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
           }, timeoutMs)
         }
 
+        /** Interprets a child-process exit code to decide whether the SteamCMD check succeeded. */
         const decide = (exitCode: number | null): boolean => {
           const lines = `${stdout}\n${stderr}`
             .split(/\r?\n/)
@@ -540,6 +564,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
       return await this.scriptRunner.runWithEphemeralScript({
         runId,
         scriptContent: scriptContent!,
+        /** Executes operation with the supplied inputs. */
         execute: async (scriptPath) => await executeCheck(['+runscript', scriptPath])
       })
     } catch {
@@ -547,10 +572,12 @@ export class SteamCmdRuntimeService extends EventEmitter {
     }
   }
 
+  /** Fetches the currently authenticated Steam profile. */
   async getCurrentProfile(): Promise<SteamProfileSummary> {
     return await this.workshopFetchService.getCurrentProfile()
   }
 
+  /** Fetches the current account's Workshop items using the configured access policy. */
   async getMyWorkshopItems(
     appId?: string,
     savedWebApiKey?: string,
@@ -562,6 +589,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     return await this.workshopFetchService.getMyWorkshopItems(appId, savedWebApiKey, options)
   }
 
+  /** Fetches one page of the current account's Workshop items. */
   async getMyWorkshopItemsPage(
     input: WorkshopItemsPageInput,
     savedWebApiKey?: string,
@@ -570,14 +598,17 @@ export class SteamCmdRuntimeService extends EventEmitter {
     return await this.workshopFetchService.getMyWorkshopItemsPage(input, savedWebApiKey, options)
   }
 
+  /** Submits Steam Guard code to the active service. */
   submitSteamGuardCode(sessionId: string, code: string): void {
     this.processSession.submitSteamGuardCode(sessionId, code)
   }
 
+  /** Cancels run and clears its pending state. */
   cancelRun(runId: string): void {
     this.processSession.cancelRun(runId)
   }
 
+  /** Runs compatibility interactive login and returns its completion result. */
   private async runCompatibilityInteractiveLogin(
     runId: string,
     args: string[],
@@ -598,6 +629,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     })
   }
 
+  /** Authenticates the Steam account and establishes an active session. */
   private async loginWithScriptMode(options: {
     runId: string
     username: string
@@ -614,6 +646,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     return await this.scriptRunner.runWithEphemeralScript({
       runId: options.runId,
       scriptContent,
+      /** Executes operation with the supplied inputs. */
       execute: async (scriptPath) =>
         await this.processSession.runOneShot(options.runId, ['+runscript', scriptPath], {
           phase: 'login',
@@ -624,6 +657,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     })
   }
 
+  /** Maps the current Steam session to the login state required by a Workshop request. */
   private async resolveWorkshopLoginState(): Promise<LoginState> {
     if (this.loginState) {
       return this.loginState
@@ -645,6 +679,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     return rememberedState
   }
 
+  /** Runs one operation with shared cancellation, logging, and error handling. */
   async upload(draft: UploadDraft, mode: 'upload' | 'update' | 'visibility'): Promise<RunResult> {
     const loginState = await this.resolveWorkshopLoginState()
     const prepared = await this.workshopCommandService.prepare(loginState.username, draft, mode)
@@ -661,6 +696,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
           commandResult = await this.scriptRunner.runWithEphemeralScript({
             runId: prepared.runId,
             scriptContent,
+            /** Executes operation with the supplied inputs. */
             execute: async (scriptPath) =>
               await this.processSession.runOneShot(prepared.runId, ['+runscript', scriptPath], {
                 phase: mode,
@@ -736,6 +772,7 @@ export class SteamCmdRuntimeService extends EventEmitter {
     }
   }
 
+  /** Runs compatibility interactive Workshop command and returns its completion result. */
   private async runCompatibilityInteractiveWorkshopCommand(
     runId: string,
     args: string[],

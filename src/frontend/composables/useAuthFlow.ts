@@ -26,6 +26,7 @@ interface UseAuthFlowOptions {
   onSteamCmdPathRequired?: () => void
 }
 
+/** Provides reactive login state and actions for sign-in, sign-out, and stored-session recovery. */
 export function useAuthFlow(options: UseAuthFlowOptions) {
   const loginState = ref<'signed_out' | 'signed_in'>('signed_out')
   const activeLoginRunId = ref<string | null>(null)
@@ -44,6 +45,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     clearStoredSession: clearStoredSessionPersistedState
   } = useStoredSessionManagement()
 
+  /** Accepts only the supported Steam Guard modes from saved preferences. */
   function normalizePreferredAuthMode(mode: SharedPreferredAuthMode | undefined): PreferredAuthMode {
     return mode === 'steam_guard_mobile' ? 'steam_guard_mobile' : 'otp'
   }
@@ -59,6 +61,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     refreshRememberedLoginState
   } = useLoginForm({
     applyRememberedProfileState,
+    /** Applies the saved auth mode when profile preferences finish loading. */
     onPreferredAuthModeLoaded: (mode) => {
       preferredAuthMode.value = mode
     },
@@ -110,6 +113,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
   const canAccessMods = computed(() => loginState.value === 'signed_in')
   const accountDisplayName = computed(() => accountPersonaName.value || loginForm.username.trim() || 'Steam account')
 
+  /** Saves the selected Steam Guard mode and updates the active login preference. */
   function setPreferredAuthMode(value: PreferredAuthMode): void {
     const normalized = normalizePreferredAuthMode(value)
     preferredAuthMode.value = normalized
@@ -118,6 +122,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     })
   }
 
+  /** Removes saved Steam authentication and clears remembered-session state. */
   async function clearStoredSession(): Promise<void> {
     if (isLoginSubmitting.value) {
       return
@@ -139,6 +144,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
   }
 
+  /** Records the final outcome of successful login and releases its active state. */
   async function finalizeSuccessfulLogin(successMessage: string): Promise<void> {
     loginState.value = 'signed_in'
     options.onHideTimeoutLogs()
@@ -151,6 +157,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     await options.onSignedIn()
   }
 
+  /** Attempts auto login with stored session and reports whether the fallback path is needed. */
   async function tryAutoLoginWithStoredSession(): Promise<void> {
     if (!loginForm.rememberAuth || !canUseStoredSessionForLogin() || loginForm.username.trim().length === 0) {
       return
@@ -202,6 +209,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
   }
 
+  /** Loads app version from its configured source. */
   async function loadAppVersion(appVersionRef: { value: string }): Promise<void> {
     try {
       const payload = await window.workshop.getAppVersion()
@@ -215,6 +223,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
   }
 
+  /** Authenticates the Steam account and establishes an active session. */
   async function login(): Promise<void> {
     if (isLoginSubmitting.value) {
       return
@@ -287,6 +296,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
   }
 
+  /** Checks the expected signature of out. */
   async function signOut(): Promise<void> {
     try {
       if (loginForm.rememberAuth) {
@@ -311,6 +321,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     options.onSignedOut()
   }
 
+  /** Requests application shutdown and performs the associated cleanup. */
   async function quitApp(): Promise<void> {
     if (!loginForm.rememberAuth && hasPersistedStoredSession.value) {
       await clearStoredSession()
@@ -327,6 +338,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
     }
   }
 
+  /** Applies mobile preferred OTP guidance to the current state. */
   function applyMobilePreferredOtpGuidance(): void {
     clearQueuedOtp()
     steamGuardPromptType.value = 'waiting'
@@ -335,6 +347,7 @@ export function useAuthFlow(options: UseAuthFlowOptions) {
       'Steam requested OTP / Email code, but Steam app approval is selected. Switch to OTP / Email mode and sign in again.'
   }
 
+  /** Updates login and Steam Guard state from the active run's events. */
   function handleRunEvent(event: RunEvent): void {
     if (event.type === 'run_started' && event.phase === 'login') {
       activeLoginRunId.value = event.runId

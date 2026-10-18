@@ -22,6 +22,7 @@ interface UseAdvancedSettingsOptions {
   setStatusMessage: (message: string) => void
 }
 
+/** Provides reactive settings state and actions for Web API and SteamCMD configuration. */
 export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
   const isSteamCmdDetected = ref(false)
   const isAdvancedOptionsOpen = ref(false)
@@ -43,34 +44,42 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     statusMessage: ''
   })
 
+  /** Stores the Web API key currently entered in advanced settings. */
   function setWebApiKey(value: string): void {
     advancedSettings.webApiKey = value
   }
 
+  /** Stores the user-selected path to a manual SteamCMD executable. */
   function setSteamCmdManualPath(value: string): void {
     advancedSettings.steamCmdManualPath = value
   }
 
+  /** Stores the login timeout text until settings are validated and saved. */
   function setLoginTimeoutMs(value: string): void {
     advancedSettings.loginTimeoutMs = value
   }
 
+  /** Stores the saved-session timeout text until settings are validated and saved. */
   function setStoredSessionTimeoutMs(value: string): void {
     advancedSettings.storedSessionTimeoutMs = value
   }
 
+  /** Stores the Workshop timeout text until settings are validated and saved. */
   function setWorkshopTimeoutMs(value: string): void {
     advancedSettings.workshopTimeoutMs = value
   }
 
+  /** Toggles visibility of the advanced settings panel. */
   function toggleAdvancedOptions(): void {
     isAdvancedOptionsOpen.value = !isAdvancedOptionsOpen.value
   }
 
+  /** Opens advanced options and updates related UI state. */
   function openAdvancedOptions(): void {
     isAdvancedOptionsOpen.value = true
   }
 
+  /** Converts milliseconds to the seconds string used by the timeout inputs. */
   function millisecondsToSecondsString(value: number): string {
     if (value === STEAMCMD_TIMEOUT_DISABLED_VALUE) {
       return String(STEAMCMD_TIMEOUT_DISABLED_VALUE)
@@ -79,6 +88,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     return String(Math.round(value / 1000))
   }
 
+  /** Clears a success message after two seconds unless a newer message replaced it. */
   function scheduleSuccessStatusClear(message: string): void {
     if (successStatusTimeout) {
       clearTimeout(successStatusTimeout)
@@ -92,6 +102,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     }, 2_000)
   }
 
+  /** Copies persisted settings into the reactive form, converting timeouts to seconds. */
   function applyAdvancedSettings(payload: AdvancedSettings): void {
     advancedSettings.webApiEnabled = payload.webApiEnabled
     advancedSettings.hasWebApiKey = payload.hasWebApiKey
@@ -104,6 +115,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     advancedSettings.workshopTimeoutMs = millisecondsToSecondsString(payload.timeouts.workshopTimeoutMs)
   }
 
+  /** Validates a timeout field in seconds and converts it to milliseconds. */
   function parseTimeoutValue(
     fieldLabel: string,
     rawValue: string,
@@ -133,6 +145,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     return parsedSeconds * 1000
   }
 
+  /** Validates all three timeout fields and returns them in milliseconds. */
   function parseTimeoutSettings(): SteamCmdTimeoutSettings | null {
     const loginTimeoutMs = parseTimeoutValue(
       'Login timeout',
@@ -174,6 +187,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     }
   }
 
+  /** Retrieves the current SteamCMD installation log path from the backend. */
   async function loadInstallLogPath(): Promise<void> {
     try {
       const payload = await window.workshop.getInstallLog()
@@ -184,6 +198,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     }
   }
 
+  /** Checks SteamCMD availability and starts installation when it is missing. */
   async function ensureSteamCmdInstalled(): Promise<void> {
     isSteamCmdDetected.value = false
     options.setStatusMessage('Checking SteamCMD installation...')
@@ -211,6 +226,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     }
   }
 
+  /** Opens install log and updates related UI state. */
   async function openInstallLog(): Promise<void> {
     if (installLogPath.value.trim().length === 0) {
       await loadInstallLogPath()
@@ -233,6 +249,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     }
   }
 
+  /** Loads advanced settings from its configured source. */
   async function loadAdvancedSettings(): Promise<void> {
     try {
       const payload = await window.workshop.getAdvancedSettings()
@@ -243,6 +260,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     }
   }
 
+  /** Opens a file picker and stores the chosen SteamCMD executable path. */
   async function pickSteamCmdManualPath(): Promise<void> {
     try {
       const path = await window.workshop.pickSteamCmdExecutable()
@@ -257,6 +275,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     }
   }
 
+  /** Persists advanced settings to the user-data store. */
   async function saveAdvancedSettings(): Promise<void> {
     if (advancedSettings.isSaving) {
       return
@@ -304,6 +323,7 @@ export function useAdvancedSettings(options: UseAdvancedSettingsOptions) {
     }
   }
 
+  /** Removes the stored Web API key and clears the key from the settings form. */
   async function clearSavedWebApiKey(): Promise<void> {
     if (advancedSettings.isSaving) {
       return

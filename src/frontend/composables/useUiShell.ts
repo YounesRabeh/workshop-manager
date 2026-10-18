@@ -25,6 +25,7 @@ interface UiToast {
 
 type UiToastInput = Omit<UiToast, 'id'> & { durationMs?: number }
 
+/** Provides shared shell state and actions for navigation, logs, fullscreen, and notifications. */
 export function useUiShell(options: UseUiShellOptions) {
   const isFullscreen = ref(false)
   const isAboutOpen = ref(false)
@@ -35,6 +36,7 @@ export function useUiShell(options: UseUiShellOptions) {
   const showRunLogs = ref(false)
   let toastTimer: ReturnType<typeof setTimeout> | null = null
 
+  /** Maps a run status to the CSS classes used by its status badge. */
   function statusBadgeClass(status: PersistedRunLog['status']): string {
     if (status === 'success') {
       return 'border-emerald-200 bg-emerald-50 text-emerald-700'
@@ -48,6 +50,7 @@ export function useUiShell(options: UseUiShellOptions) {
     return 'border-amber-200 bg-amber-50 text-amber-700'
   }
 
+  /** Formats run timestamp for display or logging. */
   function formatRunTimestamp(runId: string): string {
     const timestamp = Number(runId.split('-')[0] ?? '')
     if (!Number.isFinite(timestamp) || timestamp <= 0) {
@@ -56,6 +59,7 @@ export function useUiShell(options: UseUiShellOptions) {
     return new Date(timestamp).toLocaleString()
   }
 
+  /** Selects run and synchronizes dependent state. */
   async function selectRun(runId: string): Promise<void> {
     selectedRunId.value = runId
     try {
@@ -72,6 +76,7 @@ export function useUiShell(options: UseUiShellOptions) {
     selectedRun.value = runLogs.value.find((run) => run.runId === runId) ?? null
   }
 
+  /** Fetches run history and restores the selected run when possible. */
   async function refreshRunLogs(): Promise<void> {
     try {
       const payload = await window.workshop.getRunLogs()
@@ -94,19 +99,23 @@ export function useUiShell(options: UseUiShellOptions) {
     }
   }
 
+  /** Shows the run-log panel and loads the latest run history. */
   async function openRunLogs(): Promise<void> {
     showRunLogs.value = true
     await refreshRunLogs()
   }
 
+  /** Hides the run-log panel without discarding its selection. */
   function closeRunLogs(): void {
     showRunLogs.value = false
   }
 
+  /** Synchronizes fullscreen state with current application state. */
   function syncFullscreenState(): void {
     isFullscreen.value = Boolean(document.fullscreenElement)
   }
 
+  /** Enters or exits browser fullscreen and reports failures through the shell. */
   async function toggleFullscreen(): Promise<void> {
     try {
       if (!document.fullscreenElement) {
@@ -120,24 +129,29 @@ export function useUiShell(options: UseUiShellOptions) {
     }
   }
 
+  /** Opens about modal and updates related UI state. */
   function openAboutModal(): void {
     isAboutOpen.value = true
   }
 
+  /** Closes about modal and updates related UI state. */
   function closeAboutModal(): void {
     isAboutOpen.value = false
   }
 
+  /** Allows back navigation only for authenticated users outside the mods view. */
   function canGoBackFlow(): boolean {
     return options.isAuthenticated() && options.flowStep.value !== 'mods'
   }
 
+  /** Returns authenticated users to the Workshop mods view. */
   function goBackFlow(): void {
     if (canGoBackFlow()) {
       options.goToStep('mods')
     }
   }
 
+  /** Scrolls viewport into the visible area. */
   function scrollViewport(direction: 1 | -1): void {
     const topOffset = direction * 140
     const scrollingElement = document.scrollingElement
@@ -149,7 +163,9 @@ export function useUiShell(options: UseUiShellOptions) {
   }
 
   const onGlobalKeyDown = createAppGlobalKeyDownHandler({
+    /** Exposes whether the About dialog is open to the global key handler. */
     isAboutOpen: () => isAboutOpen.value,
+    /** Exposes the fullscreen toggle to the global keyboard handler. */
     toggleFullscreen: () => {
       void toggleFullscreen()
     },
@@ -166,6 +182,7 @@ export function useUiShell(options: UseUiShellOptions) {
     goBack: goBackFlow
   })
 
+  /** Maps a toast tone to the CSS classes used by the notification. */
   function toastToneClass(tone: UiToast['tone']): string {
     if (tone === 'success') {
       return 'border-emerald-400/60 bg-emerald-900/85 text-emerald-100'
@@ -179,6 +196,7 @@ export function useUiShell(options: UseUiShellOptions) {
     return 'border-rose-400/60 bg-rose-900/85 text-rose-100'
   }
 
+  /** Shows toast in the current view. */
   function showToast(toast: UiToastInput): void {
     const durationMs = typeof toast.durationMs === 'number' && toast.durationMs > 0 ? toast.durationMs : 3800
     activeToast.value = {
@@ -197,6 +215,7 @@ export function useUiShell(options: UseUiShellOptions) {
     }, durationMs)
   }
 
+  /** Registers global listeners for the active view. */
   function mountGlobalListeners(): void {
     syncFullscreenState()
     document.addEventListener('fullscreenchange', syncFullscreenState)
@@ -205,6 +224,7 @@ export function useUiShell(options: UseUiShellOptions) {
     document.addEventListener('auxclick', onGlobalMouseDown)
   }
 
+  /** Removes global listeners when its view is disposed. */
   function unmountGlobalListeners(): void {
     document.removeEventListener('fullscreenchange', syncFullscreenState)
     document.removeEventListener('keydown', onGlobalKeyDown)

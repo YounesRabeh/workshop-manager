@@ -33,14 +33,17 @@ interface UsePublishOrchestrationResult {
   destroy: () => void
 }
 
+/** Guards publish navigation and synchronizes progress and auth lifecycle events. */
 export function usePublishOrchestration(options: UsePublishOrchestrationOptions): UsePublishOrchestrationResult {
   const flowStep = ref<FlowStep>('mods')
   const publishProgress = new PublishProgressTracker()
 
+  /** Sets the active create, update, or Workshop-list step. */
   function setFlowStep(step: FlowStep): void {
     flowStep.value = step
   }
 
+  /** Navigates to a publish step and performs any step-specific setup. */
   function goToStep(step: FlowStep): void {
     if (!options.isAuthenticated()) {
       options.setStatusMessage('Login required.')
@@ -63,15 +66,18 @@ export function usePublishOrchestration(options: UsePublishOrchestrationOptions)
     setFlowStep(step)
   }
 
+  /** Forwards a SteamCMD run event to the publish progress tracker. */
   function handlePublishRunEvent(event: RunEvent): void {
     publishProgress.handleRunEvent(event)
   }
 
+  /** Returns to the mods view and refreshes account data after sign-in. */
   async function handleSignedIn(): Promise<void> {
     setFlowStep('mods')
     await options.onSignedInRefresh()
   }
 
+  /** Resets publish progress and returns to the mods view after sign-out. */
   function handleSignedOut(): void {
     publishProgress.reset()
     options.onSignedOutReset()
@@ -89,6 +95,7 @@ export function usePublishOrchestration(options: UsePublishOrchestrationOptions)
     handleSignedIn,
     handleSignedOut,
     setFlowStep,
+    /** Releases timers and listeners owned by operation. */
     destroy: () => {
       publishProgress.destroy()
     }

@@ -22,7 +22,9 @@ interface UseAuthErrorUtilsOptions {
   onSteamCmdPathRequired?: () => void
 }
 
+/** Normalizes authentication failures and creates user-facing issue state. */
 export function useAuthErrorUtils(options: UseAuthErrorUtilsOptions) {
+  /** Normalizes and logs an authentication failure before returning its message and code. */
   function parseAndLogError(context: string, error: unknown): ApiFailure {
     const parsed = normalizeSharedError(error)
     logError(context, parsed)
@@ -32,6 +34,7 @@ export function useAuthErrorUtils(options: UseAuthErrorUtilsOptions) {
     }
   }
 
+  /** Converts an unknown error into the message and code used by auth flows. */
   function normalizeError(error: unknown): ApiFailure {
     const parsed = normalizeSharedError(error)
     return {
@@ -40,6 +43,7 @@ export function useAuthErrorUtils(options: UseAuthErrorUtilsOptions) {
     }
   }
 
+  /** Classifies an authentication failure and adds guidance suitable for the user. */
   function toAuthIssue(error: ApiFailure): AuthIssue {
     const message = error.message.toLowerCase()
 
@@ -113,10 +117,12 @@ export function useAuthErrorUtils(options: UseAuthErrorUtilsOptions) {
     }
   }
 
+  /** Identifies failures that should fall back from saved auth to password login. */
   function isSavedSessionFallbackError(error: ApiFailure): boolean {
     return error.code === 'auth' || error.code === 'timeout' || error.code === 'command_failed'
   }
 
+  /** Opens SteamCMD settings and updates status when configuration is missing. */
   function handleSteamCmdMissingStatus(message: string): boolean {
     if (!isSteamCmdMissingConfigurationMessage(message)) {
       return false

@@ -44,6 +44,7 @@ export class SteamCmdProcessSession {
   private readonly outputProcessor: SteamCmdOutputProcessor
   private readonly processManager: SteamCmdProcessManager
 
+  /** Wires process events to the run handler and output processor. */
   constructor(
     private readonly deps: SteamCmdProcessSessionDeps,
     platformProfile: SteamCmdPlatformProfile
@@ -61,14 +62,17 @@ export class SteamCmdProcessSession {
     this.outputProcessor = new SteamCmdOutputProcessor({
       state: this.state,
       logger: this.logger,
+      /** Dispatches the queued command when SteamCMD reaches its prompt. */
       onDispatchCommandIfReady: (activeRun) => {
         this.runHandler.dispatchCommandIfReady(activeRun, (value: string) => {
           this.processManager.writeInteractiveInput(value)
         })
       },
+      /** Settles the active run with an error when output processing fails. */
       onFailActiveRun: (activeRun, error) => {
         this.failActiveRun(activeRun, error)
       },
+      /** Schedules completion checks for the active interactive run. */
       onScheduleActiveRunSettle: (activeRun) => {
         this.scheduleActiveRunSettle(activeRun)
       }
@@ -79,15 +83,18 @@ export class SteamCmdProcessSession {
       steamCmdExecutablePath: this.deps.steamCmdExecutablePath,
       runtimeDir: this.deps.runtimeDir,
       platformBehavior: this.platformBehavior,
+      /** Forwards persistent-process output chunks to the line processor. */
       onPersistentChunk: (stream, chunk) => {
         this.outputProcessor.handlePersistentChunk(stream, chunk)
       },
+      /** Fails the active run if spawning the persistent process fails. */
       onPersistentError: (error) => {
         const activeRun = this.state.activeInteractiveRun
         if (activeRun) {
           this.failActiveRun(activeRun, new AppError('command_failed', `SteamCMD spawn failed: ${error.message}`))
         }
       },
+      /** Flushes trailing output and fails any run left active at process exit. */
       onPersistentClose: (exitCode) => {
         this.outputProcessor.flushPersistentTrailingLines()
         const activeRun = this.state.activeInteractiveRun
@@ -98,24 +105,29 @@ export class SteamCmdProcessSession {
           )
         }
       },
+      /** Clears runtime authentication state when the process session is invalidated. */
       onSessionInvalidated: () => {
         this.deps.onSessionInvalidated()
       }
     })
   }
 
+  /** Returns true when the persistent process is available. */
   hasPersistentProcess(): boolean {
     return this.processManager.hasPersistentProcess()
   }
 
+  /** Checks whether no interactive run is currently active. */
   isIdle(): boolean {
     return this.state.activeInteractiveRun === null
   }
 
+  /** Builds SteamCMD login arguments, selecting stored-auth or password login flags. */
   buildLoginArgs(username: string, password: string, useStoredAuth: boolean): string[] {
     return buildLoginArgs(username, password, useStoredAuth)
   }
 
+  /** Starts a fallback timer that settles an active run if SteamCMD stops producing output. */
   private scheduleActiveRunSettle(activeRun: ActiveInteractiveRun): void {
     if (activeRun.settleTimeout) {
       clearTimeout(activeRun.settleTimeout)
@@ -125,6 +137,7 @@ export class SteamCmdProcessSession {
     }, 140)
   }
 
+  /** Finishes active run and settles its pending work. */
   private finishActiveRun(activeRun: ActiveInteractiveRun): void {
     if (this.state.activeInteractiveRun !== activeRun) {
       return
@@ -170,6 +183,7 @@ export class SteamCmdProcessSession {
     activeRun.resolve({ lines: activeRun.lines, exitCode: pending.exitCode })
   }
 
+  /** Rejects pending Steam Guard with the supplied error. */
   private rejectPendingSteamGuard(runId: string, error: Error): void {
     const pending = this.state.pendingSteamGuard.get(runId)
     if (!pending) {
@@ -180,6 +194,7 @@ export class SteamCmdProcessSession {
     pending.reject(error)
   }
 
+  /** Fails active run and settles its pending result with the error. */
   private failActiveRun(activeRun: ActiveInteractiveRun, error: Error): void {
     if (this.state.activeInteractiveRun !== activeRun) {
       return
@@ -196,6 +211,7 @@ export class SteamCmdProcessSession {
     processHandle?.kill('SIGTERM')
   }
 
+  /** Runs an interactive SteamCMD command and returns its output lines and exit code. */
   async run(
     runId: string,
     args: string[],
@@ -238,6 +254,7 @@ export class SteamCmdProcessSession {
           timeout,
           disableSteamGuardPromptHandling: options.disableSteamGuardPromptHandling === true,
           failOnSteamGuardCodePrompt: options.failOnSteamGuardCodePrompt === true,
+          /** Sends the required login response to the SteamCMD process. */
           writeInput: (value: string) => {
             this.processManager.writeInteractiveInput(value)
           },
@@ -282,6 +299,7 @@ export class SteamCmdProcessSession {
     })
   }
 
+  /** Starts the long-lived SteamCMD process and waits until its prompt is ready. */
   async runPersistentStartup(
     runId: string,
     startupArgs: string[],
@@ -322,6 +340,7 @@ export class SteamCmdProcessSession {
           timeout,
           disableSteamGuardPromptHandling: options.disableSteamGuardPromptHandling === true,
           failOnSteamGuardCodePrompt: options.failOnSteamGuardCodePrompt === true,
+          /** Sends the queued command to the persistent SteamCMD process. */
           writeInput: (value: string) => {
             this.processManager.writeInteractiveInput(value)
           },
@@ -348,6 +367,7 @@ export class SteamCmdProcessSession {
     })
   }
 
+  /** Runs a single SteamCMD command in a separate process and collects its result. */
   async runOneShot(
     runId: string,
     args: string[],
@@ -385,6 +405,7 @@ export class SteamCmdProcessSession {
           timeout,
           disableSteamGuardPromptHandling: options.disableSteamGuardPromptHandling === true,
           failOnSteamGuardCodePrompt: options.failOnSteamGuardCodePrompt === true,
+          /** Sends the one-shot command input to the child process. */
           writeInput: (value: string) => {
             child.stdin.write(`${value}${this.platformBehavior.interactiveLineEnding}`)
           },
@@ -429,6 +450,7 @@ export class SteamCmdProcessSession {
     })
   }
 
+  /** Submits Steam Guard code to the active service. */
   submitSteamGuardCode(sessionId: string, code: string): void {
     const normalizedCode = code.trim()
     if (!normalizedCode) {
@@ -467,6 +489,7 @@ export class SteamCmdProcessSession {
     activeRun.writeInput(normalizedCode)
   }
 
+  /** Cancels run and clears its pending state. */
   cancelRun(runId: string): void {
     const processHandle = this.state.activeRuns.get(runId)
     if (!processHandle) {
@@ -488,12 +511,14 @@ export class SteamCmdProcessSession {
     this.logger.emit({ runId, ts: Date.now(), type: 'run_cancelled', phase: 'cancelled' })
   }
 
+  /** Sends the logout command to the persistent SteamCMD process when it is ready. */
   sendLogoutCommand(): void {
     if (this.processManager.hasPersistentProcess()) {
       this.processManager.writeInteractiveInput('logout')
     }
   }
 
+  /** Restores persistent session to its initial state. */
   resetPersistentSession(): void {
     const persistentProcess = this.processManager.getPersistentProcess()
     if (!persistentProcess) {

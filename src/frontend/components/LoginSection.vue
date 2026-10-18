@@ -67,6 +67,7 @@ const emit = defineEmits<{
   (e: 'quit-app'): void
 }>()
 
+/** Maps an authentication issue's severity to the CSS classes used by the login UI. */
 function authIssueClasses(tone: AuthIssueTone): string {
   if (tone === 'danger') {
     return 'login-note-danger'
@@ -274,6 +275,7 @@ const hasUserEditedCredentials = ref(false)
 const hasAppliedDefaultFocus = ref(false)
 const lastDefaultFocusTarget = ref<number | null>(null)
 
+/** Returns the login control. */
 function getLoginControl(index: number): HTMLElement | null {
   const orderedControlSelectors = [
     '[data-login-control="username"]',
@@ -289,10 +291,12 @@ function getLoginControl(index: number): HTMLElement | null {
   return loginFormRef.value?.querySelector(selector) ?? null
 }
 
+/** Moves keyboard focus to login control. */
 function focusLoginControl(index: number): void {
   getLoginControl(index)?.focus()
 }
 
+/** Handles arrow navigation between related login controls. */
 function onLoginControlArrowKey(event: KeyboardEvent, index: number): void {
   if (toggleCheckboxOrRadioOnEnter(event)) {
     return
@@ -300,6 +304,7 @@ function onLoginControlArrowKey(event: KeyboardEvent, index: number): void {
   moveFocusWithVerticalArrows(event, index, getLoginControl, 4)
 }
 
+/** Chooses the login control that should receive initial keyboard focus. */
 function resolveDefaultFocusTarget(): number {
   const hasUsername = props.loginForm.username.trim().length > 0
   const hasPassword = props.loginForm.password.trim().length > 0
@@ -316,6 +321,7 @@ function resolveDefaultFocusTarget(): number {
   return 4
 }
 
+/** Moves keyboard focus to the best login control for the current authentication state. */
 function applyDefaultFocus(): void {
   if (props.isLoginSubmitting) {
     return
@@ -326,25 +332,30 @@ function applyDefaultFocus(): void {
   lastDefaultFocusTarget.value = target
 }
 
+/** Records that the user edited credentials instead of using restored values. */
 function onCredentialInput(): void {
   hasUserEditedCredentials.value = true
 }
 
+/** Marks credentials as edited and emits the new username. */
 function onUsernameInput(value: string): void {
   onCredentialInput()
   emit('update-username', value)
 }
 
+/** Marks credentials as edited and emits the new password. */
 function onPasswordInput(value: string): void {
   onCredentialInput()
   emit('update-password', value)
 }
 
+/** Marks credentials as edited and emits the username-save preference. */
 function onRememberUsernameChange(value: boolean): void {
   onCredentialInput()
   emit('update-remember-username', value)
 }
 
+/** Marks credentials as edited and emits the saved-auth preference. */
 function onRememberAuthChange(value: boolean): void {
   onCredentialInput()
   emit('update-remember-auth', value)

@@ -25,10 +25,12 @@ const STEAM_GUARD_SET_COMMAND_HINT_PATTERN =
 const STEAM_GUARD_INVALID_CODE_PATTERN =
   /that steam guard code was invalid|invalid auth(?:entication)? code|incorrect auth(?:entication)? code|invalid email\s*code|incorrect email\s*code|expired email\s*code|invalid\s*otp|incorrect\s*otp|expired\s*otp|guard code.*(invalid|incorrect|expired)|two-factor.*(invalid|incorrect|expired)|otp.*(invalid|incorrect|expired)|email\s*code.*(invalid|incorrect|expired)|one[-\s]?time\s*(?:code|passcode).*(invalid|incorrect|expired)|accountlogondeniedneedtwofactor/i
 
+/** Detects SteamCMD's prompt asking whether to use Steam Guard during login. */
 export function isSteamGuardLoginUsagePrompt(line: string): boolean {
   return STEAM_GUARD_USAGE_PATTERN.test(line)
 }
 
+/** Detects a Steam Guard code prompt in SteamCMD output. */
 export function isSteamGuardPrompt(line: string): boolean {
   if (STEAM_GUARD_MOBILE_PATTERN.test(line)) {
     return false
@@ -44,31 +46,38 @@ export function isSteamGuardPrompt(line: string): boolean {
   )
 }
 
+/** Detects a follow-up Steam Guard prompt that still needs a response. */
 export function isSteamGuardPromptContinuation(line: string): boolean {
   return STEAM_GUARD_EMAIL_CONTINUATION_PATTERN.test(line)
 }
 
+/** Gives the user the next step when Steam Guard setup is requested. */
 export function isSteamGuardSetCommandHint(line: string): boolean {
   return STEAM_GUARD_SET_COMMAND_HINT_PATTERN.test(line)
 }
 
+/** Detects SteamCMD output indicating that a Steam Guard code was rejected. */
 export function isSteamGuardInvalidCodeLine(line: string): boolean {
   return STEAM_GUARD_INVALID_CODE_PATTERN.test(line)
 }
 
+/** Detects output requesting approval in the Steam mobile app. */
 export function isSteamGuardMobilePrompt(line: string): boolean {
   return STEAM_GUARD_MOBILE_PATTERN.test(line)
 }
 
+/** Removes terminal color and control sequences from a Steam output line. */
 export function stripAnsi(line: string): string {
   return line.replace(/\u001b\[[0-9;]*m/g, '')
 }
 
+/** Detects when a Steam mobile approval request has timed out. */
 export function isSteamGuardMobileTimeout(lines: string[]): boolean {
   const joined = lines.join('\n')
   return /waiting for confirmation timed out|timed out waiting for confirmation|error \(timeout\)/i.test(joined)
 }
 
+/** Classifies credential, Steam Guard, rate-limit, saved-session, and network login failures. */
 export function parseSteamLoginFailure(lines: string[]): LoginFailure | undefined {
   const joined = lines.join('\n')
 
@@ -121,6 +130,7 @@ export function parseSteamLoginFailure(lines: string[]): LoginFailure | undefine
   return undefined
 }
 
+/** Translates SteamCMD Workshop failure output into actionable user-facing guidance. */
 export function parseWorkshopRunFailure(
   lines: string[],
   mode: 'upload' | 'update' | 'visibility'
@@ -217,20 +227,24 @@ export function parseWorkshopRunFailure(
   return undefined
 }
 
+/** Identifies Steam latency warnings that do not indicate a failed operation. */
 export function isBenignSteamLatencyWarning(line: string): boolean {
   return /IPC function call IClient(?:UGC|Utils)::[A-Za-z0-9_]+ took too long:\s*\d+\s*msec/i.test(line)
 }
 
+/** Detects SteamCMD output confirming a Workshop operation succeeded. */
 export function isWorkshopSuccessLine(line: string): boolean {
   return /\bsuccess\./i.test(line)
 }
 
+/** Extracts the published-file ID reported by SteamCMD after an upload. */
 export function parsePublishedFileId(lines: string[]): string | undefined {
   const joined = lines.join('\n')
   const idMatch = joined.match(/\bpublish(?:ed)?\s*file\s*id\b\s*[:=]?\s*(\d+)/i)
   return idMatch?.[1]
 }
 
+/** Checks that a SteamID64 is a valid 17-digit account identifier. */
 export function isValidSteamId64(value: string | undefined | null): value is string {
   if (typeof value !== 'string') {
     return false
@@ -240,6 +254,7 @@ export function isValidSteamId64(value: string | undefined | null): value is str
   return /^7656119\d{10}$/.test(normalized) && normalized !== INVALID_STEAM_ID64
 }
 
+/** Converts a Steam account ID into its 64-bit SteamID. */
 export function steamId64FromAccountId(accountId: string | number | bigint): string | undefined {
   const raw =
     typeof accountId === 'bigint'
@@ -256,6 +271,7 @@ export function steamId64FromAccountId(accountId: string | number | bigint): str
   return (STEAM_ID64_BASE + raw).toString()
 }
 
+/** Extracts a SteamID64 from output or converts a Steam account ID when needed. */
 export function parseSteamId64(lines: string[]): string | undefined {
   const joined = lines.join('\n')
   const direct = joined.match(/\b(7656119\d{10})\b/)
@@ -271,6 +287,7 @@ export function parseSteamId64(lines: string[]): string | undefined {
   return steamId64FromAccountId(account[1])
 }
 
+/** Accepts a finite numeric value or digit-only string and returns canonical digits. */
 function normalizeNumericString(value: unknown): string | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return String(value)
@@ -284,6 +301,7 @@ function normalizeNumericString(value: unknown): string | undefined {
   return undefined
 }
 
+/** Normalizes string or object tag entries into a deduplicated list of names. */
 function extractWorkshopTags(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) {
     return undefined
@@ -322,6 +340,7 @@ function extractWorkshopTags(value: unknown): string[] | undefined {
   return tags.length > 0 ? tags : undefined
 }
 
+/** Converts Steam API/community records into the shared Workshop item shape. */
 export function normalizeWorkshopItems(payload: unknown): WorkshopItemSummary[] {
   if (!payload || typeof payload !== 'object') {
     return []
@@ -374,6 +393,7 @@ export function normalizeWorkshopItems(payload: unknown): WorkshopItemSummary[] 
   return items.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
 }
 
+/** Combines duplicate Workshop records while keeping the record with the most useful details. */
 export function mergeWorkshopItems(items: WorkshopItemSummary[]): WorkshopItemSummary[] {
   const merged = new Map<string, WorkshopItemSummary>()
 
@@ -405,6 +425,7 @@ export function mergeWorkshopItems(items: WorkshopItemSummary[]): WorkshopItemSu
   return [...merged.values()].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
 }
 
+/** Builds SteamCMD Workshop arguments from the validated draft values. */
 export function buildWorkshopArgs(
   username: string,
   password: string | undefined,
@@ -418,6 +439,7 @@ export function buildWorkshopArgs(
   return args
 }
 
+/** Builds SteamCMD login arguments, selecting stored-auth or password login flags. */
 export function buildLoginArgs(username: string, password: string, useStoredAuth: boolean): string[] {
   if (useStoredAuth) {
     return ['+login', username, '+quit']
@@ -425,6 +447,7 @@ export function buildLoginArgs(username: string, password: string, useStoredAuth
   return ['+login', username, password, '+quit']
 }
 
+/** Extracts unique published-file IDs from a Steam Community HTML page. */
 export function extractWorkshopFileIdsFromHtml(html: string): string[] {
   const ids: string[] = []
   const seen = new Set<string>()
@@ -442,6 +465,7 @@ export function extractWorkshopFileIdsFromHtml(html: string): string[] {
   return ids
 }
 
+/** Reads the maximum page number from Steam Community pagination markup. */
 export function extractMaxWorkshopPage(html: string): number {
   const pageRegex = /[?&]p=(\d+)/g
   let max = 1
@@ -455,6 +479,7 @@ export function extractMaxWorkshopPage(html: string): number {
   return max
 }
 
+/** Reads and decodes the text of a named XML tag. */
 export function extractXmlTagValue(xml: string, tag: string): string | undefined {
   const cdata = xml.match(new RegExp(`<${tag}><!\\[CDATA\\[(.*?)\\]\\]><\\/${tag}>`, 'i'))
   if (cdata?.[1]) {
@@ -469,12 +494,14 @@ export function extractXmlTagValue(xml: string, tag: string): string | undefined
   return undefined
 }
 
+/** Detects SteamCMD output confirming that login completed successfully. */
 export function isLoginSuccessLine(line: string): boolean {
   return /logging in user .* to steam public\.\.\.ok|waiting for client config(?:.*ok)?|waiting for user info(?:.*ok)?|waiting for compat in post-logon(?:.*ok)?|logged in ok|login complete|successfully logged/i.test(
     line
   )
 }
 
+/** Detects output showing that SteamCMD is still processing a login. */
 export function isLoginProgressLine(line: string): boolean {
   return (
     /logging in user|waiting for client config|waiting for user info|waiting for confirmation|steam guard|two-factor|auth(?:entication)?\s*code|\botp\b|one[-\s]?time\s*(?:code|passcode)|email\s*(?:otp|code)|login failure|failed to log on|cached credentials not found|no cached credentials|logged in ok|login complete|successfully logged/i.test(line) ||
@@ -482,6 +509,7 @@ export function isLoginProgressLine(line: string): boolean {
   )
 }
 
+/** Quotes and escapes one value so SteamCMD treats it as a single interactive argument. */
 export function escapeInteractiveArg(value: string): string {
   if (value.length === 0) {
     return '""'
@@ -492,6 +520,7 @@ export function escapeInteractiveArg(value: string): string {
   return value
 }
 
+/** Chooses the release-note text supplied by the current draft format. */
 export function normalizeReleaseNoteForDraft(draft: UploadDraft): string | undefined {
   const normalizedReleaseNote = (draft.changenote ?? '').replace(/\r\n/g, '\n').trim()
   return normalizedReleaseNote.length > 0 ? normalizedReleaseNote : undefined

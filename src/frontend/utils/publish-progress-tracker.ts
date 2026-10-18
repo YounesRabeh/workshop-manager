@@ -7,10 +7,12 @@ import type { RunEvent } from '@shared/contracts'
 
 export type PublishPhase = 'upload' | 'update' | 'visibility'
 
+/** Narrows an event phase to the three phases shown by the publish progress UI. */
 function isPublishPhase(phase: string | undefined): phase is PublishPhase {
   return phase === 'upload' || phase === 'update' || phase === 'visibility'
 }
 
+/** Bounds percent to the supported range. */
 function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)))
 }
@@ -26,6 +28,7 @@ export class PublishProgressTracker {
 
   private dismissTimer: ReturnType<typeof setTimeout> | null = null
 
+  /** Initializes progress state and timers for one publish operation. */
   constructor(private readonly dismissDelayMs = 2_400) {
     this.title = computed(() => {
       if (this.phase.value === 'update') {
@@ -38,6 +41,7 @@ export class PublishProgressTracker {
     })
   }
 
+  /** Restores operation to its initial state. */
   reset(): void {
     this.clearDismissTimer()
     this.runId.value = null
@@ -48,10 +52,12 @@ export class PublishProgressTracker {
     this.lastLine.value = ''
   }
 
+  /** Releases timers and listeners owned by operation. */
   destroy(): void {
     this.clearDismissTimer()
   }
 
+  /** Updates the displayed progress when the tracked SteamCMD run emits an event. */
   handleRunEvent(event: RunEvent): void {
     if (event.type === 'phase_changed' && isPublishPhase(event.phase)) {
       this.start(event.runId, event.phase)
@@ -99,6 +105,7 @@ export class PublishProgressTracker {
     }
   }
 
+  /** Cancels the pending timer that would hide the completed progress display. */
   private clearDismissTimer(): void {
     if (this.dismissTimer) {
       clearTimeout(this.dismissTimer)
@@ -106,6 +113,7 @@ export class PublishProgressTracker {
     }
   }
 
+  /** Returns the initial progress label for the active publish phase. */
   private baseLabel(phase: PublishPhase): string {
     if (phase === 'update') {
       return 'Preparing update request...'
@@ -116,6 +124,7 @@ export class PublishProgressTracker {
     return 'Preparing upload request...'
   }
 
+  /** Starts operation and initializes its associated state. */
   private start(runId: string, phase: PublishPhase): void {
     const isNewRun = this.runId.value !== runId
     this.clearDismissTimer()
@@ -129,11 +138,13 @@ export class PublishProgressTracker {
     this.label.value = this.baseLabel(phase)
   }
 
+  /** Applies progress to the current state. */
   private applyProgress(percent: number, label: string): void {
     this.percent.value = Math.max(this.percent.value, clampPercent(percent))
     this.label.value = label
   }
 
+  /** Parses progress from line. */
   private parseProgressFromLine(line: string): { percent: number; label: string } | null {
     const normalized = line.trim().toLowerCase()
     if (!normalized) {
@@ -201,6 +212,7 @@ export class PublishProgressTracker {
     return null
   }
 
+  /** Returns the progress text for the active upload or visibility phase. */
   private progressLabel(): string {
     if (this.phase.value === 'visibility') {
       return 'Updating item visibility with Steam...'
@@ -208,6 +220,7 @@ export class PublishProgressTracker {
     return 'Uploading files to Steam...'
   }
 
+  /** Hides the completed progress display after its configured delay. */
   private scheduleDismiss(): void {
     this.clearDismissTimer()
     this.dismissTimer = setTimeout(() => {

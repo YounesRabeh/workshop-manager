@@ -10,6 +10,7 @@ export interface FlattenedContentNode {
   depth: number
 }
 
+/** Flattens visible tree nodes into rows while preserving each node's depth. */
 export function flattenContentTree(
   nodes: ContentTreeNode[],
   collapsedFolderIds: ReadonlySet<string>,
@@ -30,6 +31,7 @@ export function flattenContentTree(
   return rows
 }
 
+/** Provides collapse/expand state for folders in the staged-content tree. */
 export function useContentExplorer(stagedContentTree: ComputedRef<ContentTreeNode[]>): {
   flattenedContentNodes: ComputedRef<FlattenedContentNode[]>
   isContentExplorerCollapsed: ComputedRef<boolean>
@@ -49,6 +51,7 @@ export function useContentExplorer(stagedContentTree: ComputedRef<ContentTreeNod
 
   const allFolderIds = computed(() => {
     const ids = new Set<string>()
+    /** Collects folder IDs at every level of the staged-content tree. */
     const walk = (nodes: ContentTreeNode[]): void => {
       for (const node of nodes) {
         if (node.type === 'folder') {
@@ -79,10 +82,12 @@ export function useContentExplorer(stagedContentTree: ComputedRef<ContentTreeNod
     { immediate: true }
   )
 
+  /** Checks whether a folder is currently collapsed in the explorer. */
   function isFolderCollapsed(folderId: string): boolean {
     return collapsedFolderIds.value.has(folderId)
   }
 
+  /** Toggles one folder's expanded or collapsed state. */
   function toggleFolder(folderId: string): void {
     const next = new Set(collapsedFolderIds.value)
     if (next.has(folderId)) {
@@ -93,14 +98,17 @@ export function useContentExplorer(stagedContentTree: ComputedRef<ContentTreeNod
     collapsedFolderIds.value = next
   }
 
+  /** Expands or collapses the entire content explorer panel. */
   function toggleContentExplorerCollapsed(): void {
     isContentExplorerCollapsedRef.value = !isContentExplorerCollapsedRef.value
   }
 
+  /** Collapses every folder in the staged-content tree. */
   function collapseAllFolders(): void {
     collapsedFolderIds.value = new Set(allFolderIds.value)
   }
 
+  /** Expands all folders in the content explorer. */
   function expandAllFolders(): void {
     collapsedFolderIds.value = new Set()
   }
@@ -110,6 +118,7 @@ export function useContentExplorer(stagedContentTree: ComputedRef<ContentTreeNod
     hasAnyFolders.value ? isAnyFolderCollapsed.value : fileOnlyTreeToggleState.value
   )
 
+  /** Collapses all folders if any are open; otherwise expands them all. */
   function toggleAllFolders(): void {
     if (!hasAnyFolders.value) {
       fileOnlyTreeToggleState.value = !fileOnlyTreeToggleState.value

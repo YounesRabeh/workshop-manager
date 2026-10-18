@@ -20,6 +20,7 @@ interface UseWorkshopItemsOptions {
 
 const WORKSHOP_ITEMS_PAGE_SIZE = 12
 
+/** Provides Workshop list, filter, paging, selection, and refresh state to the renderer. */
 export function useWorkshopItems(options: UseWorkshopItemsOptions) {
   const workshopFilterAppId = ref('')
   const workshopVisibilityFilter = ref<WorkshopVisibilityFilter>('all')
@@ -66,11 +67,13 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     }
   })
 
+  /** Updates the App ID filter and returns paging to the first page. */
   function onChangeAppId(value: string): void {
     workshopFilterAppId.value = value
     workshopItemsPage.value = 1
   }
 
+  /** Applies the visibility filter and reloads the active Workshop page. */
   function onChangeWorkshopVisibilityFilter(value: WorkshopVisibilityFilter): void {
     workshopVisibilityFilter.value = value
     workshopItemsPage.value = 1
@@ -81,6 +84,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     if (options.canAccessMods()) void fetchWorkshopItems(false)
   }
 
+  /** Clamps the requested page to available results and loads that page. */
   function goToWorkshopItemsPage(page: number): void {
     if (!Number.isFinite(page)) {
       return
@@ -95,6 +99,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     void fetchWorkshopItems(false)
   }
 
+  /** Filters and slices the locally cached legacy item list for the active page. */
   function applyLegacyPage(): void {
     if (!legacyWorkshopItems) return
     const visibility = workshopVisibilityFilter.value
@@ -110,11 +115,13 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     hasNextWorkshopItemsPage.value = start + WORKSHOP_ITEMS_PAGE_SIZE < filtered.length
   }
 
+  /** Updates the current Workshop selection and hydrates its update draft when needed. */
   function selectWorkshopItem(item: WorkshopItemSummary): void {
     selectedWorkshopItemId.value = item.publishedFileId
     options.onSelectWorkshopItem(item)
   }
 
+  /** Synchronizes selection with its latest source state. */
   function reconcileSelection(items: WorkshopItemSummary[]): void {
     const selectedId = selectedWorkshopItemId.value.trim()
     if (!selectedId) {
@@ -127,6 +134,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     }
   }
 
+  /** Loads the requested account page and updates paging, selection, and error state. */
   async function fetchWorkshopItems(refreshSelection: boolean): Promise<void> {
     if (!options.canAccessMods()) {
       options.setStatusMessage('Login first to load workshop items.')
@@ -193,10 +201,12 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     }
   }
 
+  /** Loads Workshop items from its configured source. */
   async function loadWorkshopItems(): Promise<void> {
     await fetchWorkshopItems(false)
   }
 
+  /** Restores app ID filter to its initial state. */
   async function resetAppIdFilter(): Promise<void> {
     if (workshopFilterAppId.value.trim().length === 0) {
       return
@@ -211,6 +221,7 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     options.setStatusMessage('App ID filter cleared.')
   }
 
+  /** Opens selected Workshop item and updates related UI state. */
   async function openSelectedWorkshopItem(): Promise<void> {
     const publishedFileId = selectedWorkshopItemId.value.trim()
     if (!publishedFileId) {
@@ -232,10 +243,12 @@ export function useWorkshopItems(options: UseWorkshopItemsOptions) {
     }
   }
 
+  /** Refreshes the current page and reconciles the selected Workshop item. */
   async function refreshSelectedWorkshopItem(): Promise<void> {
     await fetchWorkshopItems(true)
   }
 
+  /** Clears the current Workshop list, selection, filters, and paging state. */
   function resetWorkshopState(): void {
     requestVersion += 1
     isLoadingWorkshopItems.value = false

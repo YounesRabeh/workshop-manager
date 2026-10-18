@@ -5,6 +5,7 @@
 import { ipcMain } from 'electron'
 import { AppError } from '@backend/utils/errors'
 
+/** Converts thrown values into a message and error code safe to send over IPC. */
 function toPlainError(error: unknown): { message: string; code: string } {
   if (error instanceof AppError) {
     return { message: error.message, code: error.code }
@@ -15,6 +16,7 @@ function toPlainError(error: unknown): { message: string; code: string } {
   return { message: 'Unknown error', code: 'command_failed' }
 }
 
+/** Wraps an application error in the serializable error shape expected by the renderer. */
 export function toIpcError(error: unknown): Error {
   const plain = toPlainError(error)
   const wrapped = new Error(`[${plain.code}] ${plain.message}`)
@@ -22,6 +24,7 @@ export function toIpcError(error: unknown): Error {
   return wrapped
 }
 
+/** Registers an IPC handler and translates thrown failures into renderer-safe errors. */
 export function handleIpc<Args extends unknown[], Result>(
   channel: string,
   handler: (...args: Args) => Promise<Result> | Result

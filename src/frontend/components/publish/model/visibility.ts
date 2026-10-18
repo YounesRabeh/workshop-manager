@@ -6,6 +6,7 @@ export const visibilityOptions = [0, 1, 2, 3] as const
 
 export type PublishVisibility = (typeof visibilityOptions)[number]
 
+/** Returns the user-facing name for a Steam visibility level. */
 export function visibilityLabel(value: PublishVisibility): string {
   if (value === 0) return 'Public'
   if (value === 1) return 'Friends-only'
@@ -13,6 +14,7 @@ export function visibilityLabel(value: PublishVisibility): string {
   return 'Unlisted'
 }
 
+/** Explains who can see an item at the selected visibility level. */
 export function visibilityHint(value: PublishVisibility): string {
   if (value === 0) {
     return 'This item is visible to everyone and can appear in searches and on your profile.'
@@ -26,6 +28,7 @@ export function visibilityHint(value: PublishVisibility): string {
   return 'This item is visible to everyone, but will not show up in searches or on your profile.'
 }
 
+/** Returns the tooltip text for a Steam visibility option. */
 export function visibilityTooltip(value: PublishVisibility): string {
   return `${visibilityLabel(value)}: ${visibilityHint(value)}`
 }

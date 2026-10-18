@@ -20,6 +20,7 @@ const KNOWN_ERROR_CODES = new Set<ErrorCode>([
   'timeout'
 ])
 
+/** Maps known API error codes to the stable set exposed to callers. */
 function normalizeCode(code: unknown): string {
   if (typeof code !== 'string') {
     return 'command_failed'
@@ -28,6 +29,7 @@ function normalizeCode(code: unknown): string {
   return normalized.length > 0 ? normalized : 'command_failed'
 }
 
+/** Extracts an error code prefix and readable message from a serialized IPC error. */
 function extractFromMessage(input: string): { code?: string; message: string } {
   const withoutIpcPrefix = input.replace(/^Error invoking remote method '[^']+':\s*/i, '').trim()
   const normalized = withoutIpcPrefix.replace(/^Error:\s*/i, '').trim()
@@ -46,6 +48,7 @@ function extractFromMessage(input: string): { code?: string; message: string } {
   }
 }
 
+/** Converts strings, objects, and thrown values into a consistent API error. */
 export function normalizeError(error: unknown): NormalizedError {
   const fallback: NormalizedError = {
     code: 'command_failed',
@@ -100,6 +103,7 @@ export function normalizeError(error: unknown): NormalizedError {
   return fallback
 }
 
+/** Recognizes messages asking the user to configure SteamCMD. */
 export function isSteamCmdMissingConfigurationMessage(message: string): boolean {
   return (
     /steamcmd/i.test(message) &&
@@ -107,10 +111,12 @@ export function isSteamCmdMissingConfigurationMessage(message: string): boolean 
   )
 }
 
+/** Reads the process environment when running in Node, if it is available. */
 function readProcessEnv(): Record<string, string | undefined> {
   return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
 }
 
+/** Checks whether the current process is running under a test runner. */
 function isTestEnvironment(env: Record<string, string | undefined>): boolean {
   return (
     env.NODE_ENV === 'test' ||
@@ -120,6 +126,7 @@ function isTestEnvironment(env: Record<string, string | undefined>): boolean {
   )
 }
 
+/** Determines whether log errors applies in the current environment. */
 function shouldLogErrors(): boolean {
   const env = readProcessEnv()
   if (env.NODE_ENV === 'production') {
@@ -131,6 +138,7 @@ function shouldLogErrors(): boolean {
   return true
 }
 
+/** Logs an error with its normalized code and message without throwing. */
 export function logError(context: string, error: NormalizedError): void {
   if (!shouldLogErrors()) {
     return

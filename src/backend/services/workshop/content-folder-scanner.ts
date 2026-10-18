@@ -17,14 +17,17 @@ export interface ContentScanLimits {
   maxFiles?: number
 }
 
+/** Converts platform-specific separators to the slash format used for relative paths. */
 function normalizeRelativePath(path: string): string {
   return path.replace(/\\/g, '/')
 }
 
+/** Compares by name asc values to produce a stable ordering. */
 function compareByNameAsc(a: { name: string }, b: { name: string }): number {
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
 }
 
+/** Returns regular files in stable relative-path order, skipping symlinks and enforcing scan limits. */
 export async function listContentFolderFiles(
   folderPath: string,
   limits: ContentScanLimits = {}
@@ -55,6 +58,7 @@ export async function listContentFolderFiles(
 
   const files: ContentFolderFileEntry[] = []
 
+  /** Recursively scans directories, skipping non-files and enforcing depth and file limits. */
   const walk = async (currentPath: string, depth: number): Promise<void> => {
     if (depth > maxDepth) {
       throw new AppError('validation', `Content folder hierarchy exceeds ${maxDepth} levels.`)

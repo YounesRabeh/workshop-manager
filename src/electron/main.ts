@@ -53,6 +53,7 @@ if (process.platform === 'linux') {
 
 const stableUserDataPath = configureStableUserDataPath()
 
+/** Opens a native file or folder picker with the requested filters. */
 async function showOpenDialog(
   dialogOptions: Electron.OpenDialogOptions
 ): Promise<Electron.OpenDialogReturnValue> {
@@ -62,6 +63,7 @@ async function showOpenDialog(
   return await dialog.showOpenDialog(dialogOptions)
 }
 
+/** Creates and initializes window. */
 async function createWindow(): Promise<void> {
   mainWindow = await createMainWindow()
 }
@@ -126,6 +128,7 @@ app.whenReady().then(async () => {
     })()
   })
 
+  /** Decrypts the saved Web API key only when secure storage is available. */
   const resolveSavedWebApiKey = async (): Promise<{
     key?: string
     hasUsableKey: boolean
@@ -166,6 +169,7 @@ app.whenReady().then(async () => {
     }
   }
 
+  /** Combines the Web API enablement setting and saved key into an access state. */
   const resolveWorkshopWebApiAccess = async (): Promise<{
     key?: string
     allowWebApi: boolean
@@ -189,6 +193,7 @@ app.whenReady().then(async () => {
     }
   }
 
+  /** Returns settings with the encrypted API key replaced by its safe UI representation. */
   const getAdvancedSettings = async (): Promise<AdvancedSettings> => {
     const storedWebApiEnabled = await profileStore.getWebApiEnabled()
     const resolvedKey = await resolveSavedWebApiKey()

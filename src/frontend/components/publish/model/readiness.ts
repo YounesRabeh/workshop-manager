@@ -9,6 +9,7 @@ export interface ReadinessGroups {
   secondary: PublishChecklistItem[]
 }
 
+/** Groups create checklist items into blocking requirements and optional guidance. */
 export function splitCreateReadinessItems(items: PublishChecklistItem[]): ReadinessGroups {
   const primaryLabels = ['App ID', 'Title', 'Content folder'] as const
   const primary = primaryLabels
@@ -18,6 +19,7 @@ export function splitCreateReadinessItems(items: PublishChecklistItem[]): Readin
   return { primary, secondary }
 }
 
+/** Groups update checklist items into blocking requirements and optional guidance. */
 export function splitUpdateReadinessItems(items: PublishChecklistItem[]): ReadinessGroups {
   const primaryLabels = ['App ID', 'Title'] as const
   const primary = primaryLabels

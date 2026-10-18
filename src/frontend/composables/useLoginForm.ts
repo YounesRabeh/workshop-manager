@@ -13,6 +13,7 @@ interface UseLoginFormOptions {
   normalizePreferredAuthMode: (mode: SharedPreferredAuthMode | undefined) => PreferredAuthMode
 }
 
+/** Provides reactive login fields, remember preferences, and input actions. */
 export function useLoginForm(options: UseLoginFormOptions) {
   const loginForm = reactive<LoginFormState>({
     username: '',
@@ -23,18 +24,22 @@ export function useLoginForm(options: UseLoginFormOptions) {
 
   const isPasswordPeek = ref(false)
 
+  /** Stores the username entered for the next login attempt. */
   function setLoginUsername(value: string): void {
     loginForm.username = value
   }
 
+  /** Stores the password entered for the next login attempt. */
   function setLoginPassword(value: string): void {
     loginForm.password = value
   }
 
+  /** Sets whether the username should be restored on the next launch. */
   function setRememberUsername(value: boolean): void {
     loginForm.rememberUsername = value || loginForm.rememberAuth
   }
 
+  /** Sets whether reusable Steam authentication should be stored. */
   function setRememberAuth(value: boolean): void {
     loginForm.rememberAuth = value
     if (value) {
@@ -42,10 +47,12 @@ export function useLoginForm(options: UseLoginFormOptions) {
     }
   }
 
+  /** Shows or masks the password field in the login form. */
   function setPasswordPeek(value: boolean): void {
     isPasswordPeek.value = value
   }
 
+  /** Loads the saved username and authentication preference into the form. */
   async function refreshRememberedLoginState(): Promise<void> {
     const payload = await window.workshop.getProfiles()
     const rememberedUsername = payload.rememberedUsername?.trim() ?? ''

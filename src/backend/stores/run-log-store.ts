@@ -10,6 +10,7 @@ const SESSION_LOG_FILE = 'steamcmd-output.log'
 const FLUSH_INTERVAL_MS = 120
 const FLUSH_BATCH_SIZE = 24
 
+/** Creates an independent copy of log. */
 function cloneLog(log: PersistedRunLog): PersistedRunLog {
   return {
     ...log,
@@ -25,18 +26,22 @@ export class RunLogStore {
   private backgroundFlush: Promise<void> | null = null
   private backgroundFlushError: unknown = null
 
+  /** Sets the directory where the current SteamCMD session log is persisted. */
   constructor(private readonly logsDir: string) {}
 
+  /** Resolves the path of the session's SteamCMD output log. */
   private getSessionLogPath(): string {
     return join(this.logsDir, SESSION_LOG_FILE)
   }
 
+  /** Queues database writes so concurrent read-modify-write operations cannot overwrite one another. */
   private async withWriteLock(operation: () => Promise<void>): Promise<void> {
     const next = this.writeChain.then(operation)
     this.writeChain = next.catch(() => undefined)
     await next
   }
 
+  /** Starts a new run record and clears the previous session log. */
   async create(runId: string): Promise<PersistedRunLog> {
     await this.waitForBackgroundFlush()
     const log: PersistedRunLog = {
@@ -64,6 +69,7 @@ export class RunLogStore {
     return cloneLog(log)
   }
 
+  /** Adds output to the in-memory run record and queues it for disk persistence. */
   async appendLine(runId: string, line: string): Promise<void> {
     const current = this.runs.get(runId) ?? {
       runId,
@@ -87,6 +93,7 @@ export class RunLogStore {
     this.scheduleFlush()
   }
 
+  /** Adds a diagnostic line to the current run log without changing its final result. */
   async appendDiagnosticLine(line: string): Promise<void> {
     if (this.flushTimer) {
       clearTimeout(this.flushTimer)
@@ -106,6 +113,7 @@ export class RunLogStore {
     })
   }
 
+  /** Records the final outcome of operation and releases its active state. */
   async finalize(runId: string, update: Partial<PersistedRunLog>): Promise<PersistedRunLog> {
     if (this.flushTimer) {
       clearTimeout(this.flushTimer)
@@ -138,17 +146,20 @@ export class RunLogStore {
     return cloneLog(merged)
   }
 
+  /** Returns the operation. */
   async get(runId: string): Promise<PersistedRunLog | null> {
     const found = this.runs.get(runId)
     return found ? cloneLog(found) : null
   }
 
+  /** Returns cloned run records ordered from newest run ID to oldest. */
   async list(): Promise<PersistedRunLog[]> {
     return [...this.runs.values()]
       .sort((a, b) => b.runId.localeCompare(a.runId))
       .map((entry) => cloneLog(entry))
   }
 
+  /** Starts a delayed disk flush so individual log lines can be batched. */
   private scheduleFlush(): void {
     if (this.flushTimer) {
       return
@@ -159,6 +170,7 @@ export class RunLogStore {
     }, FLUSH_INTERVAL_MS)
   }
 
+  /** Starts background flush and initializes its associated state. */
   private startBackgroundFlush(): void {
     if (this.backgroundFlush) {
       return
@@ -184,6 +196,7 @@ export class RunLogStore {
       })
   }
 
+  /** Waits for for background flush to finish before proceeding. */
   private async waitForBackgroundFlush(): Promise<void> {
     await this.backgroundFlush
     if (this.backgroundFlushError) {
@@ -193,6 +206,7 @@ export class RunLogStore {
     }
   }
 
+  /** Writes buffered pending lines to its destination. */
   private async flushPendingLines(): Promise<void> {
     if (this.pendingLines.length === 0) {
       return

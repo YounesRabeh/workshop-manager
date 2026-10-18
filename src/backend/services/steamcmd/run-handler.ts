@@ -27,8 +27,10 @@ interface SteamCmdRunHandlerDeps {
 }
 
 class SteamCmdRunHandler {
+  /** Stores the runtime services used to coordinate SteamCMD runs. */
   constructor(private readonly deps: SteamCmdRunHandlerDeps) {}
 
+  /** Queues a command until the persistent SteamCMD process is ready. */
   enqueueCommand<T>(task: () => Promise<T>): Promise<T> {
     const next = this.deps.state.commandQueue.then(task, task)
     this.deps.state.commandQueue = next.then(
@@ -38,6 +40,7 @@ class SteamCmdRunHandler {
     return next
   }
 
+  /** Prepares run context for the next operation. */
   async prepareRunContext(
     runId: string,
     options: SessionRunOptions,
@@ -76,6 +79,7 @@ class SteamCmdRunHandler {
     }
   }
 
+  /** Creates and initializes run timeout. */
   createRunTimeout(
     runId: string,
     timeoutMs: number,
@@ -95,6 +99,7 @@ class SteamCmdRunHandler {
     }, timeoutMs)
   }
 
+  /** Creates and initializes active run. */
   createActiveRun(config: ActiveRunConfig): ActiveInteractiveRun {
     return {
       runId: config.runId,
@@ -125,6 +130,7 @@ class SteamCmdRunHandler {
     }
   }
 
+  /** Dispatches command if ready when its target is ready. */
   dispatchCommandIfReady(
     activeRun: ActiveInteractiveRun,
     writeInteractiveInput: (value: string) => void
@@ -142,6 +148,7 @@ class SteamCmdRunHandler {
     this.scheduleLoginProgressRetry(activeRun, writeInteractiveInput)
   }
 
+  /** Builds the SteamCMD command for an interactive login or Workshop action. */
   buildInteractiveCommand(args: string[], phase: RunPhase): string {
     if (phase === 'login') {
       const loginIndex = args.indexOf('+login')
@@ -165,6 +172,7 @@ class SteamCmdRunHandler {
     return `workshop_build_item ${escapeInteractiveArg(args[workshopIndex + 1])}`
   }
 
+  /** Retries the interactive login command once if Steam has not reported progress. */
   private scheduleLoginProgressRetry(
     activeRun: ActiveInteractiveRun,
     writeInteractiveInput: (value: string) => void

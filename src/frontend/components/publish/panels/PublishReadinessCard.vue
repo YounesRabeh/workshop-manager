@@ -21,18 +21,22 @@ const props = defineProps<{
 
 const isCollapsed = ref(false)
 
+/** Expands or collapses the readiness checklist. */
 function toggleCollapsed(): void {
   isCollapsed.value = !isCollapsed.value
 }
 
+/** Returns checklist-item classes based on completion and publish-flow context. */
 function readinessItemClass(item: PublishChecklistItem): string {
   return resolveReadinessItemClass(item, props.context)
 }
 
+/** Returns status classes for a checklist item in its current context. */
 function readinessStatusClass(item: PublishChecklistItem): string {
   return resolveReadinessStatusClass(item, props.context)
 }
 
+/** Returns the status text shown beside a checklist item. */
 function readinessStatusLabel(item: PublishChecklistItem): string {
   return resolveReadinessStatusLabel(item, props.context)
 }

@@ -18,6 +18,7 @@ interface AppGlobalKeyboardDeps {
   isAuthenticated: () => boolean
 }
 
+/** Excludes inputs and editable elements from app-level keyboard shortcuts. */
 function isTextEditingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false
@@ -35,6 +36,7 @@ function isTextEditingTarget(target: EventTarget | null): boolean {
   return false
 }
 
+/** Returns visible, enabled controls in the order used for keyboard navigation. */
 function getFocusableElements(): HTMLElement[] {
   const selector = 'button,input,textarea,select,a[href],[tabindex]:not([tabindex="-1"])'
   return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter((element) => {
@@ -48,6 +50,7 @@ function getFocusableElements(): HTMLElement[] {
   })
 }
 
+/** Moves focus to the next or previous control, wrapping at either end of the list. */
 function moveFocusByDirection(direction: 1 | -1): void {
   const focusable = getFocusableElements()
   if (focusable.length === 0) {
@@ -66,6 +69,7 @@ function moveFocusByDirection(direction: 1 | -1): void {
   focusable[nextIndex]?.focus()
 }
 
+/** Creates the global key handler for navigation, dialogs, and keyboard shortcuts. */
 export function createAppGlobalKeyDownHandler(deps: AppGlobalKeyboardDeps): (event: KeyboardEvent) => void {
   return (event: KeyboardEvent): void => {
     if (event.defaultPrevented) {
@@ -158,6 +162,7 @@ interface AppGlobalMouseDeps {
   goBack: () => void
 }
 
+/** Creates the global mouse handler that dismisses transient menus when clicked outside. */
 export function createAppGlobalMouseDownHandler(deps: AppGlobalMouseDeps): (event: MouseEvent) => void {
   return (event: MouseEvent): void => {
     // Side mouse back button (XButton1 / button 3)
@@ -172,6 +177,7 @@ export function createAppGlobalMouseDownHandler(deps: AppGlobalMouseDeps): (even
   }
 }
 
+/** Moves keyboard focus through a vertical group while preserving its selection behavior. */
 export function moveFocusWithVerticalArrows(
   event: KeyboardEvent,
   index: number,
@@ -190,6 +196,7 @@ export function moveFocusWithVerticalArrows(
   }
 }
 
+/** Activates a checkbox or radio input when Enter is pressed. */
 export function toggleCheckboxOrRadioOnEnter(event: KeyboardEvent): boolean {
   if (event.key !== 'Enter') {
     return false

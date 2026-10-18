@@ -4,6 +4,7 @@
  */
 const SIZE_UNITS = ['B', 'KB', 'MB', 'GB'] as const
 
+/** Formats a byte count as a compact, human-readable size label. */
 export function formatSizeLabel(sizeBytes: number): string {
   const sanitized = Number.isFinite(sizeBytes) && sizeBytes > 0 ? sizeBytes : 0
   if (sanitized < 1024) {
